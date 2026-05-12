@@ -1,0 +1,3012 @@
+// Copyright 2017-2023, Charles Weinberger & Paul DeMarco.
+// All rights reserved. Use of this source code is governed by a
+// BSD-style license that can be found in the LICENSE file.
+
+#import "./include/flutter_blue_max_darwin/FlutterBlueMaxPlugin.h"
+#include <Foundation/NSObjCRuntime.h>
+
+#define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBP-iOS] " FORMAT, ##__VA_ARGS__]
+
+NSString * const CCCD = @"2902";
+const NSMutableDictionary<NSNumber *, CBCharacteristic *> *instanceIdToCharMap = nil;
+NSMutableDictionary<NSValue *, NSNumber *> *charToInstanceIdMap = nil;
+
+__attribute__((constructor))
+static void initializeInstanceIdToCharMap(void) {
+    instanceIdToCharMap = [[NSMutableDictionary alloc] init];
+    charToInstanceIdMap = [[NSMutableDictionary alloc] init];
+}
+
+
+
+@interface UniqueCharacteristicInstanceId : NSObject
++ (int)next;
++ (void)reset;
+@end
+
+@implementation UniqueCharacteristicInstanceId
+static int counter = 0;
+
++ (int)next {
+    counter++;
+    return counter;
+}
+
++ (void)reset {
+    counter = 0;
+}
+@end
+
+
+@interface CBUUID (CBUUIDAdditionsFlutterBlueMax)
+- (NSString *)uuidStr;
+@end
+
+@implementation CBUUID (CBUUIDAdditionsFlutterBlueMax)
+- (NSString *)uuidStr
+{
+    return [self.UUIDString lowercaseString];
+}
+@end
+
+typedef NS_ENUM(NSUInteger, LogLevel) {
+    LNONE = 0,
+    LERROR = 1,
+    LWARNING = 2,
+    LINFO = 3,
+    LDEBUG = 4,
+    LVERBOSE = 5,
+};
+
+@class L2CapChannelManager;
+@class L2CapChannelInfo;
+
+@interface L2CapChannelInfo : NSObject
+@property(nonatomic) NSNumber *psm;
+@property(nonatomic) NSString *remoteId;
+@property(nonatomic) CBL2CAPChannel *channel;
+@property(nonatomic) NSMutableData *readBuffer;
+@property(nonatomic, getter=isListening) BOOL listening;
+- (instancetype)initWithPsm:(NSNumber *)psm remoteId:(NSString *)remoteId channel:(CBL2CAPChannel *)channel;
+@end
+
+@interface L2CapChannelManager : NSObject <CBPeripheralManagerDelegate, NSStreamDelegate>
+@property(nonatomic, retain) FlutterMethodChannel *methodChannel;
+@property(nonatomic, weak) FlutterBlueMaxPlugin *plugin;
+@property(nonatomic) NSMutableArray<L2CapChannelInfo *> *channels;
+// Channels that have been logically closed but must be kept alive to prevent
+// CBL2CAPChannel dealloc from cascading and disconnecting all other channels
+// on the same peripheral connection (iOS/macOS CoreBluetooth bug).
+@property(nonatomic) NSMutableArray<L2CapChannelInfo *> *zombieChannels;
+@property(nonatomic) NSMutableDictionary<NSNumber *, CBPeripheralManager *> *peripheralManagers;
+@property(nonatomic) NSMutableDictionary<NSNumber *, CBMutableService *> *publishedServices;
+@property(nonatomic) NSMutableDictionary<NSString *, FlutterResult> *pendingOpenResults;
+@property(nonatomic) NSMutableDictionary<NSString *, NSNumber *> *pendingOpenRequestedPsm; // key: remoteId -> psm
+// Blocks to execute when the output stream becomes ready (HasSpaceAvailable).
+// Keyed by "<remoteId>:<psm>". Used to defer the open result until the stream
+// is actually writable, preventing "Output stream not ready" errors.
+@property(nonatomic) NSMutableDictionary<NSString *, void(^)(void)> *pendingStreamReady;
+@property(nonatomic, copy) FlutterResult pendingListenResult;
+@property(nonatomic) BOOL pendingListenSecure;
+- (instancetype)initWithMethodChannel:(FlutterMethodChannel *)methodChannel plugin:(FlutterBlueMaxPlugin *)plugin;
+- (void)handleOpenL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)handleCloseL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)handleReadL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)handleWriteL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)handleListenL2capChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)handleStopListenL2capChannel:(FlutterMethodCall *)call result:(FlutterResult)result;
+- (void)setupPeripheralDelegates:(FlutterBlueMaxPlugin *)plugin;
+- (void)setupStreamsForChannel:(L2CapChannelInfo *)channelInfo;
+- (void)reattachStreamsForChannel:(L2CapChannelInfo *)channelInfo;
+- (void)cleanupChannelsForPeripheral:(NSString *)remoteId;
+- (void)completePendingOpenForRemoteId:(NSString *)remoteId psm:(CBL2CAPPSM)psm error:(NSError *)error;
+@end
+
+@interface FlutterBlueMaxPlugin ()
+@property(nonatomic, retain) NSObject<FlutterPluginRegistrar> *registrar;
+@property(nonatomic, retain) FlutterMethodChannel *methodChannel;
+@property(nonatomic, retain) CBCentralManager *centralManager;
+@property(nonatomic) NSMutableDictionary *knownPeripherals;
+@property(nonatomic) NSMutableDictionary *connectedPeripherals;
+@property(nonatomic) NSMutableDictionary *currentlyConnectingPeripherals;
+@property(nonatomic) NSMutableArray *servicesToDiscover;
+@property(nonatomic) NSMutableArray *characteristicsToDiscover;
+@property(nonatomic) NSMutableDictionary *didWriteWithoutResponse;
+@property(nonatomic) NSMutableDictionary *peripheralMtu;
+@property(nonatomic) NSMutableDictionary *writeChrs;
+@property(nonatomic) NSMutableDictionary *writeDescs;
+@property(nonatomic) NSMutableDictionary *scanCounts;
+@property(nonatomic) NSDictionary *scanFilters;
+@property(nonatomic) NSTimer *checkForMtuChangesTimer;
+@property(nonatomic) LogLevel logLevel;
+@property(nonatomic) NSNumber *showPowerAlert;
+@property(nonatomic) NSNumber *restoreState;
+@property(nonatomic, retain) L2CapChannelManager *l2CapChannelManager;
+@end
+
+@implementation FlutterBlueMaxPlugin
++ (void)registerWithRegistrar:(NSObject<FlutterPluginRegistrar> *)registrar
+{
+    FlutterMethodChannel *methodChannel = [FlutterMethodChannel methodChannelWithName:NAMESPACE @"/methods"
+                                                                binaryMessenger:[registrar messenger]];
+    FlutterBlueMaxPlugin *instance = [[FlutterBlueMaxPlugin alloc] init];
+    instance.methodChannel = methodChannel;
+    instance.knownPeripherals = [NSMutableDictionary new];
+    instance.connectedPeripherals = [NSMutableDictionary new];
+    instance.currentlyConnectingPeripherals = [NSMutableDictionary new];
+    instance.servicesToDiscover = [NSMutableArray new];
+    instance.characteristicsToDiscover = [NSMutableArray new];
+    instance.didWriteWithoutResponse = [NSMutableDictionary new];
+    instance.peripheralMtu = [NSMutableDictionary new];
+    instance.writeChrs = [NSMutableDictionary new];
+    instance.writeDescs = [NSMutableDictionary new];
+    instance.scanCounts = [NSMutableDictionary new];
+    instance.logLevel = LDEBUG;
+    instance.showPowerAlert = @(YES);
+    instance.restoreState = @(NO);
+    instance.l2CapChannelManager = [[L2CapChannelManager alloc] initWithMethodChannel:methodChannel plugin:instance];
+
+    [registrar addMethodCallDelegate:instance channel:methodChannel];
+}
+
+////////////////////////////////////////////////////////////
+// ██   ██   █████   ███    ██  ██████   ██       ███████    
+// ██   ██  ██   ██  ████   ██  ██   ██  ██       ██         
+// ███████  ███████  ██ ██  ██  ██   ██  ██       █████      
+// ██   ██  ██   ██  ██  ██ ██  ██   ██  ██       ██         
+// ██   ██  ██   ██  ██   ████  ██████   ███████  ███████                                                       
+//                                                      
+// ███    ███  ███████  ████████  ██   ██   ██████   ██████  
+// ████  ████  ██          ██     ██   ██  ██    ██  ██   ██ 
+// ██ ████ ██  █████       ██     ███████  ██    ██  ██   ██ 
+// ██  ██  ██  ██          ██     ██   ██  ██    ██  ██   ██ 
+// ██      ██  ███████     ██     ██   ██   ██████   ██████                                              
+//                                                      
+//  ██████   █████   ██       ██                           
+// ██       ██   ██  ██       ██                           
+// ██       ███████  ██       ██                           
+// ██       ██   ██  ██       ██                           
+//  ██████  ██   ██  ███████  ███████                     
+
+- (void)handleMethodCall:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    @try
+    {
+        Log(LDEBUG, @"handleMethodCall: %@", call.method);
+
+        if ([@"setLogLevel" isEqualToString:call.method])
+        {
+            NSNumber *idx = [call arguments];
+            self.logLevel = (LogLevel)[idx integerValue];
+            result(@YES);
+            return;
+        }
+
+        if ([@"setOptions" isEqualToString:call.method])
+        {
+            NSDictionary *args = (NSDictionary*) call.arguments;
+            self.showPowerAlert = args[@"show_power_alert"];
+            self.restoreState = args[@"restore_state"];
+            result(@YES);
+            return;
+        }
+
+        // initialize adapter
+        if (self.centralManager == nil)
+        {
+            Log(LDEBUG, @"initializing CBCentralManager");
+
+            NSMutableDictionary *options = [NSMutableDictionary dictionary];
+
+            if ([self.showPowerAlert boolValue]) {
+                options[CBCentralManagerOptionShowPowerAlertKey] = self.showPowerAlert;
+            }
+
+            if ([self.restoreState boolValue]) {
+                options[CBCentralManagerOptionRestoreIdentifierKey] = @"flutterBlueMaxRestoreIdentifier";
+            }
+
+            Log(LDEBUG, @"showPowerAlert: %@", [self.showPowerAlert boolValue] ? @"yes" : @"no");
+            Log(LDEBUG, @"restoreState: %@", [self.restoreState boolValue] ? @"yes" : @"no");
+
+            self.centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil options:options];
+        }
+        // initialize timer
+        if (self.checkForMtuChangesTimer == nil)
+        {
+            Log(LDEBUG, @"initializing checkForMtuChangesTimer");
+
+            self.checkForMtuChangesTimer = [NSTimer scheduledTimerWithTimeInterval:0.025
+                target:self
+                selector:@selector(checkForMtuChangesCallback) 
+                userInfo:@{}
+                repeats:YES];
+        }
+        // check that we have an adapter, except for the 
+        // functions that don't need it
+        if (self.centralManager == nil && 
+            [@"flutterRestart" isEqualToString:call.method] == false &&
+            [@"connectedCount" isEqualToString:call.method] == false &&
+            [@"setLogLevel" isEqualToString:call.method] == false &&
+            [@"isSupported" isEqualToString:call.method] == false &&
+            [@"getAdapterName" isEqualToString:call.method] == false &&
+            [@"getAdapterState" isEqualToString:call.method] == false) {
+            NSString* s = @"the device does not support bluetooth";
+            result([FlutterError errorWithCode:@"bluetoothUnavailable" message:s details:NULL]);
+            return;
+        }
+
+        if ([@"flutterRestart" isEqualToString:call.method])
+        {
+            // no adapter?
+            if (self.centralManager == nil) {
+                result(@(0)); // no work to do
+                return;
+            }
+
+            if ([self isAdapterOn]) {
+                [self.centralManager stopScan];
+            }
+
+            // all dart state is reset after flutter restart
+            // (i.e. Hot Restart) so also reset native state
+            [self disconnectAllDevices:@"flutterRestart"];
+
+            Log(LDEBUG, @"connectedPeripherals: %lu", self.connectedPeripherals.count);
+
+            if (self.connectedPeripherals.count == 0) {
+                [self.knownPeripherals removeAllObjects];
+            }
+            
+            result(@(self.connectedPeripherals.count));
+            return;
+        }
+        else if ([@"connectedCount" isEqualToString:call.method])
+        {
+            Log(LDEBUG, @"connectedPeripherals: %lu", self.connectedPeripherals.count);
+            if (self.connectedPeripherals.count == 0) {
+                Log(LDEBUG, @"Hot Restart: complete");
+                [self.knownPeripherals removeAllObjects];
+            }
+            result(@(self.connectedPeripherals.count));
+            return;
+        }
+        else if ([@"isSupported" isEqualToString:call.method])
+        {
+            result(self.centralManager != nil ? @(YES) : @(NO));
+        }
+        else if ([@"getAdapterName" isEqualToString:call.method])
+        {
+    #if TARGET_OS_IOS
+            result([[UIDevice currentDevice] name]);
+    #else // MacOS
+            // TODO: support this via hostname?
+            result(@"Mac Bluetooth Adapter");
+    #endif
+        }
+        if ([@"getAdapterState" isEqualToString:call.method])
+        {
+            // get state
+            int adapterState = 0; // BmAdapterStateEnum.unknown
+            if (self.centralManager) {
+                adapterState = [self bmAdapterStateEnum:self.centralManager.state];    
+            }
+
+            // See BmBluetoothAdapterState
+            NSDictionary* response = @{
+                @"adapter_state" : @(adapterState),
+            };
+
+            result(response);
+        }
+        else if([@"turnOn" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"turnOn" 
+                                    message:@"iOS does not support turning on bluetooth"
+                                    details:NULL]);
+        }
+        else if([@"turnOff" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"turnOff" 
+                                    message:@"iOS does not support turning off bluetooth"
+                                    details:NULL]);
+        }
+        else if ([@"startScan" isEqualToString:call.method])
+        {
+            // See BmScanSettings
+            NSDictionary *args = (NSDictionary*) call.arguments;
+            NSArray   *withServices    = args[@"with_services"];
+            NSNumber  *continuousUpdates = args[@"continuous_updates"];
+
+            // check adapter state
+            if ([self isAdapterOn] == false) {
+                NSString* as = [self cbManagerStateString:self.centralManager.state];
+                NSString* s = [NSString stringWithFormat:@"bluetooth must be turned on. (%@)", as];
+                result([FlutterError errorWithCode:@"startScan" message:s details:NULL]);
+                return;
+            }
+
+            // remember this for later
+            self.scanFilters = args;
+
+            // allowDuplicates?
+            NSMutableDictionary<NSString *, id> *scanOpts = [NSMutableDictionary new];
+            if ([continuousUpdates boolValue]) {
+                [scanOpts setObject:[NSNumber numberWithBool:YES] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
+            }
+
+            // filters implemented by FBP, not the OS
+            BOOL hasCustomFilters =
+                [self hasFilter:@"with_remote_ids"] ||
+                [self hasFilter:@"with_names"] ||
+                [self hasFilter:@"with_keywords"] ||
+                [self hasFilter:@"with_msd"] ||
+                [self hasFilter:@"with_service_data"];
+
+            // filter services
+            NSArray *services = [NSArray array];
+            for (int i = 0; i < [withServices count]; i++) {
+                NSString *uuid = withServices[i];
+                services = [services arrayByAddingObject:[CBUUID UUIDWithString:uuid]];
+            }
+
+            // If any custom filter is set then we cannot filter by services.
+            // Why? An advertisement can match either the service filter *or*
+            // the custom filter. It does not have to match both. So we cannot have
+            // iOS & macOS filtering out any advertisements.
+            if (hasCustomFilters) {
+                services = [NSArray array];
+            }
+
+            // clear counts
+            [self.scanCounts removeAllObjects];
+
+            // start scanning
+            [self.centralManager scanForPeripheralsWithServices:services options:scanOpts];
+
+            result(@YES);
+        }
+        else if ([@"stopScan" isEqualToString:call.method])
+        {
+            [self.centralManager stopScan];
+            result(@YES);
+        }
+        else if ([@"getSystemDevices" isEqualToString:call.method])
+        {
+            NSDictionary *args = (NSDictionary*) call.arguments;
+            NSMutableArray *withServices = [NSMutableArray new];
+            for (NSString *uuid in args[@"with_services"]) {
+                [withServices addObject:[CBUUID UUIDWithString:uuid]];
+            }
+
+            // this returns devices connected by *any* app
+            NSArray *periphs = [self.centralManager retrieveConnectedPeripheralsWithServices:withServices];
+
+            // Devices
+            NSMutableArray *deviceProtos = [NSMutableArray new];
+            for (CBPeripheral *p in periphs) {
+                [deviceProtos addObject:[self bmBluetoothDevice:p]];
+            }
+
+            // See BmDevicesList
+            NSDictionary* response = @{
+                @"devices": deviceProtos,
+            };
+
+            result(response);
+        }
+        else if ([@"connect" isEqualToString:call.method])
+        {
+            // See BmConnectRequest
+            NSDictionary* args = (NSDictionary*)call.arguments;
+            NSString  *remoteId       = args[@"remote_id"];
+            NSNumber  *autoConnect    = args[@"auto_connect"];
+
+            // check adapter state
+            if ([self isAdapterOn] == false) {
+                NSString* as = [self cbManagerStateString:self.centralManager.state];
+                NSString* s = [NSString stringWithFormat:@"bluetooth must be turned on. (%@)", as];
+                result([FlutterError errorWithCode:@"connect" message:s details:NULL]);
+                return;
+            }
+
+            // already connecting?
+            if ([self.currentlyConnectingPeripherals objectForKey:remoteId] != nil) {
+                Log(LDEBUG, @"already connecting");
+                result(@YES); // still work to do
+                return;
+            }
+
+            // already connected?
+            if ([self getConnectedPeripheral:remoteId] != nil) {
+                Log(LDEBUG, @"already connected");
+                result(@NO); // no work to do
+                return;
+            }
+
+            // parse
+            NSUUID *uuid = [[NSUUID alloc] initWithUUIDString:remoteId];
+            if (uuid == nil)
+            {
+                result([FlutterError errorWithCode:@"connect" message:@"invalid remoteId" details:remoteId]);
+                return;
+            }
+
+            // check the devices iOS knowns about
+            CBPeripheral *peripheral = nil;
+            for (CBPeripheral *p in [self.centralManager retrievePeripheralsWithIdentifiers:@[uuid]])
+            {
+                if ([[p.identifier UUIDString] isEqualToString:remoteId])
+                {
+                    peripheral = p;
+                    break;
+                }
+            }
+            if (peripheral == nil)
+            {
+                result([FlutterError errorWithCode:@"connect" message:@"Peripheral not found" details:remoteId]);
+                return;
+            }
+
+            // we must keep a strong reference to any CBPeripheral before we connect to it.
+            // Why? CoreBluetooth does not keep strong references and will warn about API MISUSE and weak ptrs.
+            [self.knownPeripherals setObject:peripheral forKey:remoteId];
+
+            // set ourself as delegate
+            peripheral.delegate = self;
+
+            // options
+            NSMutableDictionary *options = [[NSMutableDictionary alloc] init];
+            if (@available(iOS 17, *)) {
+                // note: use CBConnectPeripheralOptionEnableAutoReconnect constant
+                // when all developers can be excpected to be on iOS 17+
+                [options setObject:autoConnect forKey:@"kCBConnectOptionEnableAutoReconnect"];
+            } 
+
+            [self.centralManager connectPeripheral:peripheral options:options];
+
+            // add to currently connecting peripherals
+            [self.currentlyConnectingPeripherals setObject:peripheral forKey:remoteId];
+            
+            result(@YES);
+        }
+        else if ([@"disconnect" isEqualToString:call.method])
+        {
+            // remoteId is passed raw, not in a NSDictionary
+            NSString *remoteId = [call arguments];
+
+            // already disconnected?
+            CBPeripheral *peripheral = nil;
+            if (peripheral == nil ) {
+                peripheral = [self.currentlyConnectingPeripherals objectForKey:remoteId];
+                if (peripheral != nil) {
+                    Log(LDEBUG, @"disconnect: cancelling connection in progress");
+                    [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
+                }   
+            }
+            if (peripheral == nil) {
+                peripheral = [self getConnectedPeripheral:remoteId];
+            }
+            if (peripheral == nil) {
+                Log(LDEBUG, @"already disconnected");
+                result(@NO); // no work to do
+                return;
+            }
+
+            // disconnect
+            [self.centralManager cancelPeripheralConnection:peripheral];
+            
+            result(@YES);
+        }
+        else if ([@"discoverServices" isEqualToString:call.method])
+        {
+            // remoteId is passed raw, not in a NSDictionary
+            NSString *remoteId = [call arguments];
+
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"discoverServices" message:s details:remoteId]);
+                return;
+            }
+
+            // Clear helper arrays
+            [self.servicesToDiscover removeAllObjects];
+            [self.characteristicsToDiscover removeAllObjects];
+            [self resetInstanceIds:remoteId];
+
+            // start discovery
+            [peripheral discoverServices:nil];
+
+            result(@YES);
+        }
+        else if ([@"readCharacteristic" isEqualToString:call.method])
+        {
+            // See BmReadCharacteristicRequest
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSString  *remoteId           = args[@"remote_id"];
+            NSString  *serviceUuid        = args[@"service_uuid"];
+            NSString  *characteristicUuid = args[@"characteristic_uuid"];
+            NSString  *primaryServiceUuid = args[@"primary_service_uuid"];
+            NSNumber  *instanceId         = args[@"instance_id"];
+
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"readCharacteristic" message:s details:remoteId]);
+                return;
+            }
+
+            // Find characteristic
+            NSError *error = nil;
+            CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                               peripheral:peripheral
+                                                              serviceUuid:serviceUuid
+                                                       primaryServiceUuid:primaryServiceUuid
+                                                               instanceId:instanceId
+                                                                    error:&error];
+            if (characteristic == nil) {
+                result([FlutterError errorWithCode:@"readCharacteristic" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            // check readable
+            if ((characteristic.properties & CBCharacteristicPropertyRead) == 0) {
+                NSString* s = @"The READ property is not supported by this BLE characteristic";
+                result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:NULL]);
+                return;
+            }
+
+            // Trigger a read
+            [peripheral readValueForCharacteristic:characteristic];
+
+            result(@YES);
+        }
+        else if ([@"writeCharacteristic" isEqualToString:call.method])
+        {
+            // See BmWriteCharacteristicRequest
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSString  *remoteId           = args[@"remote_id"];
+            NSString  *serviceUuid        = args[@"service_uuid"];
+            NSString  *characteristicUuid = args[@"characteristic_uuid"];
+            NSString  *primaryServiceUuid = args[@"primary_service_uuid"];
+            NSNumber  *instanceId         = args[@"instance_id"];
+            NSNumber  *writeTypeNumber    = args[@"write_type"];
+            NSNumber  *allowLongWrite     = args[@"allow_long_write"];
+            NSData    *value              = [args[@"value"] data];
+            
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:remoteId]);
+                return;
+            }
+
+            // Get correct write type
+            CBCharacteristicWriteType writeType =
+                ([writeTypeNumber intValue] == 0
+                    ? CBCharacteristicWriteWithResponse
+                    : CBCharacteristicWriteWithoutResponse);
+
+            // check maximum payload
+            int maxLen = [self getMaxPayload:peripheral forType:writeType allowLongWrite:[allowLongWrite boolValue]];
+            int dataLen = (int) value.length;
+            if (dataLen > maxLen) {
+                NSString* t = [writeTypeNumber intValue] == 0 ? @"withResponse" : @"withoutResponse";
+                NSString* a = [allowLongWrite boolValue] ? @", allowLongWrite" : @", noLongWrite";
+                NSString* b = [writeTypeNumber intValue] == 0 ? a : @"";
+                NSString* f = @"data longer than allowed. dataLen: %d > max: %d (%@%@)";
+                NSString* s = [NSString stringWithFormat:f, dataLen, maxLen, t, b];
+                result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:NULL]);
+                return;
+            }
+
+            // device not ready?
+            if (writeType == CBCharacteristicWriteWithoutResponse && !peripheral.canSendWriteWithoutResponse) {
+                // canSendWriteWithoutResponse is the current readiness of the peripheral to accept more write requests.
+                NSString* s = @"canSendWriteWithoutResponse is false. you must slow down";
+                result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:NULL]);
+                return;
+            } 
+
+            // Find characteristic
+            NSError *error = nil;
+            CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                               peripheral:peripheral
+                                                              serviceUuid:serviceUuid
+                                                       primaryServiceUuid:primaryServiceUuid
+                                                               instanceId:instanceId
+                                                                    error:&error];
+
+            if (characteristic == nil) {
+                result([FlutterError errorWithCode:@"writeCharacteristic" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            // check writeable
+            if(writeType == CBCharacteristicWriteWithoutResponse) {
+                if ((characteristic.properties & CBCharacteristicPropertyWriteWithoutResponse) == 0) {
+                    NSString* s = @"The WRITE_NO_RESPONSE property is not supported by this BLE characteristic";
+                    result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:NULL]);
+                    return;
+                }
+            } else {
+                if ((characteristic.properties & CBCharacteristicPropertyWrite) == 0) {
+                    NSString* s = @"The WRITE property is not supported by this BLE characteristic";
+                    result([FlutterError errorWithCode:@"writeCharacteristic" message:s details:NULL]);
+                    return;
+                }
+            }
+
+            // remember the data we are writing
+            NSString *key = [NSString stringWithFormat:@"%@:%@:%@:%@", remoteId, serviceUuid, characteristicUuid,
+                primaryServiceUuid != nil ? primaryServiceUuid : @""];   
+            [self.writeChrs setObject:value forKey:key];
+                  
+            // Write to characteristic
+            [peripheral writeValue:value forCharacteristic:characteristic type:writeType];
+
+            // remember the most recent write withoutResponse
+            if (writeType == CBCharacteristicWriteWithoutResponse) {
+                [self.didWriteWithoutResponse setObject:args forKey:remoteId];
+            }
+
+            result(@YES);
+        }
+        else if ([@"readDescriptor" isEqualToString:call.method])
+        {
+            // See BmReadDescriptorRequest
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSString  *remoteId                 = args[@"remote_id"];
+            NSString  *serviceUuid              = args[@"service_uuid"];
+            NSString  *characteristicUuid       = args[@"characteristic_uuid"];
+            NSString  *descriptorUuid           = args[@"descriptor_uuid"];
+            NSString  *primaryServiceUuid       = args[@"primary_service_uuid"];
+            NSNumber  *instanceId               = args[@"instance_id"];
+
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"readDescriptor" message:s details:remoteId]);
+                return;
+            }
+
+            // Find characteristic
+            NSError *error = nil;
+            CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                               peripheral:peripheral
+                                                              serviceUuid:serviceUuid
+                                                       primaryServiceUuid:primaryServiceUuid
+                                                               instanceId:instanceId
+                                                                    error:&error];
+
+            if (characteristic == nil) {
+                result([FlutterError errorWithCode:@"readDescriptor" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            // Find descriptor
+            CBDescriptor *descriptor = [self locateDescriptor:descriptorUuid characteristic:characteristic error:&error];
+            if (descriptor == nil) {
+                result([FlutterError errorWithCode:@"readDescriptor" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            [peripheral readValueForDescriptor:descriptor];
+
+            result(@YES);
+        }
+        else if ([@"writeDescriptor" isEqualToString:call.method])
+        {
+            // See BmWriteDescriptorRequest
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSString  *remoteId           = args[@"remote_id"];
+            NSString  *serviceUuid        = args[@"service_uuid"];
+            NSString  *characteristicUuid = args[@"characteristic_uuid"];
+            NSString  *descriptorUuid     = args[@"descriptor_uuid"];
+            NSString  *primaryServiceUuid = args[@"primary_service_uuid"];
+            NSNumber  *instanceId         = args[@"instance_id"];
+            NSData    *value              = [args[@"value"] data];
+
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"writeDescriptor" message:s details:remoteId]);
+                return;
+            }
+
+            // check mtu
+            int mtu = (int) [self getMtu:peripheral];
+            int dataLen = (int) value.length;
+            if ((mtu-3) < dataLen) {
+                NSString* f = @"data is longer than MTU allows. dataLen: %d > maxDataLen: %d";
+                NSString* s = [NSString stringWithFormat:f, dataLen, (mtu-3)];
+                result([FlutterError errorWithCode:@"writeDescriptor" message:s details:NULL]);
+                return;
+            }
+
+            // Find characteristic
+            NSError *error = nil;
+            CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                               peripheral:peripheral
+                                                              serviceUuid:serviceUuid
+                                                       primaryServiceUuid:primaryServiceUuid
+                                                               instanceId:instanceId
+                                                                    error:&error];
+
+            if (characteristic == nil) {
+                result([FlutterError errorWithCode:@"writeDescriptor" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            // Find descriptor
+            CBDescriptor *descriptor = [self locateDescriptor:descriptorUuid characteristic:characteristic error:&error];
+            if (descriptor == nil) {
+                result([FlutterError errorWithCode:@"writeDescriptor" message:error.localizedDescription details:NULL]);
+                return;
+            }
+            // remember the data we are writing
+            NSString *key = [NSString stringWithFormat:@"%@:%@:%@:%@:%@", remoteId, serviceUuid, characteristicUuid,
+                descriptorUuid, primaryServiceUuid != nil ? primaryServiceUuid : @""];
+            [self.writeDescs setObject:value forKey:key];
+
+            // Write descriptor
+            [peripheral writeValue:value forDescriptor:descriptor];
+
+            result(@YES);
+        }
+        else if ([@"setNotifyValue" isEqualToString:call.method])
+        {
+            // See BmSetNotifyValueRequest
+            NSDictionary *args = (NSDictionary*)call.arguments;
+            NSString   *remoteId                 = args[@"remote_id"];
+            NSString   *serviceUuid              = args[@"service_uuid"];
+            NSString   *characteristicUuid       = args[@"characteristic_uuid"];
+            NSString   *primaryServiceUuid       = args[@"primary_service_uuid"];
+            NSNumber   *instanceId               = args[@"instance_id"];
+            NSNumber   *enable                   = args[@"enable"];
+
+            // Find peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"setNotifyValue" message:s details:remoteId]);
+                return;
+            }
+
+            // Find characteristic
+            NSError *error = nil;
+            CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                               peripheral:peripheral
+                                                              serviceUuid:serviceUuid
+                                                       primaryServiceUuid:primaryServiceUuid
+                                                               instanceId:instanceId
+                                                                    error:&error];
+
+            if (characteristic == nil) {
+                result([FlutterError errorWithCode:@"setNotifyValue" message:error.localizedDescription details:NULL]);
+                return;
+            }
+
+            // check notify-able
+            bool canNotify = (characteristic.properties & CBCharacteristicPropertyNotify) != 0;
+            bool canIndicate = (characteristic.properties & CBCharacteristicPropertyIndicate) != 0;
+            if(!canIndicate && !canNotify) {
+                NSString* s = @"neither NOTIFY nor INDICATE properties are supported by this BLE characteristic";
+                result([FlutterError errorWithCode:@"setNotifyValue" message:s details:NULL]);
+                return;
+            }
+
+            // Check that CCCD is found, this is necessary for subscribing
+            CBDescriptor *descriptor = [self locateDescriptor:CCCD characteristic:characteristic error:nil];
+            if (descriptor == nil) {
+                Log(LWARNING, @"Warning: CCCD descriptor for characteristic not found: %@", characteristicUuid);
+            }
+
+            // Set notification value
+            [peripheral setNotifyValue:[enable boolValue] forCharacteristic:characteristic];
+            
+            result(@YES);
+        }
+        else if ([@"requestMtu" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"requestMtu"
+                                    message:@"iOS does not allow mtu requests to the peripheral"
+                                    details:NULL]);
+        }
+        else if ([@"readRssi" isEqualToString:call.method])
+        {
+            // remoteId is passed raw, not in a NSDictionary
+            NSString *remoteId = [call arguments];
+
+            // get peripheral
+            CBPeripheral *peripheral = [self getConnectedPeripheral:remoteId];
+            if (peripheral == nil) {
+                NSString* s = @"device is disconnected";
+                result([FlutterError errorWithCode:@"readRssi" message:s details:remoteId]);
+                return;
+            }
+
+            [peripheral readRSSI];
+
+            result(@YES);
+        }
+        else if([@"requestConnectionPriority" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"requestConnectionPriority" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"getPhySupport" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"getPhySupport" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"setPreferredPhy" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"setPreferredPhy" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"getBondedDevices" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"getBondedDevices" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"createBond" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"createBond" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"removeBond" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"removeBond" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"clearGattCache" isEqualToString:call.method])
+        {
+            result([FlutterError errorWithCode:@"clearGattCache" 
+                                    message:@"android only"
+                                    details:NULL]);
+        }
+        else if([@"openL2CapChannel" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleOpenL2CapChannel:call result:result];
+        }
+        else if([@"closeL2CapChannel" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleCloseL2CapChannel:call result:result];
+        }
+        else if([@"readL2CapChannel" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleReadL2CapChannel:call result:result];
+        }
+        else if([@"writeL2CapChannel" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleWriteL2CapChannel:call result:result];
+        }
+        else if([@"listenL2capChannel" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleListenL2capChannel:call result:result];
+        }
+        else if([@"stopL2capServer" isEqualToString:call.method])
+        {
+            [self.l2CapChannelManager handleStopListenL2capChannel:call result:result];
+        }
+        else
+        {
+            result(FlutterMethodNotImplemented);
+        }
+    }
+    @catch (NSException *e)
+    {
+        NSString *stackTrace = [[e callStackSymbols] componentsJoinedByString:@"\n"];
+        NSDictionary *details = @{@"stackTrace": stackTrace};
+        result([FlutterError errorWithCode:@"iosException" message:[e reason] details:details]);
+    }
+}
+
+//////////////////////////////////////////////////////////////////////
+// ██████   ██████   ██  ██    ██   █████   ████████  ███████ 
+// ██   ██  ██   ██  ██  ██    ██  ██   ██     ██     ██      
+// ██████   ██████   ██  ██    ██  ███████     ██     █████   
+// ██       ██   ██  ██   ██  ██   ██   ██     ██     ██      
+// ██       ██   ██  ██    ████    ██   ██     ██     ███████
+//
+// ██    ██  ████████  ██  ██       ███████ 
+// ██    ██     ██     ██  ██       ██      
+// ██    ██     ██     ██  ██       ███████ 
+// ██    ██     ██     ██  ██            ██ 
+//  ██████      ██     ██  ███████  ███████ 
+
+- (CBPeripheral *)getConnectedPeripheral:(NSString *)remoteId
+{
+    return [self.connectedPeripherals objectForKey:remoteId];
+}
+
+- (CBCharacteristic *)locateCharacteristic:(NSString *)characteristicId
+                                peripheral:(CBPeripheral *)peripheral
+                               serviceUuid:(NSString *)serviceUuid
+                        primaryServiceUuid:(NSString *)primaryServiceUuid
+                                instanceId:(NSNumber *)instanceId
+                                     error:(NSError **)error
+
+{
+    // remember
+    bool isSecondaryService = primaryServiceUuid != nil;
+
+    // primary service
+    if (primaryServiceUuid == nil) {
+        primaryServiceUuid = serviceUuid;
+    }
+
+    // primary service
+    CBService *primaryService = [self getServiceFromArray:primaryServiceUuid array:[peripheral services]];
+    if (primaryService == nil || !primaryService.isPrimary)
+    {
+        NSString* s = [NSString stringWithFormat:@"primary service not found '%@'", primaryServiceUuid];
+        NSDictionary* d = @{NSLocalizedDescriptionKey : s};
+        *error = [NSError errorWithDomain:@"flutterBlueMax" code:1000 userInfo:d];
+        return nil;
+    }
+
+    // associated primary service
+    CBService *secondaryService = nil;
+    if (isSecondaryService)
+    {
+        secondaryService = [self getServiceFromArray:serviceUuid array:[primaryService includedServices]];
+        if (error && !secondaryService) {
+            NSString* s = [NSString stringWithFormat:@"secondary service not found '%@' (primary service %@)", serviceUuid, primaryServiceUuid];
+            NSDictionary* d = @{NSLocalizedDescriptionKey : s};
+            *error = [NSError errorWithDomain:@"flutterBlueMax" code:1001 userInfo:d];
+            return nil;
+        }
+    }
+
+    // which service?
+    CBService *service = (secondaryService != nil) ? secondaryService : primaryService;
+
+    // characteristic
+    CBCharacteristic *characteristic = [self getCharacteristicFromArray:characteristicId 
+                                                                       array:[service characteristics] 
+                                                                       instanceId:instanceId];
+
+    if (characteristic == nil)
+    {
+        NSString* format = @"characteristic not found in service (chr: '%@', svc: '%@')";
+        NSString* s = [NSString stringWithFormat:format, characteristicId, serviceUuid];
+        NSDictionary* d = @{NSLocalizedDescriptionKey : s};
+        *error = [NSError errorWithDomain:@"flutterBlueMax" code:1002 userInfo:d];
+        return nil;
+    }
+    return characteristic;
+}
+
+
+- (CBDescriptor *)locateDescriptor:(NSString *)descriptorId characteristic:(CBCharacteristic *)characteristic error:(NSError**)error
+{
+    CBDescriptor *descriptor = [self getDescriptorFromArray:descriptorId array:[characteristic descriptors]];
+    if (descriptor == nil && error != nil)
+    {
+        NSString* format = @"descriptor not found in characteristic (desc: '%@', chr: '%@')";
+        NSString* s = [NSString stringWithFormat:format, descriptorId, [characteristic.UUID uuidStr]];
+        NSDictionary* d = @{NSLocalizedDescriptionKey : s};
+        *error = [NSError errorWithDomain:@"flutterBlueMax" code:1002 userInfo:d];
+        return nil;
+    }
+    return descriptor;
+}
+
+- (CBService *)getServiceFromArray:(NSString *)uuid array:(NSArray<CBService *> *)array
+{
+    for (CBService *s in array)
+    {
+        if ([s.UUID isEqual:[CBUUID UUIDWithString:uuid]])
+        {
+            return s;
+        }
+    }
+    return nil;
+}
+
+- (CBCharacteristic *)getCharacteristicFromArray:(NSString *)uuid 
+                                                array:(NSArray<CBCharacteristic *> *)array
+                                                instanceId:(NSNumber *) instanceId
+{
+    
+    for (CBCharacteristic *c in array)
+    {
+        NSNumber *charInstanceId = [self getInstanceId:c];
+        if ([c.UUID isEqual:[CBUUID UUIDWithString:uuid]])
+        {
+            if (instanceId == nil || [instanceId isEqualToNumber:charInstanceId])
+            {
+                 return c;
+            }
+           
+        }
+    }
+    return nil;
+}
+
+- (CBDescriptor *)getDescriptorFromArray:(NSString *)uuid array:(NSArray<CBDescriptor *> *)array
+{
+    for (CBDescriptor *d in array)
+    {
+        if ([d.UUID isEqual:[CBUUID UUIDWithString:uuid]])
+        {
+            return d;
+        }
+    }
+    return nil;
+}
+
+- (void)disconnectAllDevices:(NSString*)func
+{
+    Log(LDEBUG, @"disconnectAllDevices(%@)", func);
+
+    // request disconnections
+    for (NSString *key in self.connectedPeripherals)
+    {
+        CBPeripheral *peripheral = [self.connectedPeripherals objectForKey:key];
+
+        Log(LDEBUG, @"calling disconnect: %@", key);
+
+        if ([func isEqualToString:@"adapterTurnOff"]) {
+            // inexplicably, iOS does not call 'didDisconnectPeripheral' when
+            // the adapter is turned off, so we must send these responses manually
+            
+            // Note: when the adapter is turned off, it is an 'api misuse'
+            // to call cancelPeripheralConnection. It is implied.
+
+            // See BmConnectionStateResponse
+            NSDictionary *result = @{
+                @"remote_id":                [[peripheral identifier] UUIDString],
+                @"connection_state":         @([self bmConnectionStateEnum:CBPeripheralStateDisconnected]),
+                @"disconnect_reason_code":   @(1573878), // just a random value, could be anything.
+                @"disconnect_reason_string": @"Bluetooth turned off",
+            };
+
+            // Send connection state
+            [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+        } 
+        
+        if ([func isEqualToString:@"flutterRestart"] && [self isAdapterOn]) {
+            // request disconnection
+            [self.centralManager cancelPeripheralConnection:peripheral];
+        }
+    }
+
+    // normally connectedPeripherals will be updated by 'didDisconnectPeripheral',
+    // but iOS does not call 'didDisconnectPeripheral' when the
+    // adapter is turned off, so we must clear it ourself
+    if ([func isEqualToString:@"adapterTurnOff"]) {
+        [self.connectedPeripherals removeAllObjects];
+        [self.currentlyConnectingPeripherals removeAllObjects];
+    }
+
+    // Clear all L2CAP channels (including zombies)
+    [self.l2CapChannelManager.channels removeAllObjects];
+    [self.l2CapChannelManager.zombieChannels removeAllObjects];
+
+    // note: we do *not* clear self.knownPeripherals
+    // Otherwise the peripheral would not have any strong references 
+    // and would be garbage collected, making the didDisconnectPeripheral
+    // callback not called
+
+    [self.servicesToDiscover removeAllObjects];
+    [self.characteristicsToDiscover removeAllObjects];
+    [self.didWriteWithoutResponse removeAllObjects];
+    [self.peripheralMtu removeAllObjects];
+    [self.writeChrs removeAllObjects];
+    [self.writeDescs removeAllObjects];
+}
+
+////////////////////////////////////
+// ███    ███ ████████ ██    ██ 
+// ████  ████    ██    ██    ██ 
+// ██ ████ ██    ██    ██    ██ 
+// ██  ██  ██    ██    ██    ██ 
+// ██      ██    ██     ██████  
+
+// in iOS, mtu is negotatiated once automatically sometime after the
+// the connection process, but there is no platform callback for it.
+- (void)checkForMtuChangesCallback
+{
+    for (NSString *key in self.connectedPeripherals) {
+
+        CBPeripheral *peripheral = [self.connectedPeripherals objectForKey:key];
+
+        int curMtu = (int) [self getMtu:peripheral];
+
+        NSNumber* prevMtu = (NSNumber*) [self.peripheralMtu objectForKey:peripheral];
+
+        // mtu changed?
+        if (prevMtu == nil || [prevMtu intValue] != curMtu) {
+
+            // remember new mtu value
+            [self.peripheralMtu setObject:@(curMtu) forKey:peripheral];
+
+            NSString* remoteId = [[peripheral identifier] UUIDString];
+
+            // See BmMtuChangedResponse
+            NSDictionary* mtuChanged = @{
+                @"remote_id" :      remoteId,
+                @"mtu":             @(curMtu),
+                @"success":         @(1),
+                @"error_string":    @"success",
+                @"error_code":      @(0),
+            };
+
+            // send mtu value
+            [self.methodChannel invokeMethod:@"OnMtuChanged" arguments:mtuChanged];
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////////////
+//  ██████  ██████    ██████  ███████  ███    ██  ████████  ██████    █████  ██      
+// ██       ██   ██  ██       ██       ████   ██     ██     ██   ██  ██   ██ ██      
+// ██       ██████   ██       █████    ██ ██  ██     ██     ██████   ███████ ██      
+// ██       ██   ██  ██       ██       ██  ██ ██     ██     ██   ██  ██   ██ ██      
+//  ██████  ██████    ██████  ███████  ██   ████     ██     ██   ██  ██   ██ ███████ 
+//                                                                                                                                          
+// ███    ███   █████   ███    ██   █████    ██████   ███████  ██████               
+// ████  ████  ██   ██  ████   ██  ██   ██  ██        ██       ██   ██              
+// ██ ████ ██  ███████  ██ ██  ██  ███████  ██   ███  █████    ██████               
+// ██  ██  ██  ██   ██  ██  ██ ██  ██   ██  ██    ██  ██       ██   ██              
+// ██      ██  ██   ██  ██   ████  ██   ██   ██████   ███████  ██   ██              
+//                                                                                                                                                   
+// ██████   ███████  ██       ███████   ██████    █████   ████████  ███████          
+// ██   ██  ██       ██       ██       ██        ██   ██     ██     ██               
+// ██   ██  █████    ██       █████    ██   ███  ███████     ██     █████            
+// ██   ██  ██       ██       ██       ██    ██  ██   ██     ██     ██               
+// ██████   ███████  ███████  ███████   ██████   ██   ██     ██     ███████ 
+
+- (void)centralManager:(CBCentralManager *)central
+      willRestoreState:(NSDictionary *)state {
+
+    Log(LDEBUG, @"centralManagerWillRestoreState");
+
+    // restore adapter state
+    [self centralManagerDidUpdateState:central];
+
+    NSArray *peripherals = state[CBCentralManagerRestoredStatePeripheralsKey];
+    
+    for (CBPeripheral *peripheral in peripherals) {
+        
+        // Set the delegate to self to receive the peripheral callbacks
+        peripheral.delegate = self;
+
+        if (peripheral.state != CBPeripheralStateConnected) {
+            // connect
+            Log(LDEBUG, @"Restore: reconnecting to %@", peripheral.identifier.UUIDString);
+            [self.centralManager connectPeripheral:peripheral options:nil];
+        } else {
+            // update connection state
+            Log(LDEBUG, @"Restore: already connected to %@", peripheral.identifier.UUIDString);
+            [self centralManager:central didConnectPeripheral:peripheral];
+            
+            for (CBService *service in peripheral.services) {
+
+                // restore services
+                [self peripheral:peripheral didDiscoverServices:nil];
+                
+                for (CBCharacteristic *characteristic in service.characteristics) {
+
+                    // restore characteristics
+                    [self peripheral:peripheral didDiscoverCharacteristicsForService:service error:nil];
+
+                    // restore notifications
+                    if (characteristic.isNotifying) {
+                        [self peripheral:peripheral didUpdateNotificationStateForCharacteristic:characteristic error:nil];
+                    }
+                }
+            }
+        }
+    }
+}
+
+
+- (void)centralManagerDidUpdateState:(nonnull CBCentralManager *)central
+{
+    Log(LDEBUG, @"centralManagerDidUpdateState %@", [self cbManagerStateString:self.centralManager.state]);
+
+    int adapterState = [self bmAdapterStateEnum:self.centralManager.state];
+
+    // stop scanning when adapter is turned off. 
+    // Otherwise, scanning automatically resumes when the adapter is
+    // turned back on. I don't think most users expect that.
+    if (self.centralManager.state != CBManagerStatePoweredOn) {
+        [self.centralManager stopScan];
+    }
+
+    // See BmBluetoothAdapterState
+    NSDictionary* response = @{
+        @"adapter_state" : @(adapterState),
+    };
+
+    [self.methodChannel invokeMethod:@"OnAdapterStateChanged" arguments:response];
+
+    // disconnect all devices
+    if (self.centralManager.state != CBManagerStatePoweredOn) {
+        [self disconnectAllDevices:@"adapterTurnOff"];
+    }
+}
+
+- (void)centralManager:(CBCentralManager *)central
+    didDiscoverPeripheral:(CBPeripheral *)peripheral
+        advertisementData:(NSDictionary<NSString *, id> *)advertisementData
+                     RSSI:(NSNumber *)RSSI
+{
+    Log(LVERBOSE, @"centralManager didDiscoverPeripheral");
+
+    NSString* remoteId = [[peripheral identifier] UUIDString];
+    
+    // add to known peripherals
+    [self.knownPeripherals setObject:peripheral forKey:remoteId];
+
+    // advertising data
+    NSArray *advServices = advertisementData[CBAdvertisementDataServiceUUIDsKey];
+    NSString *advName = advertisementData[CBAdvertisementDataLocalNameKey];
+    NSData *advMsd = advertisementData[CBAdvertisementDataManufacturerDataKey];
+    NSDictionary* advSd = advertisementData[CBAdvertisementDataServiceDataKey];
+
+    BOOL allow = NO;
+
+    // are any filters set?
+    BOOL isAnyFilterSet = [self hasFilter:@"with_services"] ||
+                          [self hasFilter:@"with_remote_ids"] ||
+                          [self hasFilter:@"with_names"] ||
+                          [self hasFilter:@"with_keywords"] ||
+                          [self hasFilter:@"with_msd"] ||
+                          [self hasFilter:@"with_service_data"];
+
+    // no filters set? allow all
+    if (!isAnyFilterSet) {
+        allow = YES;
+    }
+
+    // apply filters only if at least one filter is set
+    // Note: filters are additive. An advertisment can match *any* filter
+    if (isAnyFilterSet)
+    {
+        // filter services
+        if (!allow && [self foundService:self.scanFilters[@"with_services"] target:advServices]) {
+            allow = YES;
+        }
+
+        // filter remoteIds
+        if (!allow && [self foundRemoteId:self.scanFilters[@"with_remote_ids"] target:remoteId]) {
+            allow = YES;
+        }
+
+        // filter names
+        if (!allow && [self foundName:self.scanFilters[@"with_names"] target:advName]) {
+            allow = YES;
+        }
+
+        // filter keywords
+        if (!allow && [self foundKeyword:self.scanFilters[@"with_keywords"] target:advName]) {
+            allow = YES;
+        }
+
+        // filter msd
+        if (!allow && [self foundMsd:self.scanFilters[@"with_msd"] msd:advMsd]) {
+            allow = YES;
+        }
+
+        // filter service data
+        if (!allow && [self foundServiceData:self.scanFilters[@"with_service_data"] sd:advSd]) {
+            allow = YES;
+        }
+    }
+
+    // If no filters are satisfied, return
+    if (!allow) {
+        return;
+    }
+
+    // filter divisor
+    if ([self.scanFilters[@"continuous_updates"] integerValue] != 0) {
+        NSInteger count = [self scanCountIncrement:remoteId];
+        NSInteger divisor = [self.scanFilters[@"continuous_divisor"] integerValue];
+        if ((count % divisor) != 0) {
+            return;
+        }
+    }
+
+    // See BmScanResponse
+    NSDictionary *response = @{
+        @"advertisements": @[[self bmScanAdvertisement:remoteId advertisementData:advertisementData RSSI:RSSI]],
+    };
+
+    [self.methodChannel invokeMethod:@"OnScanResponse" arguments:response];
+}
+
+- (void)centralManager:(CBCentralManager *)central
+  didConnectPeripheral:(CBPeripheral *)peripheral
+{
+    Log(LDEBUG, @"didConnectPeripheral");
+
+    NSString* remoteId = [[peripheral identifier] UUIDString];
+
+    // remember the connected peripherals of *this app*
+    [self.connectedPeripherals setObject:peripheral forKey:remoteId];
+
+    // remove from currently connecting peripherals
+    [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
+
+    // Register self as delegate for peripheral
+    peripheral.delegate = self;
+
+    // See BmConnectionStateResponse
+    NSDictionary *result = @{
+        @"remote_id":                remoteId,
+        @"connection_state":         @([self bmConnectionStateEnum:peripheral.state]),
+        @"disconnect_reason_code":   [NSNull null],
+        @"disconnect_reason_string": [NSNull null],
+    };
+
+    // Send connection state
+    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+}
+
+- (void)centralManager:(CBCentralManager *)central
+    didDisconnectPeripheral:(CBPeripheral *)peripheral
+                      error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didDisconnectPeripheral:");
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didDisconnectPeripheral:");
+    }
+
+    NSString* remoteId = [[peripheral identifier] UUIDString];
+
+    // remember the connected peripherals of *this app*
+    [self.connectedPeripherals removeObjectForKey:remoteId];
+
+    // remove from currently connecting peripherals
+    [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
+
+    // clear negotiated mtu
+    [self.peripheralMtu removeObjectForKey:peripheral];
+
+    // Unregister self as delegate for peripheral, not working #42
+    peripheral.delegate = nil;
+
+    // Clean up all L2CAP channels (active + zombie) for this peripheral
+    [self.l2CapChannelManager cleanupChannelsForPeripheral:remoteId];
+
+    // random number defined by flutter blue plus
+    int bmUserCanceledErrorCode = 23789258;
+
+    // See BmConnectionStateResponse
+    NSDictionary *result = @{
+        @"remote_id":                remoteId,
+        @"connection_state":         @([self bmConnectionStateEnum:peripheral.state]),
+        @"disconnect_reason_code":   error ? @(error.code) : @(bmUserCanceledErrorCode),
+        @"disconnect_reason_string": error ? [error localizedDescription] : @("connection canceled"),
+    };
+
+    // Send connection state
+    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+}
+
+- (void)centralManager:(CBCentralManager *)central
+    didFailToConnectPeripheral:(CBPeripheral *)peripheral
+                         error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didFailToConnectPeripheral:");
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didFailToConnectPeripheral:");
+    }
+
+    NSString* remoteId = [[peripheral identifier] UUIDString];
+
+    // remove from currently connecting peripherals
+    [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
+
+    // See BmConnectionStateResponse
+    NSDictionary *result = @{
+        @"remote_id":                [[peripheral identifier] UUIDString],
+        @"connection_state":         @([self bmConnectionStateEnum:peripheral.state]),
+        @"disconnect_reason_code":   error ? @(error.code) : [NSNull null], 
+        @"disconnect_reason_string": error ? [error localizedDescription] : [NSNull null],
+    };
+
+    // Send connection state
+    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+}
+
+/////////////////////////////////////////////////////////////////////////////////////////////////////////
+//  ██████  ██████   ██████   ███████  ██████   ██  ██████   ██   ██  ███████  ██████    █████   ██      
+// ██       ██   ██  ██   ██  ██       ██   ██  ██  ██   ██  ██   ██  ██       ██   ██  ██   ██  ██      
+// ██       ██████   ██████   █████    ██████   ██  ██████   ███████  █████    ██████   ███████  ██      
+// ██       ██   ██  ██       ██       ██   ██  ██  ██       ██   ██  ██       ██   ██  ██   ██  ██      
+//  ██████  ██████   ██       ███████  ██   ██  ██  ██       ██   ██  ███████  ██   ██  ██   ██  ███████
+//
+// ██████   ███████  ██       ███████   ██████    █████   ████████  ███████          
+// ██   ██  ██       ██       ██       ██        ██   ██     ██     ██               
+// ██   ██  █████    ██       █████    ██   ███  ███████     ██     █████            
+// ██   ██  ██       ██       ██       ██    ██  ██   ██     ██     ██               
+// ██████   ███████  ███████  ███████   ██████   ██   ██     ██     ███████ 
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didDiscoverServices:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didDiscoverServices:");
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didDiscoverServices:");
+    }
+
+    // discover characteristics and included services
+    [self.servicesToDiscover addObjectsFromArray:peripheral.services];
+    for (CBService *s in [peripheral services]) {
+        Log(LDEBUG, @"  svc: %@", [s.UUID uuidStr]);
+        [peripheral discoverCharacteristics:nil forService:s];
+        [peripheral discoverIncludedServices:nil forService:s];
+    }
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didDiscoverCharacteristicsForService:(CBService *)service
+                                   error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didDiscoverCharacteristicsForService:");
+        Log(LERROR, @"  svc: %@", [service.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didDiscoverCharacteristicsForService:");
+        Log(LDEBUG, @"  svc: %@", [service.UUID uuidStr]);
+    }
+
+    // Loop through and discover descriptors for characteristics
+    [self.servicesToDiscover removeObject:service];
+    [self.characteristicsToDiscover addObjectsFromArray:service.characteristics];
+    for (CBCharacteristic *c in [service characteristics])
+    {
+        int instanceId = [UniqueCharacteristicInstanceId next];
+        instanceIdToCharMap[@(instanceId)] = c;
+
+        NSValue *key = [NSValue valueWithNonretainedObject:c];
+        charToInstanceIdMap[key] = @(instanceId);
+
+        Log(LDEBUG, @"    chr: %@", [c.UUID uuidStr]);
+        [peripheral discoverDescriptorsForCharacteristic:c];
+    }
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
+                                      error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didDiscoverDescriptorsForCharacteristic:");
+        Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didDiscoverDescriptorsForCharacteristic:");
+        Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
+    }
+
+    // print descriptors
+    for (CBDescriptor *d in [characteristic descriptors])
+    {
+        Log(LDEBUG, @"    desc: %@", [d.UUID uuidStr]);
+    }
+
+    // have we finished discovering?
+    [self.characteristicsToDiscover removeObject:characteristic];
+    if (self.servicesToDiscover.count > 0 || self.characteristicsToDiscover.count > 0)
+    {
+        return; // Still discovering
+    }
+
+    // Add BmBluetoothServices to array
+    NSMutableArray *services = [NSMutableArray new];
+    for (CBService *s in [peripheral services])
+    {
+        [services addObject:[self bmBluetoothService:peripheral service:s]];
+    }
+
+    // See BmDiscoverServicesResult
+    NSDictionary* response = @{
+        @"remote_id":       [peripheral.identifier UUIDString],
+        @"services":        services,
+        @"success":         error == nil ? @(1) : @(0),
+        @"error_string":    error ? [error localizedDescription] : @"success",
+        @"error_code":      error ? @(error.code) : @(0),
+    };
+
+    // Send updated tree
+    [self.methodChannel invokeMethod:@"OnDiscoveredServices" arguments:response];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didDiscoverIncludedServicesForService:(CBService *)service
+                                    error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didDiscoverIncludedServicesForService:");
+        Log(LERROR, @"  svc: %@", [service.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didDiscoverIncludedServicesForService:");
+        Log(LDEBUG, @"  svc: %@", [service.UUID uuidStr]);
+    }
+
+    // discover characteristics 
+    [peripheral discoverCharacteristics:nil forService:service];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic
+                              error:(NSError *)error
+{
+    // this function is called on notifications as well as manual reads
+    if (error) {
+        Log(LERROR, @"didUpdateValueForCharacteristic:");
+        Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didUpdateValueForCharacteristic:");
+        Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
+    }
+
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
+    NSNumber *instanceId = [self getInstanceId:characteristic];
+
+    // See BmCharacteristicData
+    NSMutableDictionary* result = [@{
+        @"remote_id":                   [peripheral.identifier UUIDString],
+        @"service_uuid":                [characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":         [characteristic.UUID uuidStr],
+        @"primary_service_uuid":        primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":                 instanceId ? instanceId : [NSNull null],
+        @"value":                       characteristic.value ? characteristic.value : [NSNull null],
+        @"success":                     error == nil ? @(1) : @(0),
+        @"error_string":                error ? [error localizedDescription] : @"success",
+        @"error_code":                  error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnCharacteristicReceived" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didWriteValueForCharacteristic:(CBCharacteristic *)characteristic
+                             error:(NSError *)error
+{
+    // Note: this callback is only called for writeWithResponse
+    if (error) {
+        Log(LERROR, @"didWriteValueForCharacteristic:");
+        Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didWriteValueForCharacteristic:");
+        Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
+    }
+
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
+
+    // for convenience
+    NSString *remoteId = [peripheral.identifier UUIDString];
+    NSString *serviceUuid = [characteristic.service.UUID uuidStr];
+    NSString *characteristicUuid = [characteristic.UUID uuidStr];
+    NSNumber *instanceId = [self getInstanceId:characteristic];
+
+    // what data did we write?
+    NSString *key = [NSString stringWithFormat:@"%@:%@:%@:%@", remoteId, serviceUuid, characteristicUuid,
+        primaryService != nil ? [primaryService.UUID uuidStr] : @""];
+    NSData *value = self.writeChrs[key] ? self.writeChrs[key] : [NSMutableData data];
+    [self.writeChrs removeObjectForKey:key];
+
+    // See BmCharacteristicData
+    NSMutableDictionary* result = [@{
+        @"remote_id":               remoteId,
+        @"service_uuid":            [characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":     characteristicUuid,
+        @"primary_service_uuid":    primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":             instanceId ? instanceId : [NSNull null],
+        @"value":                   value,
+        @"success":                 @(error == nil),
+        @"error_string":            error ? [error localizedDescription] : @"success",
+        @"error_code":              error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnCharacteristicWritten" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic
+                                          error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didUpdateNotificationStateForCharacteristic:");
+        Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didUpdateNotificationStateForCharacteristic:");
+        Log(LDEBUG, @"  chr: %@", [characteristic.UUID uuidStr]);
+    }
+
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
+    NSNumber *instanceId = [self getInstanceId:characteristic];
+
+    // Oddly iOS does not update the CCCD descriptors when didUpdateNotificationState is called. 
+    // So instead of using characteristic.descriptors we have to manually recreate the
+    // CCCD descriptor using isNotifying & characteristic.properties
+    int value = 0;
+    if(characteristic.isNotifying) {
+        // in iOS, if a characteristic supports both indications and notifications, 
+        // then CoreBluetooth will default to indications
+        bool supportsNotify = (characteristic.properties & CBCharacteristicPropertyNotify) != 0;
+        bool supportsIndicate = (characteristic.properties & CBCharacteristicPropertyIndicate) != 0;
+        if (characteristic.isNotifying && supportsIndicate) {value = 2;} // '2' comes from the CCCD BLE spec
+        if (characteristic.isNotifying && supportsNotify) {value = 1;} // '1' comes from the CCCD BLE spec
+    }
+    
+    // See BmDescriptorData
+    NSMutableDictionary* result = [@{
+        @"remote_id":              [peripheral.identifier UUIDString],
+        @"service_uuid":           [characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":    [characteristic.UUID uuidStr],
+        @"descriptor_uuid":        CCCD,
+        @"primary_service_uuid":   primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":            instanceId ? instanceId : [NSNull null],
+        @"value":                  [NSData dataWithBytes:&value length:sizeof(value)],
+        @"success":                @(error == nil),
+        @"error_string":           error ? [error localizedDescription] : @"success",
+        @"error_code":             error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnDescriptorWritten" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didUpdateValueForDescriptor:(CBDescriptor *)descriptor
+                          error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didUpdateValueForDescriptor:");
+        Log(LERROR, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
+        Log(LERROR, @"  desc: %@", [descriptor.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didUpdateValueForDescriptor:");
+        Log(LDEBUG, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
+        Log(LDEBUG, @"  desc: %@", [descriptor.UUID uuidStr]);
+    }
+
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:descriptor.characteristic];
+    NSNumber *instanceId = [self getInstanceId:descriptor.characteristic];
+
+    NSData* data = [self descriptorToData:descriptor];
+    
+    // See BmDescriptorData
+    NSMutableDictionary* result = [@{
+        @"remote_id":              [peripheral.identifier UUIDString],
+        @"service_uuid":           [descriptor.characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":    [descriptor.characteristic.UUID uuidStr],
+        @"descriptor_uuid":        [descriptor.UUID uuidStr],
+        @"primary_service_uuid":   primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":            instanceId ? instanceId : [NSNull null],
+        @"value":                  data,
+        @"success":                @(error == nil),
+        @"error_string":           error ? [error localizedDescription] : @"success",
+        @"error_code":             error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnDescriptorRead" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didWriteValueForDescriptor:(CBDescriptor *)descriptor
+                         error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didWriteValueForDescriptor:");
+        Log(LERROR, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
+        Log(LERROR, @"  desc: %@", [descriptor.UUID uuidStr]);
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didWriteValueForDescriptor:");
+        Log(LDEBUG, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
+        Log(LDEBUG, @"  desc: %@", [descriptor.UUID uuidStr]);
+    }
+
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:descriptor.characteristic];
+    NSNumber *instanceId = [self getInstanceId:descriptor.characteristic];
+
+    // for convenience
+    NSString *remoteId = [peripheral.identifier UUIDString];
+    NSString *serviceUuid = [descriptor.characteristic.service.UUID uuidStr];
+    NSString *characteristicUuid = [descriptor.characteristic.UUID uuidStr];
+    NSString *descriptorUuid = [descriptor.UUID uuidStr];
+
+    // what data did we write?
+    NSString *key = [NSString stringWithFormat:@"%@:%@:%@:%@:%@", remoteId, serviceUuid, characteristicUuid,
+        descriptorUuid, primaryService != nil ? [primaryService.UUID uuidStr] : @""];  
+    NSData *value = self.writeChrs[key] ? self.writeChrs[key] : [NSMutableData data];
+    [self.writeDescs removeObjectForKey:key];
+    
+    // See BmDescriptorData
+    NSMutableDictionary* result = [@{
+        @"remote_id":              remoteId,
+        @"service_uuid":           serviceUuid,
+        @"characteristic_uuid":    characteristicUuid,
+        @"descriptor_uuid":        descriptorUuid,
+        @"primary_service_uuid":   primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":            instanceId ? instanceId : [NSNull null],
+        @"value":                  value,
+        @"success":                @(error == nil),
+        @"error_string":           error ? [error localizedDescription] : @"success",
+        @"error_code":             error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnDescriptorWritten" arguments:result];
+}
+
+- (void)peripheralDidUpdateName:(CBPeripheral *)peripheral
+{
+    Log(LDEBUG, @"didUpdateName: %@", [peripheral name]);
+
+    // See BmNameChanged
+    NSDictionary* result = @{
+        @"remote_id": [[peripheral identifier] UUIDString],
+        @"name":      [peripheral name] ? [peripheral name] : [NSNull null],
+    };
+
+    [self.methodChannel invokeMethod:@"OnNameChanged" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral 
+    didModifyServices:(NSArray<CBService *> *)invalidatedServices
+{
+    Log(LDEBUG, @"didModifyServices");
+
+    NSDictionary* result = [self bmBluetoothDevice:peripheral];
+
+    [self.methodChannel invokeMethod:@"OnServicesReset" arguments:result];
+}
+
+- (void)peripheral:(CBPeripheral *)peripheral
+    didReadRSSI:(NSNumber *)rssi error:(NSError *)error
+{
+    if (error) {
+        Log(LERROR, @"didReadRSSI:");
+        Log(LERROR, @"  error: %@", [error localizedDescription]);
+    } else {
+        Log(LDEBUG, @"didReadRSSI: %@", rssi);
+    }
+
+    // See BmReadRssiResult
+    NSDictionary* result = @{
+        @"remote_id":       [peripheral.identifier UUIDString],
+        @"rssi":            rssi,
+        @"success":         @(error == nil),
+        @"error_string":    error ? [error localizedDescription] : @"success",
+        @"error_code":      error ? @(error.code) : @(0),
+    };
+
+    [self.methodChannel invokeMethod:@"OnReadRssi" arguments:result];
+}
+
+- (void)peripheralIsReadyToSendWriteWithoutResponse:(CBPeripheral *)peripheral
+{
+    Log(LVERBOSE, @"peripheralIsReadyToSendWriteWithoutResponse");
+
+    // peripheralIsReadyToSendWriteWithoutResponse is used to signal
+    // when a 'writeWithoutResponse' request has completed. 
+    // The dart code will wait for this signal, so that we don't
+    // queue writes too fast, which iOS would then drop the packets.
+    
+    NSDictionary *request = [self.didWriteWithoutResponse objectForKey:[[peripheral identifier] UUIDString]];
+    if (request == nil) {
+        Log(LERROR, @"didWriteWithoutResponse is null");
+        return;
+    }
+    
+    // See BmWriteCharacteristicRequest
+    NSString  *serviceUuid        = request[@"service_uuid"];
+    NSString  *characteristicUuid = request[@"characteristic_uuid"];
+    NSString  *primaryServiceUuid = request[@"primary_service_uuid"];
+    NSNumber  *instanceId         = request[@"instance_id"];
+    NSString  *value              = request[@"value"];
+
+    // Find characteristic
+    NSError *error = nil;
+    CBCharacteristic *characteristic = [self locateCharacteristic:characteristicUuid
+                                                       peripheral:peripheral
+                                                     serviceUuid:serviceUuid
+                                               primaryServiceUuid:primaryServiceUuid
+                                                      instanceId:instanceId
+                                                            error:&error];
+
+    if (characteristic == nil) {
+        Log(LERROR, @"Error: peripheralIsReadyToSendWriteWithoutResponse: %@", [error localizedDescription]);
+        return;
+    }
+
+    // See BmCharacteristicData
+    NSMutableDictionary* result = [@{
+        @"remote_id":               [peripheral.identifier UUIDString],
+        @"service_uuid":            [characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":     [characteristic.UUID uuidStr],
+        @"primary_service_uuid":    primaryServiceUuid != nil ? primaryServiceUuid : [NSNull null],
+        @"instance_id":             instanceId ? instanceId : [NSNull null],
+        @"value":                   value,
+        @"success":                 @(error == nil),
+        @"error_string":            error ? [error localizedDescription] : @"success",
+        @"error_code":              error ? @(error.code) : @(0),
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryServiceUuid) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    [self.methodChannel invokeMethod:@"OnCharacteristicWritten" arguments:result];
+}
+
+//////////////////////////////////////////////////////////////////////
+// ███    ███  ███████   ██████      
+// ████  ████  ██       ██           
+// ██ ████ ██  ███████  ██   ███     
+// ██  ██  ██       ██  ██    ██     
+// ██      ██  ███████   ██████ 
+//     
+// ██   ██  ███████  ██       ██████   ███████  ██████   ███████ 
+// ██   ██  ██       ██       ██   ██  ██       ██   ██  ██      
+// ███████  █████    ██       ██████   █████    ██████   ███████ 
+// ██   ██  ██       ██       ██       ██       ██   ██       ██ 
+// ██   ██  ███████  ███████  ██       ███████  ██   ██  ███████ 
+
+- (int)bmAdapterStateEnum:(CBManagerState)adapterState
+{
+    switch (adapterState)
+    {
+        case CBManagerStateUnknown:      return 0; // BmAdapterStateEnum.unknown
+        case CBManagerStateUnsupported:  return 1; // BmAdapterStateEnum.unavailable
+        case CBManagerStateUnauthorized: return 2; // BmAdapterStateEnum.unauthorized
+        case CBManagerStateResetting:    return 3; // BmAdapterStateEnum.turningOn
+        case CBManagerStatePoweredOn:    return 4; // BmAdapterStateEnum.on
+        case CBManagerStatePoweredOff:   return 6; // BmAdapterStateEnum.off
+        default:                         return 0; // BmAdapterStateEnum.unknown
+    }
+    return 0;
+}
+
+- (NSDictionary *)bmScanAdvertisement:(NSString*)remoteId
+             advertisementData:(NSDictionary<NSString *, id> *)advertisementData
+                          RSSI:(NSNumber *)RSSI
+{
+    NSString     *advName        = advertisementData[CBAdvertisementDataLocalNameKey];
+    NSNumber     *connectable    = advertisementData[CBAdvertisementDataIsConnectable];
+    NSNumber     *txPower        = advertisementData[CBAdvertisementDataTxPowerLevelKey];
+    NSData       *manufData      = advertisementData[CBAdvertisementDataManufacturerDataKey];
+    NSArray      *serviceUuids   = advertisementData[CBAdvertisementDataServiceUUIDsKey];
+    NSDictionary *serviceData    = advertisementData[CBAdvertisementDataServiceDataKey];
+
+    // Manufacturer Data
+    NSDictionary* manufDataB = nil;
+    if (manufData != nil && manufData.length >= 2) {
+        
+        // first 2 bytes are manufacturerId (little endian)
+        uint8_t bytes[2];
+        [manufData getBytes:bytes length:2];
+        unsigned short manufId = (unsigned short) (bytes[0] | bytes[1] << 8);
+
+        // trim off first 2 bytes
+        NSData* trimmed = [manufData subdataWithRange:NSMakeRange(2, manufData.length - 2)];
+
+        manufDataB = @{
+            @(manufId): trimmed,
+        };
+    }
+    
+    // Service Uuids - convert from CBUUID's to UUID strings
+    NSArray *serviceUuidsB = nil;
+    if (serviceUuids != nil) {
+        NSMutableArray *mutable = [[NSMutableArray alloc] init];
+        for (CBUUID *uuid in serviceUuids) {
+            [mutable addObject:[uuid uuidStr]];
+        }
+        serviceUuidsB = [mutable copy];
+    }
+    
+    // Service Data - convert from CBUUID's to UUID strings
+    NSDictionary *serviceDataB = nil;
+    if (serviceData != nil)
+    {
+        NSMutableDictionary *mutable = [[NSMutableDictionary alloc] init];
+        for (CBUUID *uuid in serviceData) {
+            NSData *data = serviceData[uuid];
+            [mutable setObject:data forKey:[uuid uuidStr]];
+        }
+        serviceDataB = [mutable copy];
+    }
+
+    // platform name
+    NSString* platformName = nil;
+    if ([self.knownPeripherals objectForKey:remoteId] != nil) {
+        CBPeripheral* peripheral = [self.knownPeripherals objectForKey:remoteId];
+        platformName = peripheral.name;
+    }
+
+    // See BmScanAdvertisement
+    // perf: only add keys if they exist
+    NSMutableDictionary *map = [NSMutableDictionary dictionary];
+    if (remoteId)              {map[@"remote_id"] = remoteId;}
+    if (platformName)          {map[@"platform_name"] = platformName;}
+    if (advName)               {map[@"adv_name"] = advName;}
+    if (connectable.boolValue) {map[@"connectable"] = connectable;}
+    if (txPower)               {map[@"tx_power_level"] = txPower;}
+    if (manufDataB)            {map[@"manufacturer_data"] = manufDataB;}
+    if (serviceUuidsB)         {map[@"service_uuids"] = serviceUuidsB;}
+    if (serviceDataB)          {map[@"service_data"] = serviceDataB;}
+    if (RSSI)                  {map[@"rssi"] = RSSI;}
+    return map;
+}
+
+- (NSDictionary *)bmBluetoothDevice:(CBPeripheral *)peripheral
+{
+    return @{
+        @"remote_id":       [[peripheral identifier] UUIDString],
+        @"platform_name":   [peripheral name] ? [peripheral name] : [NSNull null],
+    };
+}
+
+- (int)bmConnectionStateEnum:(CBPeripheralState)connectionState
+{
+    switch (connectionState)
+    {
+        case CBPeripheralStateDisconnected:  return 0; // BmConnectionStateEnum.disconnected
+        case CBPeripheralStateConnected:     return 1; // BmConnectionStateEnum.connected
+        default:                             return 0;
+    }
+}
+
+- (NSDictionary *)bmBluetoothService:(CBPeripheral *)peripheral service:(CBService *)service
+{
+    // Characteristics
+    NSMutableArray *characteristicProtos = [NSMutableArray new];
+    for (CBCharacteristic *c in [service characteristics])
+    {
+        [characteristicProtos addObject:[self bmBluetoothCharacteristic:peripheral characteristic:c]];
+    }
+
+    // Included Services
+    NSMutableArray *includedServicesProtos = [NSMutableArray new];
+    for (CBService *included in [service includedServices])
+    {
+        // service includes itself?
+        if ([included.UUID isEqual:service.UUID]) {
+            continue; // skip, infinite recursion
+        }
+        [includedServicesProtos addObject:[self bmBluetoothService:peripheral service:included]];
+    }
+
+    // See BmBluetoothService
+    return @{
+        @"remote_id":           [peripheral.identifier UUIDString],
+        @"service_uuid":        [service.UUID uuidStr],
+        @"characteristics":     characteristicProtos,
+    };
+}
+
+- (NSDictionary*)bmBluetoothCharacteristic:(CBPeripheral *)peripheral
+                            characteristic:(CBCharacteristic *)characteristic
+{
+    CBService *primaryService = [self getPrimaryService:peripheral characteristic:characteristic];
+    NSNumber *instanceId = [self getInstanceId:characteristic];
+
+    // descriptors
+    NSMutableArray *descriptors = [NSMutableArray new];
+    for (CBDescriptor *d in [characteristic descriptors])
+    {
+        // See: BmBluetoothDescriptor
+        NSMutableDictionary* desc = [@{
+            @"remote_id":              [peripheral.identifier UUIDString],
+            @"service_uuid":           [d.characteristic.service.UUID uuidStr],
+            @"characteristic_uuid":    [d.characteristic.UUID uuidStr],
+            @"descriptor_uuid":        [d.UUID uuidStr],
+            @"primary_service_uuid":   primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+            @"instance_id":            instanceId ? instanceId : [NSNull null], 
+        } mutableCopy];
+
+        // remove if null
+        if (!primaryService) {[desc removeObjectForKey:@"primary_service_uuid"];}
+
+        [descriptors addObject:desc];
+    }
+
+    CBCharacteristicProperties props = characteristic.properties;
+
+    // See: BmCharacteristicProperties
+    NSDictionary* propsMap = @{
+        @"broadcast":                    @((props & CBCharacteristicPropertyBroadcast) != 0),
+        @"read":                         @((props & CBCharacteristicPropertyRead) != 0),
+        @"write_without_response":       @((props & CBCharacteristicPropertyWriteWithoutResponse) != 0),
+        @"write":                        @((props & CBCharacteristicPropertyWrite) != 0),
+        @"notify":                       @((props & CBCharacteristicPropertyNotify) != 0),
+        @"indicate":                     @((props & CBCharacteristicPropertyIndicate) != 0),
+        @"authenticated_signed_writes":  @((props & CBCharacteristicPropertyAuthenticatedSignedWrites) != 0),
+        @"extended_properties":          @((props & CBCharacteristicPropertyExtendedProperties) != 0),
+        @"notify_encryption_required":   @((props & CBCharacteristicPropertyNotifyEncryptionRequired) != 0),
+        @"indicate_encryption_required": @((props & CBCharacteristicPropertyIndicateEncryptionRequired) != 0),
+    };
+
+    // See BmBluetoothCharacteristic
+    NSMutableDictionary* result = [@{
+        @"remote_id":              [peripheral.identifier UUIDString],
+        @"service_uuid":           [characteristic.service.UUID uuidStr],
+        @"characteristic_uuid":    [characteristic.UUID uuidStr],
+        @"primary_service_uuid":    primaryService ? [primaryService.UUID uuidStr] : [NSNull null],
+        @"instance_id":            instanceId ? instanceId : [NSNull null],
+        @"descriptors":            descriptors,
+        @"properties":             propsMap,
+    } mutableCopy];
+
+    // remove if null
+    if (!primaryService) {[result removeObjectForKey:@"primary_service_uuid"];}
+
+    return result;
+}
+
+//////////////////////////////////////////
+// ██    ██ ████████  ██  ██       ███████ 
+// ██    ██    ██     ██  ██       ██      
+// ██    ██    ██     ██  ██       ███████ 
+// ██    ██    ██     ██  ██            ██ 
+//  ██████     ██     ██  ███████  ███████ 
+
+- (bool)isAdapterOn
+{
+    return self.centralManager.state == CBManagerStatePoweredOn;
+}
+
+- (NSInteger)scanCountIncrement:(NSString *)remoteId {
+    if (!self.scanCounts[remoteId]) {self.scanCounts[remoteId] = @(0);}
+    NSInteger count = [self.scanCounts[remoteId] integerValue];
+    self.scanCounts[remoteId] = @(count + 1);
+    return count;
+}
+
+- (BOOL)hasFilter:(NSString *)key {
+    NSArray *filterArray = self.scanFilters[key];
+    return (filterArray != nil && [filterArray count] > 0);
+}
+
+- (BOOL)foundService:(NSArray<NSString *> *)services
+                target:(NSArray<CBUUID *> *)target
+{
+    if (target == nil || target.count == 0) {
+        return NO;
+    }
+    for (CBUUID *s in target) {
+        if ([services containsObject:[s uuidStr]]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)foundKeyword:(NSArray<NSString *> *)keywords
+                target:(NSString *)target
+{
+    if (target == nil) {
+        return NO;
+    }
+    for (NSString *k in keywords) {
+        if ([target rangeOfString:k].location != NSNotFound) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)foundName:(NSArray<NSString *> *)names
+                target:(NSString *)target
+{
+    if (target == nil) {
+        return NO;
+    }
+    for (NSString *n in names) {
+        if ([target isEqualToString:n]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)foundRemoteId:(NSArray<NSString *> *)remoteIds
+                target:(NSString *)target
+{
+    if (target == nil) {
+        return NO;
+    }
+    for (NSString *r in remoteIds) {
+        if ([[target lowercaseString] isEqualToString:[r lowercaseString]]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)foundServiceData:(NSArray<NSDictionary*>*)filters
+                       sd:(NSDictionary *)sd
+{
+    if (sd == nil || sd.count == 0) {
+        return NO;
+    }
+    for (NSDictionary *f in filters) {
+        NSString *service = f[@"service"];
+        NSData *data      = [f[@"data"] data];
+        NSData *mask      = [f[@"mask"] data];
+
+        // mask
+        if (mask.length == 0 && data.length > 0) {
+            uint8_t *bytes = malloc(data.length);
+            memset(bytes, 1, data.length); 
+            mask = [NSData dataWithBytesNoCopy:bytes length:data.length freeWhenDone:YES];
+        }
+
+        // found a match?
+        for (CBUUID *uuid in sd) {
+            NSString* a = [uuid uuidStr];
+            NSString* b = [service lowercaseString];
+            if([a isEqualToString:b] && [self findData:data inData:sd[uuid] usingMask:mask]) {
+                return YES;
+            }
+        }
+    }
+    return NO;
+}
+
+- (BOOL)foundMsd:(NSArray<NSDictionary*>*)filters
+              msd:(NSData *)msd
+{
+    if (msd == nil || msd.length < 2) {
+        return NO;
+    }
+    for (NSDictionary *f in filters) {
+        NSNumber *manufacturerId = f[@"manufacturer_id"];
+        NSData *data =             [f[@"data"] data];
+        NSData *mask =             [f[@"mask"] data];
+
+        // first 2 bytes are manufacturer id
+        unsigned short mId = 0;
+        [msd getBytes:&mId length:2];
+
+        // mask
+        if (mask.length == 0 && data.length > 0) {
+            uint8_t *bytes = malloc(data.length);
+            memset(bytes, 1, data.length); 
+            mask = [NSData dataWithBytesNoCopy:bytes length:data.length freeWhenDone:YES];
+        }
+
+        // trim off first 2 bytes
+        NSData* trim = [msd subdataWithRange:NSMakeRange(2, msd.length - 2)];
+
+        // manufacturer id & data
+        if(mId == [manufacturerId integerValue] && [self findData:data inData:trim usingMask:mask]) {
+            return YES;
+        }
+    }
+    return NO;
+}
+
+- (BOOL)findData:(NSData *)find inData:(NSData *)data usingMask:(NSData *)mask {
+    // Ensure find & mask are same length
+    if ([find length] != [mask length]) {
+        return NO;
+    }
+    
+    const uint8_t *bFind = [find bytes];
+    const uint8_t *bData = [data bytes];
+    const uint8_t *bMask = [mask bytes];
+    
+    for (NSUInteger i = 0; i < [find length]; i++) {
+        // Perform bitwise AND with mask and then compare
+        if ((bFind[i] & bMask[i]) != (bData[i] & bMask[i])) {
+            return NO;
+        }
+    }
+    
+    return YES;
+}
+
+- (NSString *)cbManagerStateString:(CBManagerState)adapterState
+{
+    switch (adapterState)
+    {
+        case CBManagerStateUnknown:      return @"CBManagerStateUnknown";
+        case CBManagerStateUnsupported:  return @"CBManagerStateUnsupported";
+        case CBManagerStateUnauthorized: return @"CBManagerStateUnauthorized";
+        case CBManagerStateResetting:    return @"CBManagerStateResetting";
+        case CBManagerStatePoweredOn:    return @"CBManagerStatePoweredOn";
+        case CBManagerStatePoweredOff:   return @"CBManagerStatePoweredOff";
+        default:                         return @"unhandled";
+    }
+    return @"";
+}
+
+- (void)log:(LogLevel)level
+     format:(NSString *)format, ...
+{
+    if (level <= self.logLevel)
+    {
+        va_list args;
+        va_start(args, format);
+        NSString* msg = [[NSString alloc] initWithFormat:format arguments:args];
+        NSLog(@"%@", msg);
+        va_end(args);
+    }
+}
+
+- (int)getMaxPayload:(CBPeripheral *)peripheral forType:(CBCharacteristicWriteType)writeType allowLongWrite:(bool)allowLongWrite
+{
+    // if allowLongWrite is disabled, we can only write up to MTU-3
+    if (allowLongWrite == false) {
+        writeType = CBCharacteristicWriteWithoutResponse;
+    }
+
+    // For withoutResponse, or allowLongWrite == false
+    //   iOS returns MTU-3. In theory, MTU can be as high as 65535 (16-bit).
+    //   I've seen iOS return 524 for this value. But typically it is lower.
+    //   The MTU negotiated by the OS depends on iOS version.
+    //
+    // For withResponse, 
+    //   iOS typically returns a constant value of 512, regardless of MTU. 
+    //   This is because iOS will autosplit large writes
+    int maxForType = (int) [peripheral maximumWriteValueLengthForType:writeType];
+
+    // In order to operate the same on both iOS & Android, we enforce a 
+    // maximum of 512, which is the same as android. This is also the
+    // maxAttrLen of a characteristic in the BLE specification.
+    return MIN(maxForType, 512);
+}
+
+- (int)getMtu:(CBPeripheral *)peripheral
+{
+    int maxPayload = [self getMaxPayload:peripheral forType:CBCharacteristicWriteWithoutResponse allowLongWrite:false];
+    return maxPayload + 3; // ATT overhead
+}
+
+- (CBService *)getPrimaryService:(CBPeripheral *)peripheral
+                 characteristic:(CBCharacteristic *)characteristic
+{
+    CBService *service = characteristic.service;
+
+    // is this *already* a primary service?
+    if ([service isPrimary]) {
+        return nil;
+    } 
+
+    // Otherwise, iterate all services until we find the primary service
+    for (CBService *primary in [peripheral services])
+    {
+        for (CBService *secondary in [primary includedServices])
+        {
+            if ([secondary.UUID isEqual:service.UUID])
+            {
+                return primary;
+            }
+        }
+    }
+
+    return NULL;
+}
+
+// uniquely distinguish similar characteristics within a single discovery session.
+- (nullable NSNumber *)getInstanceId:(CBCharacteristic *)characteristic
+{
+    NSValue *key = [NSValue valueWithNonretainedObject:characteristic];
+    return charToInstanceIdMap[key];
+}
+
+- (void)resetInstanceIds:(NSString *)discoveredDeviceId {
+    NSMutableArray<NSNumber *> *idsToRemove = [NSMutableArray array];
+    NSMutableArray<NSValue *>  *chrsToRemove    = [NSMutableArray array];
+
+    [instanceIdToCharMap enumerateKeysAndObjectsUsingBlock:^(NSNumber *iid, CBCharacteristic *chr, BOOL *stop) {
+        if ([[chr.service.peripheral.identifier UUIDString] isEqualToString:discoveredDeviceId]) {
+            [idsToRemove addObject:iid];
+            [chrsToRemove addObject:[NSValue valueWithNonretainedObject:chr]];
+        }
+    }];
+
+    [instanceIdToCharMap removeObjectsForKeys:idsToRemove];
+    [charToInstanceIdMap removeObjectsForKeys:chrsToRemove];
+}
+
+- (NSData *)descriptorToData:(CBDescriptor *)descriptor
+{
+    NSData* data = nil;
+    if (descriptor.value)
+    {
+        if ([descriptor.value isKindOfClass:[NSString class]])
+        {
+            // NSString
+            data = [descriptor.value dataUsingEncoding:NSUTF8StringEncoding];
+        }
+        else if ([descriptor.value isKindOfClass:[NSNumber class]])
+        {
+            // NSNumber
+            int value = [descriptor.value intValue];
+            data = [NSData dataWithBytes:&value length:sizeof(value)];
+        } 
+        else if ([descriptor.value isKindOfClass:[NSData class]])
+        {
+            // NSData
+            data = descriptor.value;
+        }
+    }
+    return data;
+}
+
+// L2CAP channel delegate method for client side
+- (void)peripheral:(CBPeripheral *)peripheral didOpenL2CAPChannel:(CBL2CAPChannel *)channel error:(NSError *)error API_AVAILABLE(ios(11.0))
+{
+    if (error) {
+        Log(LERROR, @"didOpenL2CAPChannel error: %@ (%@, code=%ld)", error.localizedDescription, error.domain, (long)error.code);
+        NSString *remoteId = [[peripheral identifier] UUIDString];
+        [self.l2CapChannelManager completePendingOpenForRemoteId:remoteId
+                                                             psm:channel.PSM
+                                                           error:error];
+        return;
+    }
+    
+    Log(LDEBUG, @"didOpenL2CAPChannel: PSM=%d", channel.PSM);
+    
+    NSString *remoteId = [[peripheral identifier] UUIDString];
+    L2CapChannelInfo *channelInfo = [[L2CapChannelInfo alloc] initWithPsm:@(channel.PSM) 
+                                                                  remoteId:remoteId
+                                                                   channel:channel];
+    [self.l2CapChannelManager.channels addObject:channelInfo];
+    
+    [self.l2CapChannelManager setupStreamsForChannel:channelInfo];
+
+    // Defer the open result until the output stream fires HasSpaceAvailable.
+    // setupStreamsForChannel dispatches async, so the stream isn't ready yet.
+    NSString *readyKey = [NSString stringWithFormat:@"%@:%@", remoteId, @(channel.PSM)];
+    __weak typeof(self) weakSelf = self;
+    self.l2CapChannelManager.pendingStreamReady[readyKey] = ^{
+        __strong typeof(weakSelf) strongSelf = weakSelf;
+        if (!strongSelf) return;
+        [strongSelf.l2CapChannelManager completePendingOpenForRemoteId:remoteId psm:channel.PSM error:nil];
+        [strongSelf.methodChannel invokeMethod:@"OnL2CapChannelOpened" arguments:@{
+            @"remote_id": remoteId,
+            @"psm": @(channel.PSM)
+        }];
+    };
+}
+
+@end
+
+//////////////////////////////////////////////////////////////////////
+// ██       ██████   ██████   █████   ██████      ██████  ██   ██  ██
+// ██       ╚════██ ██       ██   ██  ██   ██    ██      ██   ██  ██
+// ██        █████  ██       ███████  ██████     ██      ███████  ██
+// ██       ██      ██       ██   ██  ██         ██      ██   ██
+// ███████  ███████  ██████  ██   ██  ██          ██████ ██   ██  ██
+//
+//  ██████  ██   ██   █████   ███    ██  ███    ██  ███████  ██
+// ██       ██   ██  ██   ██  ████   ██  ████   ██  ██       ██
+// ██       ███████  ███████  ██ ██  ██  ██ ██  ██  █████    ██
+// ██       ██   ██  ██   ██  ██  ██ ██  ██  ██ ██  ██       ██
+//  ██████  ██   ██  ██   ██  ██   ████  ██   ████  ███████  ███████
+
+@implementation L2CapChannelInfo
+- (instancetype)initWithPsm:(NSNumber *)psm remoteId:(NSString *)remoteId channel:(CBL2CAPChannel *)channel
+{
+    self = [super init];
+    if (self) {
+        self.psm = psm;
+        self.remoteId = remoteId;
+        self.channel = channel;
+        self.readBuffer = [[NSMutableData alloc] init];
+        self.listening = NO;
+    }
+    return self;
+}
+@end
+
+@implementation L2CapChannelManager
+
+- (instancetype)initWithMethodChannel:(FlutterMethodChannel *)methodChannel plugin:(FlutterBlueMaxPlugin *)plugin
+{
+    self = [super init];
+    if (self) {
+        self.methodChannel = methodChannel;
+        self.plugin = plugin;
+        self.channels = [[NSMutableArray alloc] init];
+        self.zombieChannels = [[NSMutableArray alloc] init];
+        self.peripheralManagers = [[NSMutableDictionary alloc] init];
+        self.publishedServices = [[NSMutableDictionary alloc] init];
+        // Track pending client open requests keyed by "<remoteId>:<psm>"
+        if (!self.pendingOpenResults) {
+            self.pendingOpenResults = [[NSMutableDictionary alloc] init];
+        }
+        if (!self.pendingOpenRequestedPsm) {
+            self.pendingOpenRequestedPsm = [[NSMutableDictionary alloc] init];
+        }
+        if (!self.pendingStreamReady) {
+            self.pendingStreamReady = [[NSMutableDictionary alloc] init];
+        }
+    }
+    return self;
+}
+
+- (void)handleOpenL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    if (@available(iOS 11.0, *)) {
+        NSDictionary *args = call.arguments;
+        NSString *remoteId = args[@"remote_id"];
+        NSNumber *psmValue = args[@"psm"];
+        NSNumber *secure = args[@"secure"];  // Extract secure parameter for validation
+        CBPeripheral *peripheral = [self findPeripheralById:remoteId];
+        
+        // Note: iOS Core Bluetooth openL2CAPChannel does not have a security parameter.
+        // Security is controlled by the peripheral when publishing the channel with
+        // publishL2CAPChannelWithEncryption. The secure parameter is acknowledged but 
+        // cannot be enforced on the client side - it depends on the server's configuration.
+        BOOL secureBool = [secure boolValue];
+        NSLog(@"Opening L2CAP channel with requested security: %@ (Note: iOS client security controlled by server)", secureBool ? @"secure" : @"insecure");
+        
+        if (peripheral == nil) {
+            result([FlutterError errorWithCode:@"openL2CapChannel" 
+                                      message:@"Peripheral not found" 
+                                      details:nil]);
+            return;
+        }
+        
+        if (peripheral.state != CBPeripheralStateConnected) {
+            result([FlutterError errorWithCode:@"openL2CapChannel"
+                                      message:@"Peripheral not connected"
+                                      details:nil]);
+            return;
+        }
+
+        // Check if a zombie channel exists for this remoteId+PSM.
+        // If so, recycle it instead of opening a new one (iOS won't allow
+        // opening a PSM that's still alive, even if logically closed).
+        L2CapChannelInfo *zombie = nil;
+        for (L2CapChannelInfo *info in self.zombieChannels) {
+            if ([info.remoteId isEqualToString:remoteId] && [info.psm isEqualToNumber:psmValue]) {
+                zombie = info;
+                break;
+            }
+        }
+        if (zombie && zombie.channel) {
+            [self.zombieChannels removeObject:zombie];
+            [self.channels addObject:zombie];
+            [self reattachStreamsForChannel:zombie];
+
+            // Defer result until the output stream fires HasSpaceAvailable.
+            // This prevents "Output stream not ready" when Dart writes immediately.
+            NSString *readyKey = [NSString stringWithFormat:@"%@:%@", remoteId, psmValue];
+            FlutterResult capturedResult = [result copy];
+            __weak typeof(self) weakSelf = self;
+            self.pendingStreamReady[readyKey] = ^{
+                __strong typeof(weakSelf) strongSelf = weakSelf;
+                if (!strongSelf) return;
+                [strongSelf.methodChannel invokeMethod:@"OnL2CapChannelOpened" arguments:@{
+                    @"remote_id": remoteId,
+                    @"psm": psmValue
+                }];
+                capturedResult(nil);
+            };
+            return;
+        }
+
+        // Defer the result until didOpenL2CAPChannel returns (success or error)
+        NSString *key = [NSString stringWithFormat:@"%@: %@", remoteId, psmValue];
+        self.pendingOpenResults[key] = [result copy];
+        self.pendingOpenRequestedPsm[remoteId] = psmValue;
+        [peripheral openL2CAPChannel:[psmValue unsignedShortValue]];
+    } else {
+        result([FlutterError errorWithCode:@"openL2CapChannel" 
+                                  message:@"L2CAP channels require iOS 11.0 or later" 
+                                  details:nil]);
+    }
+}
+
+// Complete pending open request (called from plugin delegate)
+- (void)completePendingOpenForRemoteId:(NSString *)remoteId psm:(CBL2CAPPSM)psm error:(NSError *)error
+{
+    // Try exact key first
+    NSString *key = [NSString stringWithFormat:@"%@: %@", remoteId, @(psm)];
+    FlutterResult pending = self.pendingOpenResults[key];
+    // Fallback: use the originally requested PSM for this remoteId
+    if (!pending) {
+        NSNumber *requestedPsm = self.pendingOpenRequestedPsm[remoteId];
+        if (requestedPsm) {
+            key = [NSString stringWithFormat:@"%@: %@", remoteId, requestedPsm];
+            pending = self.pendingOpenResults[key];
+        }
+    }
+    // Last resort: find any pending key that matches remoteId prefix
+    if (!pending) {
+        for (NSString *k in self.pendingOpenResults.allKeys) {
+            if ([k hasPrefix:[NSString stringWithFormat:@"%@: ", remoteId]]) {
+                key = k;
+                pending = self.pendingOpenResults[k];
+                break;
+            }
+        }
+    }
+    if (pending) {
+        [self.pendingOpenResults removeObjectForKey:key];
+        [self.pendingOpenRequestedPsm removeObjectForKey:remoteId];
+        if (error) {
+            pending([FlutterError errorWithCode:@"openL2CapChannel" message:error.localizedDescription details:@(error.code)]);
+        } else {
+            pending(nil);
+        }
+    }
+}
+
+- (void)handleCloseL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    NSDictionary *args = call.arguments;
+    NSString *remoteId = args[@"remote_id"];
+    NSNumber *psmValue = args[@"psm"];
+
+    L2CapChannelInfo *channelInfo = [self findChannelByRemoteId:remoteId psm:psmValue];
+    // Fallback for server-accepted channels which are tracked under remoteId "server"
+    if (!channelInfo) {
+        channelInfo = [self findChannelByRemoteId:@"server" psm:psmValue];
+    }
+    if (channelInfo && channelInfo.channel) {
+        void (^closeChannelNow)(void) = ^{
+            // Detach delegates and remove from run loop so we stop receiving events
+            NSInputStream *is = channelInfo.channel.inputStream;
+            NSOutputStream *os = channelInfo.channel.outputStream;
+            is.delegate = nil;
+            os.delegate = nil;
+            [is removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [os removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+
+            // Move to zombie list instead of removing. This keeps the CBL2CAPChannel
+            // object alive so ARC doesn't dealloc it. Releasing a CBL2CAPChannel
+            // triggers iOS to disconnect ALL L2CAP channels on the same peripheral.
+            // Do NOT close the streams — the channel must stay usable for recycling
+            // when the same PSM is re-opened later.
+            [self.channels removeObject:channelInfo];
+            [self.zombieChannels addObject:channelInfo];
+        };
+        if ([NSThread isMainThread]) {
+            closeChannelNow();
+        } else {
+            dispatch_async(dispatch_get_main_queue(), closeChannelNow);
+        }
+    }
+
+    result(nil);
+}
+
+- (void)handleReadL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    NSDictionary *args = call.arguments;
+    NSString *remoteId = args[@"remote_id"];
+    NSNumber *psmValue = args[@"psm"];
+    
+    L2CapChannelInfo *channelInfo = [self findChannelByRemoteId:remoteId psm:psmValue];
+    
+    // If not found with the provided remoteId, try looking for server-side channel
+    if (!channelInfo) {
+        channelInfo = [self findChannelByRemoteId:@"server" psm:psmValue];
+    }
+    if (channelInfo && channelInfo.readBuffer.length > 0) {
+        NSData *data = [NSData dataWithData:channelInfo.readBuffer];
+        [channelInfo.readBuffer setLength:0];
+        result(data);
+    } else {
+        result([NSData data]);
+    }
+}
+
+- (void)handleWriteL2CapChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    NSDictionary *args = call.arguments;
+    NSString *remoteId = args[@"remote_id"];
+    NSNumber *psmValue = args[@"psm"];
+    FlutterStandardTypedData *valueData = args[@"value"];
+    
+    L2CapChannelInfo *channelInfo = [self findChannelByRemoteId:remoteId psm:psmValue];
+    
+    // If not found with the provided remoteId, try looking for server-side channel
+    if (!channelInfo) {
+        channelInfo = [self findChannelByRemoteId:@"server" psm:psmValue];
+        NSLog(@"Searching for server channel with PSM: %@, found: %@", psmValue, channelInfo ? @"YES" : @"NO");
+    }
+    
+    if (channelInfo && channelInfo.channel && channelInfo.channel.outputStream) {
+        NSOutputStream *outputStream = channelInfo.channel.outputStream;
+        if (outputStream.hasSpaceAvailable) {
+            NSInteger bytesWritten = [outputStream write:valueData.data.bytes maxLength:valueData.data.length];
+            if (bytesWritten < 0) {
+                result([FlutterError errorWithCode:@"writeL2CapChannel"
+                                          message:@"Write failed"
+                                          details:nil]);
+            } else {
+                result(nil);
+            }
+        } else {
+            result([FlutterError errorWithCode:@"writeL2CapChannel"
+                                      message:@"Output stream not ready"
+                                      details:nil]);
+        }
+    } else {
+        result([FlutterError errorWithCode:@"writeL2CapChannel" 
+                                  message:@"Channel not found" 
+                                  details:nil]);
+    }
+}
+
+- (void)handleListenL2capChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    if (@available(iOS 11.0, *)) {
+        NSDictionary *args = call.arguments;
+        NSNumber *secure = args[@"secure"];
+        
+        // Store the result callback and settings to be used when peripheral manager is ready
+        self.pendingListenResult = result;
+        self.pendingListenSecure = [secure boolValue];
+        
+        CBPeripheralManager *peripheralManager = [[CBPeripheralManager alloc] initWithDelegate:self queue:nil];
+        
+        NSNumber *psmPlaceholder = @(0);
+        self.peripheralManagers[psmPlaceholder] = peripheralManager;
+        
+        // Publishing will happen in peripheralManagerDidUpdateState when state is poweredOn
+        // Don't call result here - wait for didPublishL2CAPChannel callback
+    } else {
+        result([FlutterError errorWithCode:@"listenL2capChannel" 
+                                  message:@"L2CAP channels require iOS 11.0 or later" 
+                                  details:nil]);
+    }
+}
+
+- (void)handleStopListenL2capChannel:(FlutterMethodCall *)call result:(FlutterResult)result
+{
+    NSDictionary *args = call.arguments;
+    NSNumber *psmValue = args[@"psm"];
+    
+    CBPeripheralManager *peripheralManager = self.peripheralManagers[psmValue];
+    if (peripheralManager) {
+        [peripheralManager unpublishL2CAPChannel:psmValue.unsignedShortValue];
+        [self.peripheralManagers removeObjectForKey:psmValue];
+        [self.publishedServices removeObjectForKey:psmValue];
+    }
+    
+    result(nil);
+}
+
+- (CBPeripheral *)findPeripheralById:(NSString *)remoteId
+{
+    if (self.plugin && self.plugin.knownPeripherals) {
+        return self.plugin.knownPeripherals[remoteId];
+    }
+    return nil;
+}
+
+- (L2CapChannelInfo *)findChannelByRemoteId:(NSString *)remoteId psm:(NSNumber *)psm
+{
+    for (L2CapChannelInfo *info in self.channels) {
+        if ([info.remoteId isEqualToString:remoteId] && [info.psm isEqualToNumber:psm]) {
+            return info;
+        }
+    }
+    return nil;
+}
+
+#pragma mark - CBPeripheralManagerDelegate
+
+- (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral
+{
+    NSLog(@"Peripheral manager state updated: %ld", (long)peripheral.state);
+    
+    if (@available(iOS 11.0, *)) {
+        if (peripheral.state == CBManagerStatePoweredOn && self.pendingListenResult) {
+            NSLog(@"Publishing L2CAP channel with encryption: %@", self.pendingListenSecure ? @"YES" : @"NO");
+            [peripheral publishL2CAPChannelWithEncryption:self.pendingListenSecure];
+        } else if (peripheral.state != CBManagerStatePoweredOn && self.pendingListenResult) {
+            // If peripheral manager is not powered on, return error
+            NSString *errorMessage = [NSString stringWithFormat:@"Bluetooth peripheral manager not ready (state: %ld)", (long)peripheral.state];
+            self.pendingListenResult([FlutterError errorWithCode:@"listenL2capChannel" 
+                                                         message:errorMessage 
+                                                         details:nil]);
+            self.pendingListenResult = nil;
+        }
+    }
+}
+
+- (void)peripheralManager:(CBPeripheralManager *)peripheral didPublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error API_AVAILABLE(ios(11.0))
+{
+    if (error) {
+        NSLog(@"Failed to publish L2CAP channel: %@", error.localizedDescription);
+        if (self.pendingListenResult) {
+            self.pendingListenResult([FlutterError errorWithCode:@"listenL2capChannel" 
+                                                         message:error.localizedDescription 
+                                                         details:nil]);
+            self.pendingListenResult = nil;
+        }
+        return;
+    }
+    
+    NSNumber *psmValue = @(PSM);
+    self.peripheralManagers[psmValue] = peripheral;
+    [self.peripheralManagers removeObjectForKey:@(0)];
+    
+    // Call the pending result callback with the actual PSM
+    if (self.pendingListenResult) {
+        self.pendingListenResult(@{@"psm": psmValue});
+        self.pendingListenResult = nil;
+    }
+    
+    [self.methodChannel invokeMethod:@"OnL2CapChannelPublished" arguments:@{@"psm": psmValue}];
+}
+
+- (void)peripheralManager:(CBPeripheralManager *)peripheral didOpenL2CAPChannel:(CBL2CAPChannel *)channel error:(NSError *)error API_AVAILABLE(ios(11.0))
+{
+    if (error) {
+        NSLog(@"Failed to open L2CAP channel: %@", error.localizedDescription);
+        return;
+    }
+    
+    // Get the PSM from the channel's input stream
+    CBL2CAPPSM psm = channel.PSM;
+    
+    NSLog(@"L2CAP channel opened on server - PSM: %d", (int)psm);
+    
+    // Create channel info for the incoming connection
+    // For server side, we use a generic remote ID since we don't know the specific peripheral
+    NSString *serverRemoteId = @"server";
+    L2CapChannelInfo *channelInfo = [[L2CapChannelInfo alloc] initWithPsm:@(psm) 
+                                                                   remoteId:serverRemoteId 
+                                                                    channel:channel];
+    
+    // Set up streams for the channel
+    [self setupStreamsForChannel:channelInfo];
+    
+    // Add to channels array
+    [self.channels addObject:channelInfo];
+    
+    NSLog(@"L2CAP server channel ready for PSM: %d", (int)psm);
+}
+
+- (void)peripheralManager:(CBPeripheralManager *)peripheral didUnpublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error API_AVAILABLE(ios(11.0))
+{
+    if (error) {
+        NSLog(@"Failed to unpublish L2CAP channel: %@", error.localizedDescription);
+    }
+    
+    [self.methodChannel invokeMethod:@"OnL2CapChannelUnpublished" arguments:@{@"psm": @(PSM)}];
+}
+
+- (void)setupStreamsForChannel:(L2CapChannelInfo *)channelInfo
+{
+    if (@available(iOS 11.0, *)) {
+        CBL2CAPChannel *channel = channelInfo.channel;
+        // Ensure stream setup happens on the main run loop to avoid xpc_fd_dup errors
+        dispatch_async(dispatch_get_main_queue(), ^{
+            channel.inputStream.delegate = (id<NSStreamDelegate>)self;
+            channel.outputStream.delegate = (id<NSStreamDelegate>)self;
+
+            [channel.inputStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [channel.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+
+            [channel.inputStream open];
+            [channel.outputStream open];
+        });
+    }
+}
+
+/// Re-attach a zombie channel's streams to the run loop without calling open.
+/// The streams were already opened; we just detached delegates and removed from
+/// the run loop when zombifying. Calling open again would be undefined behavior.
+- (void)reattachStreamsForChannel:(L2CapChannelInfo *)channelInfo
+{
+    if (@available(iOS 11.0, *)) {
+        CBL2CAPChannel *channel = channelInfo.channel;
+        dispatch_async(dispatch_get_main_queue(), ^{
+            channel.inputStream.delegate = (id<NSStreamDelegate>)self;
+            channel.outputStream.delegate = (id<NSStreamDelegate>)self;
+
+            [channel.inputStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [channel.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            // Do NOT call open — streams are already open from the original channel setup
+
+            // The output stream may already have space available. Since we just
+            // re-attached to the run loop, HasSpaceAvailable might not fire again.
+            // Check immediately and fire any pending callback.
+            if (channel.outputStream.hasSpaceAvailable) {
+                NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
+                void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+                if (pendingBlock) {
+                    [self.pendingStreamReady removeObjectForKey:readyKey];
+                    pendingBlock();
+                }
+            }
+        });
+    }
+}
+
+- (void)setupPeripheralDelegates:(FlutterBlueMaxPlugin *)plugin
+{
+    for (CBPeripheral *peripheral in plugin.knownPeripherals.allValues) {
+        if ([peripheral.delegate class] == [FlutterBlueMaxPlugin class]) {
+            FlutterBlueMaxPlugin *pluginDelegate = (FlutterBlueMaxPlugin *)peripheral.delegate;
+            pluginDelegate.l2CapChannelManager = self;
+        }
+    }
+}
+
+#pragma mark - NSStreamDelegate
+
+- (void)stream:(NSStream *)aStream handleEvent:(NSStreamEvent)eventCode
+{
+    L2CapChannelInfo *channelInfo = [self findChannelForStream:aStream];
+    if (!channelInfo) return;
+
+    switch (eventCode) {
+        case NSStreamEventHasBytesAvailable:
+            if (aStream == channelInfo.channel.inputStream) {
+                [self handleBytesAvailableForChannel:channelInfo];
+            }
+            break;
+        case NSStreamEventHasSpaceAvailable:
+            if (aStream == channelInfo.channel.outputStream) {
+                NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
+                void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+                if (pendingBlock) {
+                    [self.pendingStreamReady removeObjectForKey:readyKey];
+                    pendingBlock();
+                }
+            }
+            break;
+        case NSStreamEventErrorOccurred:
+            NSLog(@"L2CAP Stream error: %@", [aStream streamError]);
+            break;
+        case NSStreamEventEndEncountered:
+            [self handleStreamEndForChannel:channelInfo];
+            break;
+        default:
+            break;
+    }
+}
+
+- (void)handleBytesAvailableForChannel:(L2CapChannelInfo *)channelInfo
+{
+    if (@available(iOS 11.0, *)) {
+        NSInputStream *inputStream = channelInfo.channel.inputStream;
+        uint8_t buffer[1024];
+        NSInteger bytesRead = [inputStream read:buffer maxLength:sizeof(buffer)];
+        
+        if (bytesRead > 0) {
+            [channelInfo.readBuffer appendBytes:buffer length:bytesRead];
+            
+            [self.methodChannel invokeMethod:@"OnL2CapChannelReceived" arguments:@{
+                @"remote_id": channelInfo.remoteId,
+                @"psm": channelInfo.psm,
+                @"value": [NSData dataWithBytes:buffer length:bytesRead]
+            }];
+        }
+    }
+}
+
+- (void)handleStreamEndForChannel:(L2CapChannelInfo *)channelInfo
+{
+    BOOL stillTracked = [self.channels containsObject:channelInfo];
+    if (!stillTracked) {
+        return;
+    }
+
+    // If there's a pending stream-ready callback (channel died before becoming writable),
+    // clean it up so the Dart side gets the close event instead of hanging.
+    NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
+    void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+    if (pendingBlock) {
+        [self.pendingStreamReady removeObjectForKey:readyKey];
+        // Complete the pending open with an error so Dart doesn't hang
+        [self completePendingOpenForRemoteId:channelInfo.remoteId
+                                         psm:[channelInfo.psm unsignedShortValue]
+                                       error:[NSError errorWithDomain:@"flutter_blue_max"
+                                                                 code:-1
+                                                             userInfo:@{NSLocalizedDescriptionKey: @"L2CAP stream ended before becoming ready"}]];
+    }
+
+    [self.methodChannel invokeMethod:@"OnL2CapChannelClosed" arguments:@{
+        @"remote_id": channelInfo.remoteId,
+        @"psm": channelInfo.psm
+    }];
+
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (channelInfo.channel) {
+            NSInputStream *is = channelInfo.channel.inputStream;
+            NSOutputStream *os = channelInfo.channel.outputStream;
+            is.delegate = nil;
+            os.delegate = nil;
+            [is removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [os removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+        }
+        [self.channels removeObject:channelInfo];
+    });
+}
+
+- (L2CapChannelInfo *)findChannelForStream:(NSStream *)stream
+{
+    for (L2CapChannelInfo *info in self.channels) {
+        if (@available(iOS 11.0, *)) {
+            if (info.channel.inputStream == stream || info.channel.outputStream == stream) {
+                return info;
+            }
+        }
+    }
+    return nil;
+}
+
+- (void)cleanupChannelsForPeripheral:(NSString *)remoteId
+{
+    // Remove active channels for this peripheral
+    NSMutableArray *toRemove = [NSMutableArray array];
+    for (L2CapChannelInfo *info in self.channels) {
+        if ([info.remoteId isEqualToString:remoteId]) {
+            [toRemove addObject:info];
+        }
+    }
+    [self.channels removeObjectsInArray:toRemove];
+
+    // Now safe to release zombie channels — the BLE connection is gone,
+    // so CBL2CAPChannel dealloc won't cascade to other channels.
+    toRemove = [NSMutableArray array];
+    for (L2CapChannelInfo *info in self.zombieChannels) {
+        if ([info.remoteId isEqualToString:remoteId]) {
+            [toRemove addObject:info];
+        }
+    }
+    [self.zombieChannels removeObjectsInArray:toRemove];
+
+    // Remove any pending stream-ready callbacks for this peripheral
+    NSMutableArray *keysToRemove = [NSMutableArray array];
+    for (NSString *key in self.pendingStreamReady) {
+        if ([key hasPrefix:remoteId]) {
+            [keysToRemove addObject:key];
+        }
+    }
+    [self.pendingStreamReady removeObjectsForKeys:keysToRemove];
+}
+
+@end
