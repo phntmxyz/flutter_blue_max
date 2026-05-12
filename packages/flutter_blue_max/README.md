@@ -1,25 +1,8 @@
 [![pub package](https://img.shields.io/pub/v/flutter_blue_max.svg)](https://pub.dartlang.org/packages/flutter_blue_max)
-[![Chat](https://img.shields.io/discord/634853295160033301.svg?style=flat-square&colorB=758ED3)](https://discord.gg/Yk5Efra)
-
-<br>
-<p align="center">
-<img alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_max/blob/master/site/flutterbluemax.png?raw=true" />
-</p>
-<br><br>
-
-## Sponsor
-
-<p align="left">
-<img width="250px" alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_max/blob/master/site/jamcorder.png?raw=true" />
-</p>
-
-FlutterBlueMax is sponsored by [Jamcorder](https://www.jamcorder.com/). 
 
 ---
 
-**Note: this plugin is continuous work from [FlutterBlue](https://github.com/pauldemarco/flutter_blue).**
-
-Migrating from [FlutterBlue](https://github.com/pauldemarco/flutter_blue)? See [Migration Guide](./MIGRATION.md)
+**Note: FlutterBlueMax is a fork of [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) and continues its work under the same [BSD-3-Clause license](./LICENSE).**
 
 ## Contents
 
