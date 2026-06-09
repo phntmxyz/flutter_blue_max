@@ -2,11 +2,17 @@
 
 ---
 
-**Note: FlutterBlueMax is a fork of [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) and continues its work under the same [BSD-3-Clause license](./LICENSE).**
+> **FlutterBlueMax is a fork of [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) by [@chipweinberger](https://github.com/chipweinberger).**
+>
+> It is maintained by [PHNTM](https://github.com/phntmxyz) and continues under the same [BSD-3-Clause license](./LICENSE) that FlutterBluePlus originally shipped with.
+>
+> Key additions over FlutterBluePlus:
+> - **L2CAP support** on iOS and Android (client & server)
 
 ## Contents
 
 - [Introduction](#introduction)
+- [L2CAP](#l2cap)
 - [Usage](#usage)
 - [Getting Started](#getting-started)
 - [Using Ble in App Background](#using-ble-in-app-background)
@@ -17,9 +23,9 @@
 
 ## Introduction
 
-FlutterBlueMax is a Bluetooth Low Energy plugin for [Flutter](https://flutter.dev). 
+FlutterBlueMax is a Bluetooth Low Energy plugin for [Flutter](https://flutter.dev).
 
-It supports BLE Central Role only (most common). 
+It supports BLE Central Role only (most common).
 
 If you need BLE Peripheral Role, you should check out [FlutterBlePeripheral](https://pub.dev/packages/flutter_ble_peripheral), or [bluetooth_low_energy](https://pub.dev/packages/bluetooth_low_energy).
 
@@ -47,20 +53,6 @@ FlutterBlueMax has zero dependencies besides Flutter, Android, iOS, and macOS th
 
 This makes FlutterBlueMax very stable, and easy to maintain.
 
-## Windows Support
-
-Use [flutter_blue_max_windows](https://pub.dev/packages/flutter_blue_max_windows) if you need Windows support.
-
-It is maintained by @chan150. Eventually the goal is to merge. 
-
-## ⭐ Stars ⭐
-
-Please star this repo & on [pub.dev](https://pub.dev/packages/flutter_blue_max). We all benefit from having a larger community.
-
-## Discord 💬
-
-[![Chat](https://img.shields.io/discord/634853295160033301.svg?style=flat-square&colorB=758ED3)](https://discord.gg/Yk5Efra) There is a community Discord server. ([Link](https://discord.gg/Yk5Efra))
-
 ## Example
 
 FlutterBlueMax has a beautiful example app, useful to debug issues.
@@ -70,22 +62,18 @@ cd ./example
 flutter run
 ```
 
-<p align="center">
-<img alt="FlutterBlue" src="https://github.com/boskokg/flutter_blue_max/blob/master/site/example.png?raw=true" />
-</p>
-
 ## Versioning
 
 `flutter_blue_max` uses Traditional Versioning
 
 `BIG.MEDIUM.SMALL`:
 * `BIG` : Significant overhauls. e.g. `1.0.0` -> `2.0.0`.
-* `MEDIUM` : Moderate improvements, feature updates, breaking chages. e.g. `1.0.0` -> `1.1.0`.
+* `MEDIUM` : Moderate improvements, feature updates, breaking changes. e.g. `1.0.0` -> `1.1.0`.
 * `SMALL` : Small fixes, patches, or refinements. `1.0.0` -> `1.0.1`.
   
 ---
 
-`flutter_blue_max_android`, `flutter_blue_max_darwin`, `flutter_blue_max_linux`, `flutter_blue_max_platform_interface`, `flutter_blue_max_web` use [Semantic Versioning](https://semver.org). 
+`flutter_blue_max_android`, `flutter_blue_max_darwin`, `flutter_blue_max_linux`, `flutter_blue_max_platform_interface`, `flutter_blue_max_web` use [Semantic Versioning](https://semver.org).
 
 `MAJOR.MINOR.PATCH`:
 * `MAJOR` : Breaking API changes. e.g. `1.0.0` -> `2.0.0`.
@@ -93,11 +81,73 @@ flutter run
 * `PATCH` : Bug fixes. e.g. `1.0.0` -> `1.0.1`.
 
 
+## L2CAP
+
+FlutterBlueMax adds full L2CAP (Logical Link Control and Adaptation Protocol) support on top of FlutterBluePlus. L2CAP provides a raw, high-throughput channel between two Bluetooth devices — useful when GATT characteristics are too small or too slow.
+
+For the full L2CAP API reference see [L2CAP_README.md](../../L2CAP_README.md).
+
+### Platform support
+
+| Platform    | Client | Server | Minimum version |
+|-------------|--------|--------|-----------------|
+| **iOS**     | ✅      | ✅      | iOS 11.0        |
+| **Android** | ✅      | ✅      | API 21          |
+| **Web**     | ❌      | ❌      | —               |
+
+### Server (listening for connections)
+
+```dart
+// Start an L2CAP server — PSM is assigned automatically
+int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
+print('L2CAP server listening on PSM: $psm');
+
+// Receive data from any connected client
+FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
+    print('Received ${data.bytes.length} bytes from ${data.remoteId}');
+});
+
+// Stop the server when done
+await FlutterBlueMax.stopL2capServer(psm);
+```
+
+### Client (connecting to a server)
+
+```dart
+// Connect to the device first (normal BLE connection)
+await device.connect();
+
+// Open an L2CAP channel on the advertised PSM
+BluetoothL2capChannel channel = await device.openL2CapChannel(psm, secure: true);
+
+// Write data
+await channel.write([0x01, 0x02, 0x03]);
+
+// Read data (polling)
+List<int> response = await channel.read();
+
+// Or listen to the stream for incoming data
+channel.onL2CapChannelReceived.listen((List<int> data) {
+    print('Received: $data');
+});
+
+// Close the channel when done
+await channel.close();
+```
+
+### Secure vs insecure channels
+
+Pass `secure: false` to both `listenL2capChannel` / `openL2CapChannel` if you need an unencrypted channel. Both sides must agree on the security mode.
+
+On **Android** this maps to `listenUsingL2capChannel()` vs `listenUsingInsecureL2capChannel()`.  
+On **iOS** the security is controlled by the server's `publishL2CAPChannelWithEncryption` flag.
+
+
 ## Usage
 
 ### 🔥 Error Handling 🔥
 
-Flutter Blue Plus takes error handling seriously. 
+Flutter Blue Plus takes error handling seriously.
 
 Every error returned by the native platform is checked and thrown as an exception where appropriate.
 
@@ -125,12 +175,10 @@ Setting `LogLevel.verbose` shows *all* data in and out.
 
 🟡 = data from platform
 
-<img width="600" alt="Screenshot 2023-07-27 at 4 53 08 AM" src="https://github.com/boskokg/flutter_blue_max/assets/1863934/ee37d702-2752-4402-bf26-fc661728c1c3">
-
 
 ### Bluetooth On & Off
 
-**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any FlutterBlueMax method. 
+**Note:** On iOS, a "*This app would like to use Bluetooth*" system dialogue appears on first call to any FlutterBlueMax method.
  
 ```dart
 // first, check if bluetooth is supported by your hardware
@@ -327,7 +375,7 @@ await c.write([0x12, 0x34]);
 await c.write(data, allowLongWrite:true);
 ```
 
-**splitWrite**: To write lots of data (unlimited), you can define the `splitWrite` function. 
+**splitWrite**: To write lots of data (unlimited), you can define the `splitWrite` function.
 
 ```dart
 import 'dart:math';
@@ -370,7 +418,7 @@ await characteristic.setNotifyValue(true);
 
 `lastValueStream` is an alternative to `onValueReceived`. It emits a value any time the characteristic changes, **including writes.**
 
-It is very convenient for simple characteristics that support both WRITE and READ (and/or NOTIFY). **e.g.** a "light switch toggle" characteristic. 
+It is very convenient for simple characteristics that support both WRITE and READ (and/or NOTIFY). **e.g.** a "light switch toggle" characteristic.
 
 ```dart
 final subscription = characteristic.lastValueStream.listen((value) {
@@ -432,7 +480,7 @@ for (var d in devs) {
 
 Get devices connected to the system by *any* app.
 
-**Note:** before you can communicate, you must connect *your app* to these devices 
+**Note:** before you can communicate, you must connect *your app* to these devices
 
 ```dart
 // `withServices` required on iOS, ignored on android
@@ -446,7 +494,7 @@ for (var d in devs) {
 
 ### Create Bond (Android Only)
 
-**Note:** calling this is usually not necessary!! The platform will do it automatically. 
+**Note:** calling this is usually not necessary!! The platform will do it automatically.
 
 However, you can force the popup to show sooner.
 
@@ -587,7 +635,7 @@ PlatformException(startScan, Field androidScanMode_ for m0.e0 not found. Known f
 
 ### Add permissions for iOS
 
-In the **ios/Runner/Info.plist** let’s add:
+In the **ios/Runner/Info.plist** let's add:
 
 ```dart
 <dict>
@@ -600,13 +648,11 @@ In the **ios/Runner/Info.plist** let’s add:
 
 For location permissions on iOS see more at: [https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services](https://developer.apple.com/documentation/corelocation/requesting_authorization_for_location_services)
 
-### Add permissions for macOS 
+### Add permissions for macOS
 
 Make sure you have granted access to the Bluetooth hardware:
 
 `Xcode -> Runners -> Targets -> Runner-> Signing & Capabilities -> App Sandbox -> Hardware -> Enable Bluetooth`
-
-<img width="528" alt="Screenshot 2023-12-11 at 10 32 04 AM" src="https://github.com/boskokg/flutter_blue_max/assets/1863934/554079ef-4627-4dfc-97e3-1f07f84a0f3c">
 
 ## Using Ble in App Background
 
@@ -625,7 +671,7 @@ Add the following to your `Info.plist`
 </array>
 ```
 
-When this key-value pair is included in the app’s Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
+When this key-value pair is included in the app's Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
 
 To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any FBP work**:
 
@@ -666,6 +712,9 @@ Note: When functionality is unsupported on a platform, sensible defaults are ret
 | connectedDevices   ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | List of devices connected to *your app*                     |
 | systemDevices     🔥| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | List of devices connected to the system, even by other apps |
 | getPhySupport       | ✔️      | ❌   | ❌     | ❌     | ❌   | Get supported bluetooth phy codings                         |
+| listenL2capChannel🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
+| stopL2capServer   🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stop an L2CAP server by PSM                                 |
+| onL2capReceived   🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of incoming L2CAP data from all channels             |
 
 ### FlutterBlueMax Events API
 
@@ -707,6 +756,16 @@ Note: When functionality is unsupported on a platform, sensible defaults are ret
 | removeBond                  | ✔️      | ❌   | ✔️    | ❌     | ❌   | Remove Bluetooth Bond of device                            |
 | setPreferredPhy             | ✔️      | ❌   | ❌     | ❌     | ❌   | Set preferred RX and TX phy for connection and phy options |
 | clearGattCache              | ✔️      | ❌   | ❌     | ❌     | ❌   | Clear android cache of service discovery results           |
+| openL2CapChannel          🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Open an L2CAP channel; returns a BluetoothL2capChannel     |
+
+### BluetoothL2capChannel API
+
+|                         | Android | iOS | macOS | Description                                        |
+|-------------------------|---------|-----|-------|----------------------------------------------------|
+| write                 🔥| ✔️      | ✔️  | ✔️    | Write bytes to the L2CAP channel                   |
+| read                  🔥| ✔️      | ✔️  | ✔️    | Read bytes from the L2CAP channel (polling)        |
+| close                 🔥| ✔️      | ✔️  | ✔️    | Close the L2CAP channel and free resources         |
+| onL2CapChannelReceived🌀| ✔️      | ✔️  | ✔️    | Stream of incoming bytes for this specific channel |
 
 ### BluetoothCharacteristic API
 
@@ -738,7 +797,7 @@ The easiest way to debug issues in FlutterBlueMax is to make your own local copy
 
 ```
 cd /user/downloads
-git clone https://github.com/boskokg/flutter_blue_max.git
+git clone https://github.com/phntmxyz/flutter_blue_max.git
 ```
 
 then in `pubspec.yaml` add the repo by path:
@@ -791,7 +850,7 @@ Flutter Errors:
 
 ### "bluetooth must be turned on"
 
-You need to wait for the bluetooth adapter to fully turn on. 
+You need to wait for the bluetooth adapter to fully turn on.
 
 `await FlutterBlueMax.adapterState.where((state) => state == BluetoothAdapterState.on).first;`
 
@@ -850,7 +909,7 @@ Install a BLE scanner app on your phone. Can it find your device?
 
 **3. your device uses bluetooth classic, not BLE.**
 
-Headphones, speakers, keyboards, mice, gamepads, & printers all use Bluetooth Classic. 
+Headphones, speakers, keyboards, mice, gamepads, & printers all use Bluetooth Classic.
 
 These devices may be found in System Settings, but they cannot be connected to by FlutterBlueMax. FlutterBlueMax only supports Bluetooth Low Energy.
 
@@ -882,7 +941,7 @@ for (var d in system) {
 
 **6. Android: you're calling startScan too often**
 
-On Adroid you can only call `startScan` 5 times per 30 second period. This is a platform restriction.
+On Android you can only call `startScan` 5 times per 30 second period. This is a platform restriction.
 
 **7. Android: make sure location services are enabled**
 
@@ -975,7 +1034,7 @@ It means your device stopped working. FlutterBlueMax cannot fix it.
 
 ### List of Bluetooth GATT Errors
 
-These GATT error codes are part of the BLE Specification. 
+These GATT error codes are part of the BLE Specification.
 
 **These are *responses* from your ble device because you are sending an invalid request.**
 
@@ -1086,9 +1145,9 @@ Bluetooth is wireless and will not always work.
 
 **1. you are not calling the right function**
 
-`lastValueStream` will receive data for `chr.read()` & `chr.write()` & `chr.setNotifyValue(true)` 
+`lastValueStream` will receive data for `chr.read()` & `chr.write()` & `chr.setNotifyValue(true)`
 
-`onValueReceived` will receive data for `chr.read()` & `chr.setNotifyValue(true)` 
+`onValueReceived` will receive data for `chr.read()` & `chr.setNotifyValue(true)`
 
 **2. your device has nothing to send**
 
@@ -1098,7 +1157,7 @@ Try interacting with your device to get it to send new data.
 
 **3. your device has bugs**
 
-Try rebooting your ble device. 
+Try rebooting your ble device.
 
 Some ble devices have buggy software and stop sending data
 
@@ -1137,9 +1196,9 @@ await characteristic.setNotifyValue(true);
 
 ### ANDROID_SPECIFIC_ERROR
 
-There is no 100% solution.  
+There is no 100% solution.
 
-FBP already has mitigations for this error, but Android will still fail with this code randomly. 
+FBP already has mitigations for this error, but Android will still fail with this code randomly.
 
 The recommended solution is to `catch` the error, and retry.
 
@@ -1160,13 +1219,3 @@ If you just added flutter_blue_max to your pubspec.yaml, a hot reload / hot rest
 You need to fully stop your app and run again so that the native plugins are loaded.
 
 Also try `flutter clean`.
-
-
-
-
-
-
-
-
-
-
