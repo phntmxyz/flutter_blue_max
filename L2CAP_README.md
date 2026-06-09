@@ -26,20 +26,20 @@ L2CAP follows the same object-oriented patterns as all other Flutter Blue Plus f
 ### Server (Listening for Connections)
 
 ```dart
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 // Start L2CAP server
-int psm = await FlutterBluePlus.listenL2capChannel(secure: true);
+int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
 print('L2CAP server listening on PSM: $psm');
 
 // Listen for incoming data
-FlutterBluePlus.onL2capReceived.listen((data) {
+FlutterBlueMax.onL2capReceived.listen((data) {
   print('Received ${data.bytes.length} bytes from ${data.remoteId}');
   // Handle incoming data
 });
 
 // Stop server when done
-await FlutterBluePlus.stopL2capServer(psm);
+await FlutterBlueMax.stopL2capServer(psm);
 ```
 
 ### Client (Connecting to Server)
@@ -63,7 +63,7 @@ await channel.close();
 
 ## API Reference
 
-### FlutterBluePlus (Static Methods)
+### FlutterBlueMax (Static Methods)
 
 #### `listenL2capChannel({bool secure = true})`
 Starts an L2CAP server listening for incoming connections.
@@ -74,7 +74,7 @@ Starts an L2CAP server listening for incoming connections.
 - **Platform:** iOS 11.0+, Android
 
 ```dart
-int psm = await FlutterBluePlus.listenL2capChannel(secure: true);
+int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
 ```
 
 #### `stopL2capServer(int psm)`
@@ -86,7 +86,7 @@ Stops an L2CAP server by PSM.
 - **Platform:** iOS 11.0+, Android
 
 ```dart
-await FlutterBluePlus.stopL2capServer(psm);
+await FlutterBlueMax.stopL2capServer(psm);
 ```
 
 ### BluetoothDevice
@@ -98,7 +98,7 @@ Opens an L2CAP channel to the connected device.
   - `psm`: Protocol Service Multiplexer to connect to
   - `secure`: Whether to use secure L2CAP channel (default: true)
 - **Returns:** `Future<BluetoothL2capChannel>`
-- **Throws:** `FlutterBluePlusException` if device not connected
+- **Throws:** `FlutterBlueMaxException` if device not connected
 - **Platform:** iOS 11.0+, Android
 
 ```dart
@@ -119,7 +119,7 @@ Writes data to the L2CAP channel.
 - **Parameters:**
   - `data`: List of bytes to write
 - **Returns:** `Future<void>`
-- **Throws:** `FlutterBluePlusException` on write failure
+- **Throws:** `FlutterBlueMaxException` on write failure
 
 ```dart
 await channel.write([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // "Hello"
@@ -129,7 +129,7 @@ await channel.write([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // "Hello"
 Reads available data from the L2CAP channel.
 
 - **Returns:** `Future<List<int>>` - The received bytes
-- **Throws:** `FlutterBluePlusException` if channel not found
+- **Throws:** `FlutterBlueMaxException` if channel not found
 
 ```dart
 List<int> data = await channel.read();
@@ -149,11 +149,11 @@ await channel.close();
 
 Flutter Blue Plus provides comprehensive event streams for L2CAP operations:
 
-### `FlutterBluePlus.onL2capReceived`
+### `FlutterBlueMax.onL2capReceived`
 Stream of incoming L2CAP data.
 
 ```dart
-FlutterBluePlus.onL2capReceived.listen((L2CapChannelData data) {
+FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
   print('Device: ${data.remoteId}');
   print('PSM: ${data.psm}');  
   print('Data: ${data.bytes}');
@@ -180,7 +180,7 @@ Additional events available on iOS platform:
 ## Complete Example
 
 ```dart
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 class L2CAPExample {
   int? serverPsm;
@@ -188,11 +188,11 @@ class L2CAPExample {
 
   // Start L2CAP server
   Future<void> startServer() async {
-    serverPsm = await FlutterBluePlus.listenL2capChannel(secure: true);
+    serverPsm = await FlutterBlueMax.listenL2capChannel(secure: true);
     print('L2CAP server started on PSM: $serverPsm');
     
     // Listen for incoming data
-    FlutterBluePlus.onL2capReceived.listen((data) {
+    FlutterBlueMax.onL2capReceived.listen((data) {
       print('Server received: ${String.fromCharCodes(data.bytes)}');
       print('From device: ${data.remoteId}, PSM: ${data.psm}');
     });
@@ -231,7 +231,7 @@ class L2CAPExample {
     
     // Stop server
     if (serverPsm != null) {
-      await FlutterBluePlus.stopL2capServer(serverPsm!);
+      await FlutterBlueMax.stopL2capServer(serverPsm!);
       serverPsm = null;
     }
   }
@@ -246,7 +246,7 @@ L2CAP methods follow the same error handling patterns as other Flutter Blue Plus
 try {
   BluetoothL2capChannel channel = await device.openL2CapChannel(1234);
 } catch (e) {
-  if (e is FlutterBluePlusException) {
+  if (e is FlutterBlueMaxException) {
     switch (e.errorCode) {
       case FbpErrorCode.deviceIsDisconnected.index:
         print('Device not connected');
