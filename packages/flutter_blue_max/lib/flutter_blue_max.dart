@@ -11,7 +11,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 
 export 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart'
-    show DeviceIdentifier, Guid, LogLevel, PhySupport, L2CapChannelData, L2CapChannelClosed;
+    show DeviceIdentifier, Guid, LogLevel, PhySupport, L2CapChannelData, L2CapChannelClosed, L2CapChannelConnected;
 
 part 'src/bluetooth_characteristic.dart';
 part 'src/bluetooth_descriptor.dart';

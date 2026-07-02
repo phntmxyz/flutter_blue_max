@@ -2911,7 +2911,15 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
     
     // Add to channels array
     [self.channels addObject:channelInfo];
-    
+
+    // Tell Dart a client connected to the L2CAP server. CoreBluetooth does not
+    // expose which central opened the channel, so server-accepted channels are
+    // addressed with the placeholder remoteId "server".
+    [self.methodChannel invokeMethod:@"OnL2CapChannelConnected" arguments:@{
+        @"remote_id": serverRemoteId,
+        @"psm": @(psm)
+    }];
+
     NSLog(@"L2CAP server channel ready for PSM: %d", (int)psm);
 }
 

@@ -1276,6 +1276,32 @@ class L2CapChannelClosed {
   }
 }
 
+/// Event emitted when a remote device connects to an L2CAP server
+/// started with `listenL2capChannel`.
+class L2CapChannelConnected {
+  /// The identifier to address the accepted channel with.
+  ///
+  /// On Android this is the connecting client's MAC address. On iOS
+  /// CoreBluetooth does not expose which central opened the channel, so the
+  /// placeholder id `server` is reported instead — both platforms accept it
+  /// for channel operations on server-accepted channels.
+  final DeviceIdentifier remoteId;
+
+  /// The PSM (Protocol Service Multiplexer) of the server that was connected to
+  final int psm;
+
+  /// Creates a new [L2CapChannelConnected] instance
+  L2CapChannelConnected({required this.remoteId, required this.psm});
+
+  /// Creates an [L2CapChannelConnected] from a platform message map
+  factory L2CapChannelConnected.fromMap(Map<dynamic, dynamic> map) {
+    return L2CapChannelConnected(
+      remoteId: DeviceIdentifier(map['remote_id']),
+      psm: map['psm'],
+    );
+  }
+}
+
 // random number defined by flutter blue plus.
 // Ideally it should not conflict with iOS or Android error codes.
 int bmUserCanceledErrorCode = 23789258;

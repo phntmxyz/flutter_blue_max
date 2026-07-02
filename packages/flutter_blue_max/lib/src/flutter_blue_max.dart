@@ -134,6 +134,18 @@ class FlutterBlueMax {
   /// covers server-side channels accepted via [listenL2capChannel].
   static Stream<L2CapChannelClosed> get onL2capClosed => FlutterBlueMaxPlatform.instance.onL2CapChannelClosed;
 
+  /// Stream of L2CAP server connection events: emitted when a remote device
+  /// connects to a server started with [listenL2capChannel].
+  ///
+  /// Use the event's remoteId and psm to construct a [BluetoothL2capChannel]
+  /// for talking to the connected client. On Android the remoteId is the
+  /// client's MAC address; on iOS CoreBluetooth does not expose which central
+  /// opened the channel, so the placeholder id `server` is reported instead.
+  /// Both platforms accept either id for operations on server-accepted
+  /// channels, but data and close events always carry the same id as this
+  /// event — so always key channels by the id reported here.
+  static Stream<L2CapChannelConnected> get onL2capConnected => FlutterBlueMaxPlatform.instance.onL2CapChannelConnected;
+
   /// Set configurable options
   ///   - [showPowerAlert] Whether to show the power alert (iOS & MacOS only). i.e. CBCentralManagerOptionShowPowerAlertKey
   ///       To set this option you must call this method before any other method in this package.

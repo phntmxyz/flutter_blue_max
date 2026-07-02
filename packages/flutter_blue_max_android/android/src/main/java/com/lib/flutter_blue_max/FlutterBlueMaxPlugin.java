@@ -137,11 +137,10 @@ public class FlutterBlueMaxPlugin implements
     private L2CapChannelManager l2CapChannelManager;
 
     private final L2CapChannelManager.DeviceConnected deviceConnectedCallback = (remoteDevice, psm) -> {
-        final DeviceConnectedToL2CapChannel newConnectedDeviceState = new DeviceConnectedToL2CapChannel(remoteDevice, psm);
-        final HashMap<String, Object> deviceConnectedData = new HashMap<>();
-        deviceConnectedData.put("psm", psm);
-        deviceConnectedData.put("bluetoothDevice", MarshallingUtil.bmBluetoothDevice(remoteDevice));
-        invokeMethodUIThread("connectToL2CapChannel", deviceConnectedData);
+        final HashMap<String, Object> data = new HashMap<>();
+        data.put("remote_id", remoteDevice.getAddress());
+        data.put("psm", psm);
+        invokeMethodUIThread("OnL2CapChannelConnected", data);
     };
 
     private final L2CapChannelManager.DataReceived dataReceivedCallback = (remoteDevice, psm, value) -> {
@@ -3330,10 +3329,9 @@ class L2CapChannelManager {
             firePlatformNotSupportedError(resultCallback);
             return;
         }
-        final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(device, psm);
+        final L2CapChannel channel = findChannelForRemoteId(remoteId, psm);
         if (channel == null) {
-            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
+            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + remoteId + " / psm " + psm, null);
             return;
         }
         channel.read(remoteId, psm, resultCallback);
@@ -3344,10 +3342,9 @@ class L2CapChannelManager {
             firePlatformNotSupportedError(resultCallback);
             return;
         }
-        final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(device, psm);
+        final L2CapChannel channel = findChannelForRemoteId(remoteId, psm);
         if (channel == null) {
-            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
+            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + remoteId + " / psm " + psm, null);
             return;
         }
         channel.write(remoteId, psm, value, resultCallback);
@@ -3356,6 +3353,17 @@ class L2CapChannelManager {
     public synchronized void closeChannel(String remoteId, int psm, final Result resultCallback) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
             firePlatformNotSupportedError(resultCallback);
+            return;
+        }
+        if (SERVER_REMOTE_ID.equals(remoteId)) {
+            final ServerSocketInfo serverInfo = findServerInfo(psm);
+            final L2CapServerChannel channel = serverInfo != null ? serverInfo.getAnyL2CapChannel() : null;
+            if (channel != null) {
+                serverInfo.closeChannel(channel);
+            } else {
+                plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "No server-accepted channel found for psm " + psm);
+            }
+            resultCallback.success(null);
             return;
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
@@ -3437,6 +3445,21 @@ class L2CapChannelManager {
             return serverInfo.getL2CapChannel(remoteDevice);
         }
         return null;
+    }
+
+    // iOS cannot know which central connected to an L2CAP server, so Dart may
+    // address a server-accepted channel with the placeholder remoteId "server".
+    // Accept it here too; data and close events still carry the client's real
+    // MAC address (which is likewise accepted, via findChannel's server fallback).
+    static final String SERVER_REMOTE_ID = "server";
+
+    @Nullable
+    private L2CapChannel findChannelForRemoteId(final String remoteId, final int psm) {
+        if (SERVER_REMOTE_ID.equals(remoteId)) {
+            final ServerSocketInfo serverInfo = findServerInfo(psm);
+            return serverInfo != null ? serverInfo.getAnyL2CapChannel() : null;
+        }
+        return findChannel(adapter.getRemoteDevice(remoteId), psm);
     }
 
 
@@ -3863,8 +3886,21 @@ class ServerSocketInfo implements L2CapInfo {
         if (channelToDelete == null) {
             return;
         }
-        channelToDelete.close();
-        openChannels.remove(channelToDelete);
+        closeChannel(channelToDelete);
+    }
+
+    // For operations addressed with the placeholder remoteId "server" (see
+    // L2CapChannelManager.SERVER_REMOTE_ID): the first accepted channel.
+    @Nullable
+    L2CapServerChannel getAnyL2CapChannel() {
+        synchronized (openChannels) {
+            return openChannels.isEmpty() ? null : openChannels.get(0);
+        }
+    }
+
+    void closeChannel(final L2CapServerChannel channel) {
+        channel.close();
+        openChannels.remove(channel);
     }
 
     public void acceptConnections() {
@@ -3915,17 +3951,6 @@ class ServerSocketInfo implements L2CapInfo {
 
 
 
-
-class DeviceConnectedToL2CapChannel {
-    public final BluetoothDevice device;
-    public final int psm;
-
-    public DeviceConnectedToL2CapChannel(BluetoothDevice device, int psm) {
-        this.device = device;
-        this.psm = psm;
-    }
-
-}
 
 // MethodChannel results must be invoked on the platform (main) thread; work
 // running on background threads wraps its Result with this.
