@@ -3785,7 +3785,9 @@ class ServerSocketInfo implements L2CapInfo {
     private final L2CapChannelManager.DataReceived dataReceivedCallback;
     private final L2CapChannelManager.ChannelClosed channelClosedCallback;
     private final FlutterBlueMaxPlugin plugin;
-    private boolean isAcceptingConnections;
+    // volatile: written on the main thread (closeSocket), read on the accept
+    // thread — without it the accept loop may never observe the shutdown
+    private volatile boolean isAcceptingConnections;
 
     public ServerSocketInfo(BluetoothServerSocket serverSocket, final L2CapChannelManager.DeviceConnected deviceConnectedCallback, final L2CapChannelManager.DataReceived dataReceivedCallback, final L2CapChannelManager.ChannelClosed channelClosedCallback, final FlutterBlueMaxPlugin plugin) {
         this.serverSocket = serverSocket;
@@ -3813,9 +3815,14 @@ class ServerSocketInfo implements L2CapInfo {
 
     @Override
     public L2CapServerChannel getL2CapChannel(final BluetoothDevice remoteDevice) {
-        for (L2CapServerChannel openChannel : openChannels) {
-            if (remoteDevice.getAddress().equals(openChannel.getSocket().getRemoteDevice().getAddress())) {
-                return openChannel;
+        // iterating a synchronizedList is not atomic and the accept thread
+        // adds connections concurrently — synchronize manually
+        synchronized (openChannels) {
+            for (L2CapServerChannel openChannel : openChannels) {
+                final BluetoothSocket socket = openChannel.getSocket();
+                if (socket != null && remoteDevice.getAddress().equals(socket.getRemoteDevice().getAddress())) {
+                    return openChannel;
+                }
             }
         }
         return null;
@@ -3850,19 +3857,26 @@ class ServerSocketInfo implements L2CapInfo {
                     deviceConnectedCallback.deviceConnected(socket.getRemoteDevice(), getPsm());
                 } catch (IOException e) {
                     if (isAcceptingConnections) {
-                        Log.e(TAG, "Accepting incoming connection failed.", e);
+                        Log.e(TAG, "Accepting incoming connection failed. Stop accepting.", e);
+                        isAcceptingConnections = false;
                     }
+                    // a server socket whose accept() throws is dead (closed or
+                    // adapter off) — retrying would busy-spin on the same error
+                    break;
                 }
             }
         }).start();
     }
 
     public void closeSocket() {
-        for (L2CapServerChannel openChannel : openChannels) {
-            openChannel.close();
+        isAcceptingConnections = false;
+        synchronized (openChannels) {
+            for (L2CapServerChannel openChannel : openChannels) {
+                openChannel.close();
+            }
+            openChannels.clear();
         }
         try {
-            isAcceptingConnections = false;
             serverSocket.close();
         } catch (IOException e) {
             Log.e(TAG, "Closing server socket failed.", e);

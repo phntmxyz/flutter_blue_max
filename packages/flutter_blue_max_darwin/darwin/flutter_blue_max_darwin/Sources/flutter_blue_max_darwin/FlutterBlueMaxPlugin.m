@@ -2537,6 +2537,18 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
                 break;
             }
         }
+        // Only recycle a zombie whose streams are still usable. A zombie whose
+        // channel died (e.g. the peer closed it) stays in the list so it isn't
+        // dealloc'd, but the open proceeds with a fresh OS-level channel below.
+        if (zombie && zombie.channel) {
+            NSStreamStatus inStatus = zombie.channel.inputStream.streamStatus;
+            NSStreamStatus outStatus = zombie.channel.outputStream.streamStatus;
+            BOOL streamDead = inStatus == NSStreamStatusAtEnd || inStatus == NSStreamStatusClosed || inStatus == NSStreamStatusError
+                           || outStatus == NSStreamStatusAtEnd || outStatus == NSStreamStatusClosed || outStatus == NSStreamStatusError;
+            if (streamDead) {
+                zombie = nil;
+            }
+        }
         if (zombie && zombie.channel) {
             [self.zombieChannels removeObject:zombie];
             // Drop data buffered before the channel was closed so the recycled
@@ -2767,7 +2779,16 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
     if (@available(iOS 11.0, *)) {
         NSDictionary *args = call.arguments;
         NSNumber *secure = args[@"secure"];
-        
+
+        // A second concurrent listen would overwrite the first pending result,
+        // leaving its Dart future hanging forever.
+        if (self.pendingListenResult) {
+            result([FlutterError errorWithCode:@"listenL2capChannel"
+                                       message:@"another listenL2capChannel call is already in progress"
+                                       details:nil]);
+            return;
+        }
+
         // Store the result callback and settings to be used when peripheral manager is ready
         self.pendingListenResult = result;
         self.pendingListenSecure = [secure boolValue];
@@ -3102,7 +3123,14 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
             [is removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
             [os removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
         }
+        // Zombify instead of releasing: dealloc'ing a CBL2CAPChannel while the
+        // BLE connection is still up makes iOS tear down ALL other L2CAP
+        // channels on the same peripheral (see zombieChannels). The zombie is
+        // released by cleanupChannelsForPeripheral once the device disconnects.
         [self.channels removeObject:channelInfo];
+        if (![self.zombieChannels containsObject:channelInfo]) {
+            [self.zombieChannels addObject:channelInfo];
+        }
     });
 }
 
