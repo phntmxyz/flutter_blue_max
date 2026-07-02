@@ -1602,7 +1602,7 @@ public class FlutterBlueMaxPlugin implements
                     l2CapChannelManager.write(remoteId, psm, value, result);
                     break;
                 }
-                case "listenL2capChannel":
+                case "listenL2CapChannel":
                 {
                     ArrayList<String> permissions = new ArrayList<>();
                     if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)

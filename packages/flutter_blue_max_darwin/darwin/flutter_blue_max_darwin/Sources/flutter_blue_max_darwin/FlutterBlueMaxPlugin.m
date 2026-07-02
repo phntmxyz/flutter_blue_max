@@ -916,7 +916,7 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
         {
             [self.l2CapChannelManager handleWriteL2CapChannel:call result:result];
         }
-        else if([@"listenL2capChannel" isEqualToString:call.method])
+        else if([@"listenL2CapChannel" isEqualToString:call.method])
         {
             [self.l2CapChannelManager handleListenL2capChannel:call result:result];
         }

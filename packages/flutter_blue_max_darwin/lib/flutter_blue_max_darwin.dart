@@ -302,7 +302,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   Future<int> listenL2CapChannel(
     ListenL2CapChannelRequest request,
   ) async {
-    var result = await _invokeMethod('listenL2capChannel', request.toMap());
+    var result = await _invokeMethod('listenL2CapChannel', request.toMap());
     return result is Map ? (result['psm'] as int? ?? 4097) : 4097;
   }
 
