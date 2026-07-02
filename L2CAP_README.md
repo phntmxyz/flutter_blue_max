@@ -1,25 +1,15 @@
-# L2CAP Implementation - Flutter Blue Plus
+# L2CAP Implementation - flutter_blue_max
 
-Flutter Blue Plus provides comprehensive L2CAP (Logical Link Control and Adaptation Protocol) support with full cross-platform compatibility and object-oriented design that seamlessly integrates with the library's existing architecture.
+flutter_blue_max provides L2CAP CoC (Connection-oriented Channel) support on iOS and Android, with an object-oriented design that follows the library's existing architecture.
 
 ## Features
 
-- ✅ **Full Cross-Platform Support**: iOS client connections, Android client/server operations
-- ✅ **Object-Oriented Design**: Dedicated `BluetoothL2capChannel` objects for clean API
-- ✅ **Complete Server Management**: Start/stop L2CAP servers with PSM-specific control
-- ✅ **Comprehensive Event Handling**: 5 different event types for complete lifecycle tracking
-- ✅ **Secure & Insecure Channels**: Support for both secure and insecure L2CAP connections
-- ✅ **Auto PSM Assignment**: Automatic PSM assignment for server operations
-- ✅ **Stream-Based Data Handling**: Efficient data transfer with stream management
-
-## Architecture Overview
-
-L2CAP follows the same object-oriented patterns as all other Flutter Blue Plus functionality:
-
-1. **Device Operations** → Return dedicated objects
-2. **Object Encapsulation** → Operations belong to objects, not devices  
-3. **Parameter Elimination** → No repetitive parameter passing
-4. **Consistent Error Handling** → Same exception patterns as characteristics/services
+- ✅ **Client & Server on both platforms**: open channels to a remote PSM, or publish your own
+- ✅ **Object-Oriented Design**: dedicated `BluetoothL2capChannel` objects for a clean API
+- ✅ **Full Lifecycle Events**: connected, data received, and closed events as Dart streams
+- ✅ **Secure & Insecure Channels**: support for both secure and insecure L2CAP connections
+- ✅ **Auto PSM Assignment**: the OS assigns a PSM when starting a server
+- ✅ **Timeout Protection**: open/listen calls time out instead of blocking the package forever
 
 ## Quick Start
 
@@ -32,10 +22,21 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
 print('L2CAP server listening on PSM: $psm');
 
+// A client connected: build a channel handle from the event to talk to it
+BluetoothL2capChannel? clientChannel;
+FlutterBlueMax.onL2capConnected.listen((evt) {
+  clientChannel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+  clientChannel!.write([0x01, 0x02, 0x03]); // send data back to the client
+});
+
 // Listen for incoming data
 FlutterBlueMax.onL2capReceived.listen((data) {
-  print('Received ${data.bytes.length} bytes from ${data.remoteId}');
-  // Handle incoming data
+  print('Received ${data.value.length} bytes from ${data.remoteId}');
+});
+
+// Notice dead channels (client closed, stream error, disconnect)
+FlutterBlueMax.onL2capClosed.listen((evt) {
+  print('Channel closed: ${evt.remoteId} / PSM ${evt.psm}');
 });
 
 // Stop server when done
@@ -54,8 +55,13 @@ BluetoothL2capChannel channel = await device.openL2CapChannel(1234, secure: true
 // Write data
 await channel.write([0x01, 0x02, 0x03, 0x04]);
 
-// Read data
-List<int> response = await channel.read();
+// Receive data (preferred over polling with read())
+channel.onL2CapChannelReceived.listen((value) {
+  print('Received ${value.length} bytes');
+});
+
+// Notice when the channel dies
+channel.onClosed.first.then((_) => print('Channel closed by remote'));
 
 // Close channel
 await channel.close();
@@ -65,25 +71,25 @@ await channel.close();
 
 ### FlutterBlueMax (Static Methods)
 
-#### `listenL2capChannel({bool secure = true})`
+#### `listenL2capChannel({bool secure = true, int timeout = 15})`
 Starts an L2CAP server listening for incoming connections.
 
 - **Parameters:**
-  - `secure`: Whether to use secure L2CAP channel (default: true)
+  - `secure`: Whether to use a secure L2CAP channel (default: true)
+  - `timeout`: Seconds to wait for the server to start (default: 15)
 - **Returns:** `Future<int>` - The assigned PSM
-- **Platform:** iOS 11.0+, Android
+- **Platform:** iOS 11.0+, Android 10+ (API 29)
 
 ```dart
 int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
 ```
 
 #### `stopL2capServer(int psm)`
-Stops an L2CAP server by PSM.
+Stops an L2CAP server by PSM and closes its accepted channels.
 
 - **Parameters:**
   - `psm`: The PSM of the server to stop
 - **Returns:** `Future<void>`
-- **Platform:** iOS 11.0+, Android
 
 ```dart
 await FlutterBlueMax.stopL2capServer(psm);
@@ -91,15 +97,18 @@ await FlutterBlueMax.stopL2capServer(psm);
 
 ### BluetoothDevice
 
-#### `openL2CapChannel(int psm, {bool secure = true})`
+#### `openL2CapChannel(int psm, {bool secure = true, int timeout = 35})`
 Opens an L2CAP channel to the connected device.
 
 - **Parameters:**
   - `psm`: Protocol Service Multiplexer to connect to
-  - `secure`: Whether to use secure L2CAP channel (default: true)
+  - `secure`: Whether to use a secure L2CAP channel (default: true).
+    On Android this selects `createL2capChannel()` vs `createInsecureL2capChannel()`;
+    on iOS security is controlled by the server's encryption setting.
+  - `timeout`: Seconds to wait for the channel to open (default: 35)
 - **Returns:** `Future<BluetoothL2capChannel>`
-- **Throws:** `FlutterBlueMaxException` if device not connected
-- **Platform:** iOS 11.0+, Android
+- **Throws:** `FlutterBlueMaxException` if the device is not connected, the open fails, or the timeout elapses
+- **Platform:** iOS 11.0+, Android 10+ (API 29)
 
 ```dart
 BluetoothL2capChannel channel = await device.openL2CapChannel(1234, secure: true);
@@ -107,7 +116,8 @@ BluetoothL2capChannel channel = await device.openL2CapChannel(1234, secure: true
 
 ### BluetoothL2capChannel
 
-The `BluetoothL2capChannel` class encapsulates an L2CAP channel connection and provides methods for data transfer.
+Encapsulates one L2CAP channel. Returned by `openL2CapChannel()`, or constructed
+from an `onL2capConnected` event for server-accepted channels.
 
 #### Properties
 - `DeviceIdentifier deviceId` - The device this channel connects to
@@ -116,66 +126,90 @@ The `BluetoothL2capChannel` class encapsulates an L2CAP channel connection and p
 #### `write(List<int> data)`
 Writes data to the L2CAP channel.
 
-- **Parameters:**
-  - `data`: List of bytes to write
-- **Returns:** `Future<void>`
-- **Throws:** `FlutterBlueMaxException` on write failure
+- **Returns:** `Future<void>` - completes once the platform has accepted all bytes
+- **Throws:** `FlutterBlueMaxException` on write failure or if the channel is closed
 
 ```dart
 await channel.write([0x48, 0x65, 0x6C, 0x6C, 0x6F]); // "Hello"
 ```
 
 #### `read()`
-Reads available data from the L2CAP channel.
+Reads data currently buffered for this channel. Returns an empty list when no
+data is buffered — it does not wait for data to arrive. Prefer the event
+streams for reception.
 
-- **Returns:** `Future<List<int>>` - The received bytes
-- **Throws:** `FlutterBlueMaxException` if channel not found
+- **Returns:** `Future<List<int>>` - The received bytes (possibly empty)
 
 ```dart
 List<int> data = await channel.read();
-String message = String.fromCharCodes(data);
 ```
 
 #### `close()`
-Closes the L2CAP channel and releases resources.
-
-- **Returns:** `Future<void>`
+Closes the L2CAP channel and releases resources. Does not emit an `onClosed` event.
 
 ```dart
 await channel.close();
 ```
 
+#### `onL2CapChannelReceived`
+Stream of incoming data for this channel only (`Stream<List<int>>`).
+
+#### `onClosed`
+Stream that emits when this channel dies — remote close, stream error, or
+device disconnect (`Stream<void>`). Not emitted for a local `close()` call; a
+single close may be reported more than once in rare races, so cancel the
+subscription on the first event if you only care about the transition.
+
 ## Event Streams
 
-Flutter Blue Plus provides comprehensive event streams for L2CAP operations:
+Global streams on `FlutterBlueMax` (all devices, all PSMs). Match events to
+your channels by **device + PSM**, not PSM alone — multiple devices commonly
+share the same PSM.
+
+### `FlutterBlueMax.onL2capConnected`
+A remote device connected to a server started with `listenL2capChannel`.
+Build a `BluetoothL2capChannel` from the event to talk to the client.
+
+The event's `remoteId` is the client's MAC address on Android; on iOS
+CoreBluetooth does not expose the connecting central, so the placeholder id
+`server` is reported instead. Both platforms accept either id for operations
+on server-accepted channels, but data and close events always carry the same
+id as this event — so always key channels by the id reported here.
+
+```dart
+FlutterBlueMax.onL2capConnected.listen((L2CapChannelConnected evt) {
+  final channel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+});
+```
 
 ### `FlutterBlueMax.onL2capReceived`
-Stream of incoming L2CAP data.
+Incoming L2CAP data, for client and server-accepted channels.
 
 ```dart
 FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
   print('Device: ${data.remoteId}');
-  print('PSM: ${data.psm}');  
-  print('Data: ${data.bytes}');
+  print('PSM: ${data.psm}');
+  print('Data: ${data.value}');
 });
 ```
 
-### Platform Events (iOS/Darwin)
-Additional events available on iOS platform:
+### `FlutterBlueMax.onL2capClosed`
+A channel died: the remote closed it, a stream error occurred, or the device
+disconnected. Not emitted for a local `close()` call.
 
-- `OnL2CapChannelOpened` - Channel connection established
-- `OnL2CapChannelClosed` - Channel connection closed
-- `OnL2CapChannelPublished` - Server started listening
-- `OnL2CapChannelUnpublished` - Server stopped listening
-- `OnL2CapChannelReceived` - Data received on channel
+```dart
+FlutterBlueMax.onL2capClosed.listen((L2CapChannelClosed evt) {
+  print('Closed: ${evt.remoteId} / PSM ${evt.psm}');
+});
+```
 
 ## Platform Support
 
 | Platform | Client Support | Server Support | Minimum Version |
-|----------|----------------|----------------|-----------------|
-| **iOS**     | ✅ Full        | ✅ Full        | iOS 11.0       |
-| **Android** | ✅ Full        | ✅ Full        | Android API 21  |
-| **Web**     | ❌ Not supported | ❌ Not supported | N/A           |
+|----------|----------------|----------------|------------------|
+| **iOS**     | ✅ Full        | ✅ Full        | iOS 11.0         |
+| **Android** | ✅ Full        | ✅ Full        | Android 10 (API 29) |
+| **Web**     | ❌ Not supported | ❌ Not supported | N/A            |
 
 ## Complete Example
 
@@ -184,17 +218,32 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 class L2CAPExample {
   int? serverPsm;
+  BluetoothL2capChannel? serverChannel; // channel to a connected client
   BluetoothL2capChannel? clientChannel;
 
   // Start L2CAP server
   Future<void> startServer() async {
     serverPsm = await FlutterBlueMax.listenL2capChannel(secure: true);
     print('L2CAP server started on PSM: $serverPsm');
-    
-    // Listen for incoming data
+
+    FlutterBlueMax.onL2capConnected.listen((evt) {
+      if (evt.psm != serverPsm) return;
+      serverChannel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+      print('Client connected: ${evt.remoteId}');
+    });
+
     FlutterBlueMax.onL2capReceived.listen((data) {
-      print('Server received: ${String.fromCharCodes(data.bytes)}');
-      print('From device: ${data.remoteId}, PSM: ${data.psm}');
+      if (data.psm != serverPsm) return;
+      print('Server received: ${String.fromCharCodes(data.value)}');
+    });
+
+    FlutterBlueMax.onL2capClosed.listen((evt) {
+      if (serverChannel != null &&
+          evt.remoteId == serverChannel!.deviceId &&
+          evt.psm == serverChannel!.psm) {
+        print('Client channel closed');
+        serverChannel = null;
+      }
     });
   }
 
@@ -207,18 +256,19 @@ class L2CAPExample {
 
     // Open L2CAP channel
     clientChannel = await device.openL2CapChannel(serverPsm!, secure: true);
-    
+
+    // React to incoming data and channel death
+    clientChannel!.onL2CapChannelReceived.listen((value) {
+      print('Client received: ${String.fromCharCodes(value)}');
+    });
+    clientChannel!.onClosed.first.then((_) {
+      print('Channel closed by remote');
+      clientChannel = null;
+    });
+
     // Send data
     String message = "Hello from L2CAP client!";
     await clientChannel!.write(message.codeUnits);
-    
-    // Read response (if expected)
-    try {
-      List<int> response = await clientChannel!.read();
-      print('Client received: ${String.fromCharCodes(response)}');
-    } catch (e) {
-      print('No immediate response: $e');
-    }
   }
 
   // Cleanup
@@ -228,11 +278,12 @@ class L2CAPExample {
       await clientChannel!.close();
       clientChannel = null;
     }
-    
+
     // Stop server
     if (serverPsm != null) {
       await FlutterBlueMax.stopL2capServer(serverPsm!);
       serverPsm = null;
+      serverChannel = null;
     }
   }
 }
@@ -240,7 +291,7 @@ class L2CAPExample {
 
 ## Error Handling
 
-L2CAP methods follow the same error handling patterns as other Flutter Blue Plus operations:
+L2CAP methods follow the same error handling patterns as other flutter_blue_max operations. `openL2CapChannel` and `listenL2capChannel` also throw when their timeout elapses, so a hung platform call cannot block the package-wide operation mutexes forever.
 
 ```dart
 try {
@@ -264,16 +315,16 @@ try {
 ## Best Practices
 
 1. **Always check device connection** before opening L2CAP channels
-2. **Close channels explicitly** to free resources
-3. **Stop servers when done** to prevent resource leaks  
-4. **Handle platform limitations** (check for web/unsupported platforms)
-5. **Use secure channels** unless specifically needing insecure connections
-6. **Implement proper error handling** for connection failures
-7. **Listen to event streams** for incoming data and connection state changes
+2. **Listen to `onClosed` / `onL2capClosed`** — otherwise the only sign of a dead channel is a failing write
+3. **Match events by device + PSM**, not PSM alone; key server channels by the id from `onL2capConnected`
+4. **Close channels explicitly** to free resources
+5. **Stop servers when done** to prevent resource leaks
+6. **Prefer the event streams over `read()`** — `read()` only returns already-buffered data
+7. **Use secure channels** unless specifically needing insecure connections
 
 ## Architecture Alignment
 
-L2CAP implementation follows the exact same patterns as Flutter Blue Plus characteristics and services:
+L2CAP implementation follows the exact same patterns as flutter_blue_max characteristics and services:
 
 - **Object Creation**: `device.openL2CapChannel()` → returns channel object (like `device.discoverServices()`)
 - **Object Operations**: `channel.read()`, `channel.write()` (like `characteristic.read()`)
@@ -281,4 +332,4 @@ L2CAP implementation follows the exact same patterns as Flutter Blue Plus charac
 - **Error Handling**: Same exception types and patterns
 - **Platform Abstraction**: Same underlying platform interface
 
-This ensures L2CAP feels natural and familiar to existing Flutter Blue Plus developers.
+This ensures L2CAP feels natural and familiar to existing flutter_blue_max developers.
