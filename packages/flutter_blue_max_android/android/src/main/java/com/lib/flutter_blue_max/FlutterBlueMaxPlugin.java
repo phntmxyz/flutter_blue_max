@@ -57,6 +57,9 @@ import java.util.UUID;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.io.StringWriter;
@@ -3315,11 +3318,11 @@ class L2CapChannelManager {
             openL2CapChannelInfos.add(l2CapInfo);
         }
         final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) l2CapInfo.getL2CapChannel(device));
-        l2CapChannel.connectToL2CapChannel(secure, resultCallback);
-        // set callbacks and start reader loop
+        // set callbacks before connecting; the channel starts its reader loop
+        // itself once the asynchronous connect succeeds
         l2CapChannel.setDataReceivedCallback(dataReceivedCallback);
         l2CapChannel.setChannelClosedCallback(channelClosedCallback);
-        l2CapChannel.startReaderLoop(psm);
+        l2CapChannel.connectToL2CapChannel(secure, resultCallback);
     }
 
     public void read(String remoteId, int psm, final Result resultCallback) {
@@ -3468,6 +3471,20 @@ abstract class L2CapChannel {
         readerGeneration.incrementAndGet();
     }
 
+    // Single-threaded executor for this channel's blocking socket I/O (connect,
+    // write). One thread per channel keeps operations ordered — writes queue
+    // behind a pending connect — without blocking the main thread or other
+    // channels. Shut down by close().
+    protected final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+
+    protected void runOnIoThread(final Runnable task, final Result resultCallback) {
+        try {
+            ioExecutor.execute(task);
+        } catch (RejectedExecutionException e) {
+            resultCallback.error("channel_closed", "The L2CAP channel is closed.", null);
+        }
+    }
+
     public synchronized void startReaderLoop(final int psm) {
         // Snapshot socket and stream: the loop must never touch the mutable fields,
         // which close() and reconnects modify from other threads (previously an NPE
@@ -3548,23 +3565,33 @@ abstract class L2CapChannel {
             }
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("input_stream_read_failed", e.getMessage(), e);
+            // e.toString(), not e: an exception object is not codec-encodable
+            resultCallback.error("input_stream_read_failed", e.getMessage(), e.toString());
         }
     }
 
-    public void write(String remoteId, int psm, byte[] value, final Result resultCallback) {
-        if (outputStream == null || socket == null || !socket.isConnected()) {
-            resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the output stream is not open.", null);
-            return;
-        }
-        final byte[] data = value;
-        try {
-            outputStream.write(data);
-            resultCallback.success(null);
-        } catch (IOException e) {
-            plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("output_stream_write_failed", e.getMessage(), e);
-        }
+    public void write(String remoteId, int psm, byte[] value, final Result rawResult) {
+        // OutputStream.write() blocks when the peer's L2CAP flow-control credits
+        // run out; on the main thread that froze the UI and stalled all other
+        // method calls. Run it on the io thread and post the result back.
+        final Result resultCallback = new MainThreadResult(rawResult);
+        runOnIoThread(() -> {
+            // snapshot inside the task: it runs after any queued connect, and
+            // close() can modify these fields concurrently
+            final BluetoothSocket socket = this.socket;
+            final OutputStream outputStream = this.outputStream;
+            if (outputStream == null || socket == null || !socket.isConnected()) {
+                resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the output stream is not open.", null);
+                return;
+            }
+            try {
+                outputStream.write(value);
+                resultCallback.success(null);
+            } catch (IOException e) {
+                plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
+                resultCallback.error("output_stream_write_failed", e.getMessage(), e.toString());
+            }
+        }, resultCallback);
     }
 
     public synchronized void close() {
@@ -3597,6 +3624,9 @@ abstract class L2CapChannel {
                 socket = null;
             }
         }
+        // closing the socket above unblocks any in-flight connect/write; tasks
+        // still queued will fail fast on the closed streams
+        ioExecutor.shutdown();
     }
 }
 
@@ -3610,37 +3640,65 @@ class L2CapClientChannel extends L2CapChannel {
         this.device = device;
     }
 
+    public void connectToL2CapChannel(final boolean secure, final Result rawResult) {
+        // BluetoothSocket.connect() blocks, potentially for tens of seconds. On
+        // the main thread that froze the UI (ANR) and — because onMethodCall
+        // holds mMethodCallMutex — stalled GATT callbacks for all devices. Run
+        // it on the io thread and post the result back to the main thread.
+        final Result resultCallback = new MainThreadResult(rawResult);
+        runOnIoThread(() -> connectBlocking(secure, resultCallback), resultCallback);
+    }
+
     @SuppressLint("MissingPermission")
     @TargetApi(Build.VERSION_CODES.Q)
-    public synchronized void connectToL2CapChannel(final boolean secure, final Result resultCallback) {
+    private void connectBlocking(final boolean secure, final Result resultCallback) {
         try {
-            // Close existing socket if present before creating a new one.
-            // Also drop the old streams so a failed connect doesn't leave stale
-            // references to the closed socket (startReaderLoop checks them).
-            if (socket != null) {
-                // this close is intentional — stop the old reader without it
-                // reporting the channel as died
-                invalidateReader();
-                try {
-                    socket.close();
-                } catch (IOException ignored) {}
-                socket = null;
-                inputStream = null;
-                outputStream = null;
+            final BluetoothSocket newSocket;
+            synchronized (this) {
+                // Close existing socket if present before creating a new one.
+                // Also drop the old streams so a failed connect doesn't leave stale
+                // references to the closed socket (startReaderLoop checks them).
+                if (socket != null) {
+                    // this close is intentional — stop the old reader without it
+                    // reporting the channel as died
+                    invalidateReader();
+                    try {
+                        socket.close();
+                    } catch (IOException ignored) {}
+                    socket = null;
+                    inputStream = null;
+                    outputStream = null;
+                }
+
+                if (secure) {
+                    newSocket = device.createL2capChannel(psm);
+                } else {
+                    newSocket = device.createInsecureL2capChannel(psm);
+                }
+                socket = newSocket;
             }
 
-            if (secure) {
-                socket = device.createL2capChannel(psm);
-            } else {
-                socket = device.createInsecureL2capChannel(psm);
+            // blocking call — deliberately outside the monitor, so close() can
+            // abort a hanging connect by closing the socket
+            newSocket.connect();
+
+            synchronized (this) {
+                if (socket != newSocket) {
+                    // closed or replaced while connecting
+                    try {
+                        newSocket.close();
+                    } catch (IOException ignored) {}
+                    resultCallback.error("open_l2cap_channel_failed", "The channel was closed while connecting.", null);
+                    return;
+                }
+                inputStream = newSocket.getInputStream();
+                outputStream = newSocket.getOutputStream();
             }
-            socket.connect();
-            inputStream = socket.getInputStream();
-            outputStream = socket.getOutputStream();
+            startReaderLoop(psm);
             resultCallback.success(null);
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e);
+            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e.toString());
         }
     }
 
@@ -3824,6 +3882,32 @@ class DeviceConnectedToL2CapChannel {
         this.psm = psm;
     }
 
+}
+
+// MethodChannel results must be invoked on the platform (main) thread; work
+// running on background threads wraps its Result with this.
+class MainThreadResult implements Result {
+    private final Result inner;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+
+    MainThreadResult(final Result inner) {
+        this.inner = inner;
+    }
+
+    @Override
+    public void success(final Object result) {
+        handler.post(() -> inner.success(result));
+    }
+
+    @Override
+    public void error(final String errorCode, final String errorMessage, final Object errorDetails) {
+        handler.post(() -> inner.error(errorCode, errorMessage, errorDetails));
+    }
+
+    @Override
+    public void notImplemented() {
+        handler.post(inner::notImplemented);
+    }
 }
 
 
