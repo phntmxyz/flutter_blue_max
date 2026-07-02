@@ -263,7 +263,10 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
   Future<int> listenL2CapChannel(
     ListenL2CapChannelRequest request,
   ) async {
-    var result = await _invokeMethod('listenL2CapChannel', request.toMap());
+    // must be spelled "listenL2capChannel" — this is the method name the native
+    // side handles (same on Android and iOS); "listenL2CapChannel" falls through
+    // to notImplemented and throws MissingPluginException
+    var result = await _invokeMethod('listenL2capChannel', request.toMap());
     return result is Map ? (result['psm'] as int? ?? 4097) : 4097;
   }
 
