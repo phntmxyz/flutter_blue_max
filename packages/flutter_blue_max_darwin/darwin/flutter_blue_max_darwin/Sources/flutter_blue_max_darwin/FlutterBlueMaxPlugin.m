@@ -61,11 +61,22 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @class L2CapChannelManager;
 @class L2CapChannelInfo;
 
+// A queued outgoing write. NSOutputStream may accept fewer bytes than offered
+// (partial write) or none at all (no space); the unwritten remainder stays
+// queued and is flushed on HasSpaceAvailable. The Dart result completes only
+// once every byte has been handed to the stream.
+@interface L2CapPendingWrite : NSObject
+@property(nonatomic) NSData *data;
+@property(nonatomic) NSUInteger offset;
+@property(nonatomic, copy) FlutterResult completion;
+@end
+
 @interface L2CapChannelInfo : NSObject
 @property(nonatomic) NSNumber *psm;
 @property(nonatomic) NSString *remoteId;
 @property(nonatomic) CBL2CAPChannel *channel;
 @property(nonatomic) NSMutableData *readBuffer;
+@property(nonatomic) NSMutableArray<L2CapPendingWrite *> *pendingWrites;
 @property(nonatomic, getter=isListening) BOOL listening;
 - (instancetype)initWithPsm:(NSNumber *)psm remoteId:(NSString *)remoteId channel:(CBL2CAPChannel *)channel;
 @end
@@ -103,6 +114,8 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 - (void)reattachStreamsForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)cleanupChannelsForPeripheral:(NSString *)remoteId;
 - (void)completePendingOpenForRemoteId:(NSString *)remoteId psm:(CBL2CAPPSM)psm error:(NSError *)error;
+- (void)drainWritesForChannel:(L2CapChannelInfo *)channelInfo;
+- (void)failPendingWritesForChannel:(L2CapChannelInfo *)channelInfo error:(FlutterError *)error;
 @end
 
 @interface FlutterBlueMaxPlugin ()
@@ -2433,6 +2446,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 // ██       ██   ██  ██   ██  ██  ██ ██  ██  ██ ██  ██       ██
 //  ██████  ██   ██  ██   ██  ██   ████  ██   ████  ███████  ███████
 
+@implementation L2CapPendingWrite
+@end
+
 @implementation L2CapChannelInfo
 - (instancetype)initWithPsm:(NSNumber *)psm remoteId:(NSString *)remoteId channel:(CBL2CAPChannel *)channel
 {
@@ -2442,6 +2458,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         self.remoteId = remoteId;
         self.channel = channel;
         self.readBuffer = [[NSMutableData alloc] init];
+        self.pendingWrites = [[NSMutableArray alloc] init];
         self.listening = NO;
     }
     return self;
@@ -2610,6 +2627,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             [is removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
             [os removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
 
+            // Writes still queued at close time can never complete — fail them
+            [self failPendingWritesForChannel:channelInfo
+                                        error:[FlutterError errorWithCode:@"writeL2CapChannel"
+                                                                  message:@"L2CAP channel closed"
+                                                                  details:nil]];
+
             // Move to zombie list instead of removing. This keeps the CBL2CAPChannel
             // object alive so ARC doesn't dealloc it. Releasing a CBL2CAPChannel
             // triggers iOS to disconnect ALL L2CAP channels on the same peripheral.
@@ -2665,25 +2688,68 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
     
     if (channelInfo && channelInfo.channel && channelInfo.channel.outputStream) {
-        NSOutputStream *outputStream = channelInfo.channel.outputStream;
-        if (outputStream.hasSpaceAvailable) {
-            NSInteger bytesWritten = [outputStream write:valueData.data.bytes maxLength:valueData.data.length];
-            if (bytesWritten < 0) {
-                result([FlutterError errorWithCode:@"writeL2CapChannel"
-                                          message:@"Write failed"
-                                          details:nil]);
-            } else {
-                result(nil);
-            }
-        } else {
-            result([FlutterError errorWithCode:@"writeL2CapChannel"
-                                      message:@"Output stream not ready"
-                                      details:nil]);
+        if (valueData.data.length == 0) {
+            result(nil);
+            return;
         }
+        // Queue the write and drain as much as the stream accepts right now.
+        // Writing directly would silently drop bytes: NSOutputStream can accept
+        // fewer bytes than offered, and has no space at all under backpressure.
+        L2CapPendingWrite *pendingWrite = [[L2CapPendingWrite alloc] init];
+        pendingWrite.data = valueData.data;
+        pendingWrite.offset = 0;
+        pendingWrite.completion = result;
+        [channelInfo.pendingWrites addObject:pendingWrite];
+        [self drainWritesForChannel:channelInfo];
     } else {
-        result([FlutterError errorWithCode:@"writeL2CapChannel" 
-                                  message:@"Channel not found" 
+        result([FlutterError errorWithCode:@"writeL2CapChannel"
+                                  message:@"Channel not found"
                                   details:nil]);
+    }
+}
+
+// Write queued data until the stream stops accepting bytes. The remainder is
+// flushed by the next HasSpaceAvailable event (or the next queued write).
+- (void)drainWritesForChannel:(L2CapChannelInfo *)channelInfo
+{
+    NSOutputStream *outputStream = channelInfo.channel.outputStream;
+    while (channelInfo.pendingWrites.count > 0 && outputStream.hasSpaceAvailable) {
+        L2CapPendingWrite *pendingWrite = channelInfo.pendingWrites.firstObject;
+        const uint8_t *bytes = (const uint8_t *)pendingWrite.data.bytes + pendingWrite.offset;
+        NSUInteger remaining = pendingWrite.data.length - pendingWrite.offset;
+        NSInteger written = [outputStream write:bytes maxLength:remaining];
+        if (written < 0) {
+            NSString *message = outputStream.streamError.localizedDescription ?: @"Write failed";
+            [channelInfo.pendingWrites removeObjectAtIndex:0];
+            pendingWrite.completion([FlutterError errorWithCode:@"writeL2CapChannel"
+                                                        message:message
+                                                        details:nil]);
+            return;
+        }
+        if (written == 0) {
+            // stream accepted nothing despite hasSpaceAvailable — wait for the
+            // next HasSpaceAvailable event instead of spinning on the main thread
+            return;
+        }
+        pendingWrite.offset += written;
+        if (pendingWrite.offset >= pendingWrite.data.length) {
+            [channelInfo.pendingWrites removeObjectAtIndex:0];
+            pendingWrite.completion(nil);
+        }
+    }
+}
+
+// Fail every queued write, e.g. when the channel dies or the device disconnects.
+// Leaving them queued would hang the Dart write futures forever.
+- (void)failPendingWritesForChannel:(L2CapChannelInfo *)channelInfo error:(FlutterError *)error
+{
+    if (channelInfo.pendingWrites.count == 0) {
+        return;
+    }
+    NSArray<L2CapPendingWrite *> *failed = [channelInfo.pendingWrites copy];
+    [channelInfo.pendingWrites removeAllObjects];
+    for (L2CapPendingWrite *pendingWrite in failed) {
+        pendingWrite.completion(error);
     }
 }
 
@@ -2937,6 +3003,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                     [self.pendingStreamReady removeObjectForKey:readyKey];
                     pendingBlock(nil);
                 }
+                [self drainWritesForChannel:channelInfo];
             }
             break;
         case NSStreamEventErrorOccurred:
@@ -2990,6 +3057,11 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                                               userInfo:@{NSLocalizedDescriptionKey: @"L2CAP stream ended before becoming ready"}]);
     }
 
+    [self failPendingWritesForChannel:channelInfo
+                                error:[FlutterError errorWithCode:@"writeL2CapChannel"
+                                                          message:error.localizedDescription ?: @"L2CAP channel closed"
+                                                          details:nil]];
+
     [self.methodChannel invokeMethod:@"OnL2CapChannelClosed" arguments:@{
         @"remote_id": channelInfo.remoteId,
         @"psm": channelInfo.psm
@@ -3027,6 +3099,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     for (L2CapChannelInfo *info in self.channels) {
         if ([info.remoteId isEqualToString:remoteId]) {
             [toRemove addObject:info];
+            [self failPendingWritesForChannel:info
+                                        error:[FlutterError errorWithCode:@"writeL2CapChannel"
+                                                                  message:@"device disconnected"
+                                                                  details:nil]];
         }
     }
     [self.channels removeObjectsInArray:toRemove];
