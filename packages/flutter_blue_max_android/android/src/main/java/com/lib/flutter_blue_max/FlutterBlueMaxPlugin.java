@@ -3311,13 +3311,13 @@ class L2CapChannelManager {
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
 
-        L2CapInfo l2CapInfo = findInfo(psm);
-        if (l2CapInfo == null) {
-            plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "L2CAP Channel with for device " + device.getAddress() + " / psm " + psm + " not open yet. Create channel.");
-            l2CapInfo = new ClientSocketInfo(new L2CapClientChannel(device, psm, plugin));
-            openL2CapChannelInfos.add(l2CapInfo);
+        ClientSocketInfo clientInfo = findClientInfo(device, psm);
+        if (clientInfo == null) {
+            plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "L2CAP Channel for device " + device.getAddress() + " / psm " + psm + " not open yet. Create channel.");
+            clientInfo = new ClientSocketInfo(new L2CapClientChannel(device, psm, plugin));
+            openL2CapChannelInfos.add(clientInfo);
         }
-        final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) l2CapInfo.getL2CapChannel(device));
+        final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) clientInfo.getL2CapChannel(device));
         // set callbacks before connecting; the channel starts its reader loop
         // itself once the asynchronous connect succeeds
         l2CapChannel.setDataReceivedCallback(dataReceivedCallback);
@@ -3331,7 +3331,7 @@ class L2CapChannelManager {
             return;
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(psm, device);
+        final L2CapChannel channel = findChannel(device, psm);
         if (channel == null) {
             resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
             return;
@@ -3345,7 +3345,7 @@ class L2CapChannelManager {
             return;
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(psm, device);
+        final L2CapChannel channel = findChannel(device, psm);
         if (channel == null) {
             resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
             return;
@@ -3359,16 +3359,20 @@ class L2CapChannelManager {
             return;
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapInfo channelInfo = findInfo(psm);
+        // prefer the client channel for this exact device+psm; fall back to a
+        // server-side channel accepted from this device
+        final ClientSocketInfo clientInfo = findClientInfo(device, psm);
+        final L2CapInfo channelInfo = clientInfo != null ? clientInfo : findServerInfo(psm);
         if (channelInfo != null) {
             try {
                 channelInfo.close(device);
             } catch (IOException e) {
                 plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
                 resultCallback.error("close_l2cap_channel_failed", "Can't close channel with psm " + psm, null);
+                return; // returning both error and success would throw "Reply already submitted"
             }
-            if (channelInfo.getType() == L2CapInfo.Type.CLIENT) {
-                openL2CapChannelInfos.remove(channelInfo);
+            if (clientInfo != null) {
+                openL2CapChannelInfos.remove(clientInfo);
             }
         } else {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "No channel found which is matching device " + device.getAddress() + " / psm " + psm);
@@ -3377,10 +3381,10 @@ class L2CapChannelManager {
     }
 
     public synchronized void closeServerSocket(int psm, final Result resultCallback) {
-        final L2CapInfo channelInfo = findInfo(psm);
-        if (channelInfo != null && channelInfo.getType() == L2CapInfo.Type.SERVER) {
-            ((ServerSocketInfo) channelInfo).closeSocket();
-            openL2CapChannelInfos.remove(channelInfo);
+        final ServerSocketInfo serverInfo = findServerInfo(psm);
+        if (serverInfo != null) {
+            serverInfo.closeSocket();
+            openL2CapChannelInfos.remove(serverInfo);
         } else {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.WARNING, "[FBP] No server socket found with psm " + psm);
         }
@@ -3391,23 +3395,48 @@ class L2CapChannelManager {
         resultCallback.error("platform_not_supported", "The device is running an older Android version. Minimum version is Android Q.", null);
     }
 
+    // Lookups must be keyed by device AND psm: the same PSM is commonly used by
+    // multiple devices of the same product (a fixed PSM in the firmware), and a
+    // PSM-only lookup then returns another device's channel — leading to NPEs,
+    // ClassCastExceptions, or closing the wrong device's channel.
     @Nullable
-    private L2CapInfo findInfo(final int psm) {
-        for (L2CapInfo channelInfo : openL2CapChannelInfos) {
-            if (psm == channelInfo.getPsm()) {
-                return channelInfo;
+    private ClientSocketInfo findClientInfo(final BluetoothDevice remoteDevice, final int psm) {
+        synchronized (openL2CapChannelInfos) {
+            for (L2CapInfo channelInfo : openL2CapChannelInfos) {
+                if (channelInfo.getType() == L2CapInfo.Type.CLIENT
+                        && psm == channelInfo.getPsm()
+                        && channelInfo.getL2CapChannel(remoteDevice) != null) {
+                    return (ClientSocketInfo) channelInfo;
+                }
             }
         }
         return null;
     }
 
     @Nullable
-    private L2CapChannel findChannel(final int psm, final BluetoothDevice remoteDevice) {
-        final L2CapInfo l2CapInfo = findInfo(psm);
-        if (l2CapInfo == null) {
-            return null;
+    private ServerSocketInfo findServerInfo(final int psm) {
+        synchronized (openL2CapChannelInfos) {
+            for (L2CapInfo channelInfo : openL2CapChannelInfos) {
+                if (channelInfo.getType() == L2CapInfo.Type.SERVER && psm == channelInfo.getPsm()) {
+                    return (ServerSocketInfo) channelInfo;
+                }
+            }
         }
-        return l2CapInfo.getL2CapChannel(remoteDevice);
+        return null;
+    }
+
+    @Nullable
+    private L2CapChannel findChannel(final BluetoothDevice remoteDevice, final int psm) {
+        final ClientSocketInfo clientInfo = findClientInfo(remoteDevice, psm);
+        if (clientInfo != null) {
+            return clientInfo.getL2CapChannel(remoteDevice);
+        }
+        // fall back to a server-side channel accepted from this device
+        final ServerSocketInfo serverInfo = findServerInfo(psm);
+        if (serverInfo != null) {
+            return serverInfo.getL2CapChannel(remoteDevice);
+        }
+        return null;
     }
 
 
