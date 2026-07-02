@@ -61,6 +61,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 @class L2CapChannelManager;
 @class L2CapChannelInfo;
 
+// Cap for the per-channel poll buffer drained by readL2CapChannel. Received
+// data is also pushed via the OnL2CapChannelReceived event; without a cap,
+// apps that only consume the event stream would accumulate the channel's
+// entire traffic in memory until the OS kills the app.
+static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
+
 // A queued outgoing write. NSOutputStream may accept fewer bytes than offered
 // (partial write) or none at all (no space); the unwritten remainder stays
 // queued and is flushed on HasSpaceAvailable. The Dart result completes only
@@ -2533,6 +2539,9 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         }
         if (zombie && zombie.channel) {
             [self.zombieChannels removeObject:zombie];
+            // Drop data buffered before the channel was closed so the recycled
+            // channel doesn't hand the previous session's bytes to the new one.
+            [zombie.readBuffer setLength:0];
             [self.channels addObject:zombie];
             [self reattachStreamsForChannel:zombie];
 
@@ -2958,6 +2967,18 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                 return;
             }
 
+            // Discard bytes the peer sent while the channel was logically closed
+            // (the OS channel stays open for zombies, so incoming data piles up
+            // in the socket buffer). Nothing here can belong to the new session:
+            // recycling is purely local, so the peer cannot have responded yet.
+            uint8_t drainBuffer[1024];
+            while (channel.inputStream.hasBytesAvailable) {
+                NSInteger drained = [channel.inputStream read:drainBuffer maxLength:sizeof(drainBuffer)];
+                if (drained <= 0) {
+                    break;
+                }
+            }
+
             // The output stream may already have space available. Since we just
             // re-attached to the run loop, HasSpaceAvailable might not fire again.
             // Check immediately and fire any pending callback.
@@ -3029,7 +3050,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         
         if (bytesRead > 0) {
             [channelInfo.readBuffer appendBytes:buffer length:bytesRead];
-            
+            // keep only the most recent bytes (drop-oldest) — see kL2CapReadBufferCap
+            if (channelInfo.readBuffer.length > kL2CapReadBufferCap) {
+                NSUInteger excess = channelInfo.readBuffer.length - kL2CapReadBufferCap;
+                [channelInfo.readBuffer replaceBytesInRange:NSMakeRange(0, excess) withBytes:NULL length:0];
+            }
+
             [self.methodChannel invokeMethod:@"OnL2CapChannelReceived" arguments:@{
                 @"remote_id": channelInfo.remoteId,
                 @"psm": channelInfo.psm,
