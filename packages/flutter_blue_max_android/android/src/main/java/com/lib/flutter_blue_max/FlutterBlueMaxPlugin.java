@@ -149,6 +149,13 @@ public class FlutterBlueMaxPlugin implements
         invokeMethodUIThread("OnL2CapChannelReceived", data);
     };
 
+    private final L2CapChannelManager.ChannelClosed channelClosedCallback = (remoteDevice, psm) -> {
+        final HashMap<String, Object> data = new HashMap<>();
+        data.put("remote_id", remoteDevice.getAddress());
+        data.put("psm", psm);
+        invokeMethodUIThread("OnL2CapChannelClosed", data);
+    };
+
     private interface OperationOnPermission {
         void op(boolean granted, String permission);
     }
@@ -347,7 +354,7 @@ public class FlutterBlueMaxPlugin implements
                 return;
             }
             if (l2CapChannelManager == null) {
-                l2CapChannelManager = new L2CapChannelManager(mBluetoothAdapter, deviceConnectedCallback, dataReceivedCallback, this);
+                l2CapChannelManager = new L2CapChannelManager(mBluetoothAdapter, deviceConnectedCallback, dataReceivedCallback, channelClosedCallback, this);
             }
 
             switch (call.method) {
@@ -3247,13 +3254,15 @@ class L2CapChannelManager {
     private final BluetoothAdapter adapter;
     private final DeviceConnected deviceConnectedCallback;
     private final DataReceived dataReceivedCallback;
+    private final ChannelClosed channelClosedCallback;
     private final FlutterBlueMaxPlugin plugin;
     private final List<L2CapInfo> openL2CapChannelInfos = Collections.synchronizedList(new LinkedList<>());
 
-    public L2CapChannelManager(@NonNull final BluetoothAdapter adapter, @NonNull final DeviceConnected deviceConnectedCallback, @NonNull final DataReceived dataReceivedCallback, @NonNull final FlutterBlueMaxPlugin plugin) {
+    public L2CapChannelManager(@NonNull final BluetoothAdapter adapter, @NonNull final DeviceConnected deviceConnectedCallback, @NonNull final DataReceived dataReceivedCallback, @NonNull final ChannelClosed channelClosedCallback, @NonNull final FlutterBlueMaxPlugin plugin) {
         this.adapter = adapter;
         this.deviceConnectedCallback = deviceConnectedCallback;
         this.dataReceivedCallback = dataReceivedCallback;
+        this.channelClosedCallback = channelClosedCallback;
         this.plugin = plugin;
     }
 
@@ -3276,7 +3285,7 @@ class L2CapChannelManager {
             } else {
                 serverSocket = adapter.listenUsingInsecureL2capChannel();
             }
-            final ServerSocketInfo socketInfo = new ServerSocketInfo(serverSocket, deviceConnectedCallback, dataReceivedCallback, plugin);
+            final ServerSocketInfo socketInfo = new ServerSocketInfo(serverSocket, deviceConnectedCallback, dataReceivedCallback, channelClosedCallback, plugin);
             openL2CapChannelInfos.add(socketInfo);
             final int psm = serverSocket.getPsm();
             socketInfo.acceptConnections();
@@ -3307,8 +3316,9 @@ class L2CapChannelManager {
         }
         final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) l2CapInfo.getL2CapChannel(device));
         l2CapChannel.connectToL2CapChannel(secure, resultCallback);
-        // set data callback and start reader loop
+        // set callbacks and start reader loop
         l2CapChannel.setDataReceivedCallback(dataReceivedCallback);
+        l2CapChannel.setChannelClosedCallback(channelClosedCallback);
         l2CapChannel.startReaderLoop(psm);
     }
 
@@ -3405,6 +3415,10 @@ class L2CapChannelManager {
     public interface DataReceived {
         void data(BluetoothDevice remoteDevice, int psm, byte[] value);
     }
+
+    public interface ChannelClosed {
+        void closed(BluetoothDevice remoteDevice, int psm);
+    }
 }
 
 
@@ -3417,6 +3431,7 @@ abstract class L2CapChannel {
     protected OutputStream outputStream;
     protected InputStream inputStream;
     protected L2CapChannelManager.DataReceived dataReceivedCallback;
+    protected L2CapChannelManager.ChannelClosed channelClosedCallback;
     // Incremented whenever the current reader loop must stop (close, reconnect).
     // Each reader thread only runs while its own generation is still current,
     // so a reconnect can never end up with two threads competing for the stream.
@@ -3441,6 +3456,16 @@ abstract class L2CapChannel {
 
     public void setDataReceivedCallback(L2CapChannelManager.DataReceived cb) {
         this.dataReceivedCallback = cb;
+    }
+
+    public void setChannelClosedCallback(L2CapChannelManager.ChannelClosed cb) {
+        this.channelClosedCallback = cb;
+    }
+
+    // Stop the current reader loop without notifying Dart — for intentional
+    // teardown (close, reconnect), as opposed to the channel dying on its own.
+    protected void invalidateReader() {
+        readerGeneration.incrementAndGet();
     }
 
     public synchronized void startReaderLoop(final int psm) {
@@ -3476,6 +3501,12 @@ abstract class L2CapChannel {
                     plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, "L2CAP reader loop error: " + e);
                     break;
                 }
+            }
+            // If our generation is still current, the loop ended because the channel
+            // died on its own (EOF, IO error, disconnect) — not because close() or a
+            // reconnect intentionally stopped it. Tell Dart the channel is gone.
+            if (generation == readerGeneration.get() && channelClosedCallback != null) {
+                channelClosedCallback.closed(remoteDevice, psm);
             }
         }).start();
     }
@@ -3538,7 +3569,7 @@ abstract class L2CapChannel {
 
     public synchronized void close() {
         // invalidate the running reader; closing the streams below also unblocks it
-        readerGeneration.incrementAndGet();
+        invalidateReader();
         if (outputStream != null) {
             try {
                 outputStream.close();
@@ -3587,6 +3618,9 @@ class L2CapClientChannel extends L2CapChannel {
             // Also drop the old streams so a failed connect doesn't leave stale
             // references to the closed socket (startReaderLoop checks them).
             if (socket != null) {
+                // this close is intentional — stop the old reader without it
+                // reporting the channel as died
+                invalidateReader();
                 try {
                     socket.close();
                 } catch (IOException ignored) {}
@@ -3691,13 +3725,15 @@ class ServerSocketInfo implements L2CapInfo {
     private final List<L2CapServerChannel> openChannels;
     private final L2CapChannelManager.DeviceConnected deviceConnectedCallback;
     private final L2CapChannelManager.DataReceived dataReceivedCallback;
+    private final L2CapChannelManager.ChannelClosed channelClosedCallback;
     private final FlutterBlueMaxPlugin plugin;
     private boolean isAcceptingConnections;
 
-    public ServerSocketInfo(BluetoothServerSocket serverSocket, final L2CapChannelManager.DeviceConnected deviceConnectedCallback, final L2CapChannelManager.DataReceived dataReceivedCallback, final FlutterBlueMaxPlugin plugin) {
+    public ServerSocketInfo(BluetoothServerSocket serverSocket, final L2CapChannelManager.DeviceConnected deviceConnectedCallback, final L2CapChannelManager.DataReceived dataReceivedCallback, final L2CapChannelManager.ChannelClosed channelClosedCallback, final FlutterBlueMaxPlugin plugin) {
         this.serverSocket = serverSocket;
         this.deviceConnectedCallback = deviceConnectedCallback;
         this.dataReceivedCallback = dataReceivedCallback;
+        this.channelClosedCallback = channelClosedCallback;
         this.plugin = plugin;
         openChannels = Collections.synchronizedList(new LinkedList<>());
         isAcceptingConnections = false;
@@ -3750,6 +3786,7 @@ class ServerSocketInfo implements L2CapInfo {
                     final L2CapServerChannel l2capChannel = new L2CapServerChannel(socket, plugin);
                     l2capChannel.openStreams();
                     l2capChannel.setDataReceivedCallback(dataReceivedCallback);
+                    l2capChannel.setChannelClosedCallback(channelClosedCallback);
                     l2capChannel.startReaderLoop(getPsm());
                     addConnection(l2capChannel);
                     deviceConnectedCallback.deviceConnected(socket.getRemoteDevice(), getPsm());

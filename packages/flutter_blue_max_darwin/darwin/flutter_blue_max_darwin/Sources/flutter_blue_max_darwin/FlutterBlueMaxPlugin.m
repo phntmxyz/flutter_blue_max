@@ -3103,6 +3103,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
                                         error:[FlutterError errorWithCode:@"writeL2CapChannel"
                                                                   message:@"device disconnected"
                                                                   details:nil]];
+            // The stream End/Error events may never be delivered for a dropped
+            // connection, so report the close from here as well.
+            [self.methodChannel invokeMethod:@"OnL2CapChannelClosed" arguments:@{
+                @"remote_id": info.remoteId,
+                @"psm": info.psm
+            }];
         }
     }
     [self.channels removeObjectsInArray:toRemove];

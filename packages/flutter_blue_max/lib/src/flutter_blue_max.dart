@@ -125,6 +125,15 @@ class FlutterBlueMax {
   /// ```
   static Stream<L2CapChannelData> get onL2capReceived => FlutterBlueMaxPlatform.instance.onL2CapChannelReceived;
 
+  /// Stream of L2CAP channel close events (any device, any PSM).
+  ///
+  /// Emitted when a channel dies — because the remote side closed it, a stream
+  /// error occurred, or the device disconnected — but not for a local
+  /// [BluetoothL2capChannel.close] call. For client channels prefer the
+  /// per-channel [BluetoothL2capChannel.onClosed]; this global stream also
+  /// covers server-side channels accepted via [listenL2capChannel].
+  static Stream<L2CapChannelClosed> get onL2capClosed => FlutterBlueMaxPlatform.instance.onL2CapChannelClosed;
+
   /// Set configurable options
   ///   - [showPowerAlert] Whether to show the power alert (iOS & MacOS only). i.e. CBCentralManagerOptionShowPowerAlertKey
   ///       To set this option you must call this method before any other method in this package.

@@ -1255,6 +1255,27 @@ class L2CapChannelData {
   }
 }
 
+/// Event emitted when an L2CAP channel is closed by the remote device,
+/// a stream error, or a device disconnect.
+class L2CapChannelClosed {
+  /// The device identifier of the remote device
+  final DeviceIdentifier remoteId;
+
+  /// The PSM (Protocol Service Multiplexer) of the channel that was closed
+  final int psm;
+
+  /// Creates a new [L2CapChannelClosed] instance
+  L2CapChannelClosed({required this.remoteId, required this.psm});
+
+  /// Creates an [L2CapChannelClosed] from a platform message map
+  factory L2CapChannelClosed.fromMap(Map<dynamic, dynamic> map) {
+    return L2CapChannelClosed(
+      remoteId: DeviceIdentifier(map['remote_id']),
+      psm: map['psm'],
+    );
+  }
+}
+
 // random number defined by flutter blue plus.
 // Ideally it should not conflict with iOS or Android error codes.
 int bmUserCanceledErrorCode = 23789258;
