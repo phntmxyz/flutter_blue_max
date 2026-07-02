@@ -452,6 +452,9 @@ class FlutterBlueMax {
   /// - [secure] - Whether to use a secure L2CAP server (default: true)
   ///   - **Android**: Uses `listenUsingL2capChannel()` vs `listenUsingInsecureL2capChannel()`
   ///   - **iOS**: Uses `publishL2CAPChannelWithEncryption(secure)`
+  /// - [timeout] - Seconds to wait for the server to start (default: 15). Without it,
+  ///   a platform-side listen that never completes would hold the package-wide
+  ///   operation mutex forever and block all further Bluetooth calls.
   ///
   /// **Returns:** The PSM value assigned to this server. Share this value with
   /// remote devices so they can connect to your server.
@@ -479,16 +482,20 @@ class FlutterBlueMax {
   /// // Remember to stop the server when done
   /// await FlutterBlueMax.stopL2capServer(serverPsm);
   /// ```
-  static Future<int> listenL2capChannel({bool secure = true}) async {
+  static Future<int> listenL2capChannel({bool secure = true, int timeout = 15}) async {
     // check platform support
     if (kIsWeb) {
       throw FlutterBlueMaxException(
           ErrorPlatform.fbp, "listenL2capChannel", FbpErrorCode.applePlatformOnly.index, "not supported on web");
     }
 
-    return await _invokeMethod(() => FlutterBlueMaxPlatform.instance.listenL2CapChannel(
+    // the timeout is applied inside _invokeMethod so that a platform call that
+    // never completes still releases the "invokeMethod" mutex
+    return await _invokeMethod(() => FlutterBlueMaxPlatform.instance
+        .listenL2CapChannel(
           ListenL2CapChannelRequest(secure: secure),
-        ));
+        )
+        .fbpTimeout(timeout, "listenL2capChannel"));
   }
 
   /// Stops the L2CAP server listening on the specified PSM.
