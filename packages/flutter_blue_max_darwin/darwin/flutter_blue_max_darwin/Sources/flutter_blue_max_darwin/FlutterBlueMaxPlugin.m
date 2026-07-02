@@ -85,7 +85,10 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 // Blocks to execute when the output stream becomes ready (HasSpaceAvailable).
 // Keyed by "<remoteId>:<psm>". Used to defer the open result until the stream
 // is actually writable, preventing "Output stream not ready" errors.
-@property(nonatomic) NSMutableDictionary<NSString *, void(^)(void)> *pendingStreamReady;
+// Called with nil on success, or with an error when the channel dies before
+// becoming ready (stream error/end, peripheral disconnect) — every path must
+// invoke the block, otherwise the Dart open future hangs forever.
+@property(nonatomic) NSMutableDictionary<NSString *, void(^)(NSError *)> *pendingStreamReady;
 @property(nonatomic, copy) FlutterResult pendingListenResult;
 @property(nonatomic) BOOL pendingListenSecure;
 - (instancetype)initWithMethodChannel:(FlutterMethodChannel *)methodChannel plugin:(FlutterBlueMaxPlugin *)plugin;
@@ -2401,10 +2404,13 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     // setupStreamsForChannel dispatches async, so the stream isn't ready yet.
     NSString *readyKey = [NSString stringWithFormat:@"%@:%@", remoteId, @(channel.PSM)];
     __weak typeof(self) weakSelf = self;
-    self.l2CapChannelManager.pendingStreamReady[readyKey] = ^{
+    self.l2CapChannelManager.pendingStreamReady[readyKey] = ^(NSError *readyError) {
         __strong typeof(weakSelf) strongSelf = weakSelf;
         if (!strongSelf) return;
-        [strongSelf.l2CapChannelManager completePendingOpenForRemoteId:remoteId psm:channel.PSM error:nil];
+        [strongSelf.l2CapChannelManager completePendingOpenForRemoteId:remoteId psm:channel.PSM error:readyError];
+        if (readyError) {
+            return;
+        }
         [strongSelf.methodChannel invokeMethod:@"OnL2CapChannelOpened" arguments:@{
             @"remote_id": remoteId,
             @"psm": @(channel.PSM)
@@ -2518,9 +2524,15 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             NSString *readyKey = [NSString stringWithFormat:@"%@:%@", remoteId, psmValue];
             FlutterResult capturedResult = [result copy];
             __weak typeof(self) weakSelf = self;
-            self.pendingStreamReady[readyKey] = ^{
+            self.pendingStreamReady[readyKey] = ^(NSError *readyError) {
                 __strong typeof(weakSelf) strongSelf = weakSelf;
                 if (!strongSelf) return;
+                if (readyError) {
+                    capturedResult([FlutterError errorWithCode:@"openL2CapChannel"
+                                                       message:readyError.localizedDescription
+                                                       details:@(readyError.code)]);
+                    return;
+                }
                 [strongSelf.methodChannel invokeMethod:@"OnL2CapChannelOpened" arguments:@{
                     @"remote_id": remoteId,
                     @"psm": psmValue
@@ -2849,15 +2861,45 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
             [channel.outputStream scheduleInRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
             // Do NOT call open — streams are already open from the original channel setup
 
+            NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
+
+            // The channel may have died while zombified (peer closed it, but the
+            // delegates were detached so we never got the event). Fail the pending
+            // open instead of waiting for a HasSpaceAvailable that never fires.
+            // Streams whose death isn't reflected in streamStatus yet will deliver
+            // an End/Error event now that they are re-scheduled, which also fails
+            // the pending open via handleStreamEndForChannel.
+            NSStreamStatus inStatus = channel.inputStream.streamStatus;
+            NSStreamStatus outStatus = channel.outputStream.streamStatus;
+            BOOL streamDead = inStatus == NSStreamStatusAtEnd || inStatus == NSStreamStatusClosed || inStatus == NSStreamStatusError
+                           || outStatus == NSStreamStatusAtEnd || outStatus == NSStreamStatusClosed || outStatus == NSStreamStatusError;
+            if (streamDead) {
+                channel.inputStream.delegate = nil;
+                channel.outputStream.delegate = nil;
+                [channel.inputStream removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+                [channel.outputStream removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+                // Keep the CBL2CAPChannel alive as a zombie — releasing it while the
+                // BLE connection is up would cascade-close the peripheral's channels.
+                [self.channels removeObject:channelInfo];
+                [self.zombieChannels addObject:channelInfo];
+                void(^pendingBlock)(NSError *) = self.pendingStreamReady[readyKey];
+                if (pendingBlock) {
+                    [self.pendingStreamReady removeObjectForKey:readyKey];
+                    pendingBlock([NSError errorWithDomain:@"flutter_blue_max"
+                                                     code:-1
+                                                 userInfo:@{NSLocalizedDescriptionKey: @"L2CAP channel is no longer open"}]);
+                }
+                return;
+            }
+
             // The output stream may already have space available. Since we just
             // re-attached to the run loop, HasSpaceAvailable might not fire again.
             // Check immediately and fire any pending callback.
             if (channel.outputStream.hasSpaceAvailable) {
-                NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
-                void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+                void(^pendingBlock)(NSError *) = self.pendingStreamReady[readyKey];
                 if (pendingBlock) {
                     [self.pendingStreamReady removeObjectForKey:readyKey];
-                    pendingBlock();
+                    pendingBlock(nil);
                 }
             }
         });
@@ -2890,18 +2932,21 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
         case NSStreamEventHasSpaceAvailable:
             if (aStream == channelInfo.channel.outputStream) {
                 NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
-                void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+                void(^pendingBlock)(NSError *) = self.pendingStreamReady[readyKey];
                 if (pendingBlock) {
                     [self.pendingStreamReady removeObjectForKey:readyKey];
-                    pendingBlock();
+                    pendingBlock(nil);
                 }
             }
             break;
         case NSStreamEventErrorOccurred:
             NSLog(@"L2CAP Stream error: %@", [aStream streamError]);
+            // A stream error kills the channel — tear it down like a stream end,
+            // so pending opens fail and Dart gets the closed event instead of hanging.
+            [self handleStreamEndForChannel:channelInfo error:[aStream streamError]];
             break;
         case NSStreamEventEndEncountered:
-            [self handleStreamEndForChannel:channelInfo];
+            [self handleStreamEndForChannel:channelInfo error:nil];
             break;
         default:
             break;
@@ -2927,7 +2972,7 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
 }
 
-- (void)handleStreamEndForChannel:(L2CapChannelInfo *)channelInfo
+- (void)handleStreamEndForChannel:(L2CapChannelInfo *)channelInfo error:(NSError *)error
 {
     BOOL stillTracked = [self.channels containsObject:channelInfo];
     if (!stillTracked) {
@@ -2935,17 +2980,14 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
 
     // If there's a pending stream-ready callback (channel died before becoming writable),
-    // clean it up so the Dart side gets the close event instead of hanging.
+    // fail it so the Dart side gets an error instead of hanging.
     NSString *readyKey = [NSString stringWithFormat:@"%@:%@", channelInfo.remoteId, channelInfo.psm];
-    void(^pendingBlock)(void) = self.pendingStreamReady[readyKey];
+    void(^pendingBlock)(NSError *) = self.pendingStreamReady[readyKey];
     if (pendingBlock) {
         [self.pendingStreamReady removeObjectForKey:readyKey];
-        // Complete the pending open with an error so Dart doesn't hang
-        [self completePendingOpenForRemoteId:channelInfo.remoteId
-                                         psm:[channelInfo.psm unsignedShortValue]
-                                       error:[NSError errorWithDomain:@"flutter_blue_max"
-                                                                 code:-1
-                                                             userInfo:@{NSLocalizedDescriptionKey: @"L2CAP stream ended before becoming ready"}]];
+        pendingBlock(error ?: [NSError errorWithDomain:@"flutter_blue_max"
+                                                  code:-1
+                                              userInfo:@{NSLocalizedDescriptionKey: @"L2CAP stream ended before becoming ready"}]);
     }
 
     [self.methodChannel invokeMethod:@"OnL2CapChannelClosed" arguments:@{
@@ -2999,14 +3041,34 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
     }
     [self.zombieChannels removeObjectsInArray:toRemove];
 
-    // Remove any pending stream-ready callbacks for this peripheral
-    NSMutableArray *keysToRemove = [NSMutableArray array];
-    for (NSString *key in self.pendingStreamReady) {
-        if ([key hasPrefix:remoteId]) {
-            [keysToRemove addObject:key];
+    // Fail any pending stream-ready callbacks for this peripheral. Just removing
+    // them would leave the Dart open future hanging forever (and with it the
+    // package-global mutexes, blocking all further BLE calls).
+    NSError *disconnectError = [NSError errorWithDomain:@"flutter_blue_max"
+                                                   code:-1
+                                               userInfo:@{NSLocalizedDescriptionKey: @"device disconnected before L2CAP channel became ready"}];
+    NSString *readyPrefix = [NSString stringWithFormat:@"%@:", remoteId];
+    for (NSString *key in self.pendingStreamReady.allKeys) {
+        if ([key hasPrefix:readyPrefix]) {
+            void(^pendingBlock)(NSError *) = self.pendingStreamReady[key];
+            [self.pendingStreamReady removeObjectForKey:key];
+            pendingBlock(disconnectError);
         }
     }
-    [self.pendingStreamReady removeObjectsForKeys:keysToRemove];
+
+    // Fail pending open results whose didOpenL2CAPChannel callback will never
+    // arrive (open was requested but the device disconnected first).
+    NSString *pendingOpenPrefix = [NSString stringWithFormat:@"%@: ", remoteId];
+    for (NSString *key in self.pendingOpenResults.allKeys) {
+        if ([key hasPrefix:pendingOpenPrefix]) {
+            FlutterResult pending = self.pendingOpenResults[key];
+            [self.pendingOpenResults removeObjectForKey:key];
+            pending([FlutterError errorWithCode:@"openL2CapChannel"
+                                        message:@"device disconnected before L2CAP channel opened"
+                                        details:nil]);
+        }
+    }
+    [self.pendingOpenRequestedPsm removeObjectForKey:remoteId];
 }
 
 @end
