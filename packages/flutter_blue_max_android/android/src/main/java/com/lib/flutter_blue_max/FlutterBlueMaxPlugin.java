@@ -58,6 +58,7 @@ import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 import java.io.ByteArrayOutputStream;
@@ -3418,7 +3419,10 @@ abstract class L2CapChannel {
     protected OutputStream outputStream;
     protected InputStream inputStream;
     protected L2CapChannelManager.DataReceived dataReceivedCallback;
-    private volatile boolean readerRunning = false;
+    // Incremented whenever the current reader loop must stop (close, reconnect).
+    // Each reader thread only runs while its own generation is still current,
+    // so a reconnect can never end up with two threads competing for the stream.
+    private final AtomicInteger readerGeneration = new AtomicInteger(0);
 
     public L2CapChannel(final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
         readBuffer = new byte[readBufferSize];
@@ -3433,23 +3437,38 @@ abstract class L2CapChannel {
         this.dataReceivedCallback = cb;
     }
 
-    public void startReaderLoop(final int psm) {
+    public synchronized void startReaderLoop(final int psm) {
+        // Snapshot socket and stream: the loop must never touch the mutable fields,
+        // which close() and reconnects modify from other threads (previously an NPE
+        // here would kill the whole app, as only IOException was caught).
+        final BluetoothSocket socket = this.socket;
+        final InputStream inputStream = this.inputStream;
         if (inputStream == null || socket == null) return;
-        readerRunning = true;
+        final BluetoothDevice remoteDevice = socket.getRemoteDevice();
+        final int generation = readerGeneration.incrementAndGet();
         new Thread(() -> {
-            while (readerRunning && socket != null && socket.isConnected()) {
+            // private buffer: the shared readBuffer is also used by read()
+            final byte[] buffer = new byte[readBuffer.length];
+            while (generation == readerGeneration.get() && socket.isConnected()) {
                 try {
                     int available = inputStream.available();
                     if (available <= 0) {
                         try { Thread.sleep(20); } catch (InterruptedException ignored) {}
                         continue;
                     }
-                    int bytesRead = inputStream.read(readBuffer);
-                    if (bytesRead > 0 && dataReceivedCallback != null) {
-                        byte[] emit = Arrays.copyOf(readBuffer, bytesRead);
-                        dataReceivedCallback.data(socket.getRemoteDevice(), psm, emit);
+                    int bytesRead = inputStream.read(buffer);
+                    if (bytesRead < 0) {
+                        break; // end of stream
+                    }
+                    if (bytesRead > 0 && generation == readerGeneration.get() && dataReceivedCallback != null) {
+                        byte[] emit = Arrays.copyOf(buffer, bytesRead);
+                        dataReceivedCallback.data(remoteDevice, psm, emit);
                     }
                 } catch (IOException e) {
+                    break;
+                } catch (Exception e) {
+                    // an uncaught exception on this thread would kill the app process
+                    plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, "L2CAP reader loop error: " + e);
                     break;
                 }
             }
@@ -3507,7 +3526,8 @@ abstract class L2CapChannel {
     }
 
     public synchronized void close() {
-        readerRunning = false;
+        // invalidate the running reader; closing the streams below also unblocks it
+        readerGeneration.incrementAndGet();
         if (outputStream != null) {
             try {
                 outputStream.close();
@@ -3556,12 +3576,16 @@ class L2CapClientChannel extends L2CapChannel {
     @TargetApi(Build.VERSION_CODES.Q)
     public synchronized void connectToL2CapChannel(final boolean secure, final Result resultCallback) {
         try {
-            // Close existing socket if present before creating a new one
+            // Close existing socket if present before creating a new one.
+            // Also drop the old streams so a failed connect doesn't leave stale
+            // references to the closed socket (startReaderLoop checks them).
             if (socket != null) {
                 try {
                     socket.close();
                 } catch (IOException ignored) {}
                 socket = null;
+                inputStream = null;
+                outputStream = null;
             }
 
             if (secure) {
