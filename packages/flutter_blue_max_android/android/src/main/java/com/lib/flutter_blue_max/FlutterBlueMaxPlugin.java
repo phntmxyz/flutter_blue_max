@@ -3410,10 +3410,8 @@ class L2CapChannelManager {
 
 abstract class L2CapChannel {
 
-    // TODO: Find root cause of why 50 bytes is insufficient and implement a more graceful solution
-    // (e.g., dynamic buffer sizing or configurable buffer size). This is a quick fix to make L2CAP work.
-    protected static final int DEFAULT_READ_BUFFER_SIZE = 512;
-    protected final byte[] readBuffer;
+    // Fallback in case the socket cannot report its local MTU.
+    protected static final int FALLBACK_READ_BUFFER_SIZE = 512;
     protected final FlutterBlueMaxPlugin plugin;
     protected BluetoothSocket socket;
     protected OutputStream outputStream;
@@ -3424,9 +3422,17 @@ abstract class L2CapChannel {
     // so a reconnect can never end up with two threads competing for the stream.
     private final AtomicInteger readerGeneration = new AtomicInteger(0);
 
-    public L2CapChannel(final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        readBuffer = new byte[readBufferSize];
+    public L2CapChannel(final FlutterBlueMaxPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    // L2CAP CoC sockets are packet-oriented: a read with a buffer smaller than
+    // the incoming SDU silently discards the rest of the packet. Size read
+    // buffers from the socket's local MTU so no SDU can ever be truncated.
+    @TargetApi(Build.VERSION_CODES.Q)
+    protected static int readBufferSize(final BluetoothSocket socket) {
+        final int mtu = socket != null ? socket.getMaxReceivePacketSize() : 0;
+        return Math.max(mtu, FALLBACK_READ_BUFFER_SIZE);
     }
 
     public BluetoothSocket getSocket() {
@@ -3447,8 +3453,7 @@ abstract class L2CapChannel {
         final BluetoothDevice remoteDevice = socket.getRemoteDevice();
         final int generation = readerGeneration.incrementAndGet();
         new Thread(() -> {
-            // private buffer: the shared readBuffer is also used by read()
-            final byte[] buffer = new byte[readBuffer.length];
+            final byte[] buffer = new byte[readBufferSize(socket)];
             while (generation == readerGeneration.get() && socket.isConnected()) {
                 try {
                     int available = inputStream.available();
@@ -3476,6 +3481,9 @@ abstract class L2CapChannel {
     }
 
     public void read(String remoteId, int psm, final Result resultCallback) {
+        // snapshot: close() can modify these fields concurrently
+        final BluetoothSocket socket = this.socket;
+        final InputStream inputStream = this.inputStream;
         if (inputStream == null || socket == null || !socket.isConnected()) {
             resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the input stream is not open.", null);
             return;
@@ -3491,18 +3499,21 @@ abstract class L2CapChannel {
                 return;
             }
 
-            final int bytesRead = inputStream.read(readBuffer);
+            // fresh buffer per call: the reader loop may read concurrently, so a
+            // shared buffer could be overwritten between read and serialization
+            final byte[] buffer = new byte[readBufferSize(socket)];
+            final int bytesRead = inputStream.read(buffer);
+            final byte[] value = bytesRead > 0 ? Arrays.copyOf(buffer, bytesRead) : new byte[0];
             final Map<String, Object> responseData = new HashMap<>();
             responseData.put("remote_id", remoteId);
             responseData.put("psm", psm);
-            responseData.put("bytes_read", bytesRead);
-            responseData.put("value", readBuffer);
+            responseData.put("bytes_read", value.length);
+            responseData.put("value", value);
             resultCallback.success(responseData);
 
             // push event
             if (dataReceivedCallback != null && bytesRead > 0) {
-                byte[] emit = Arrays.copyOf(readBuffer, bytesRead);
-                dataReceivedCallback.data(socket.getRemoteDevice(), psm, emit);
+                dataReceivedCallback.data(socket.getRemoteDevice(), psm, value);
             }
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
@@ -3563,11 +3574,7 @@ class L2CapClientChannel extends L2CapChannel {
     private final int psm;
 
     public L2CapClientChannel(final BluetoothDevice device, final int psm, final FlutterBlueMaxPlugin plugin) {
-        this(device, psm, DEFAULT_READ_BUFFER_SIZE, plugin);
-    }
-
-    public L2CapClientChannel(final BluetoothDevice device, final int psm, final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        super(readBufferSize, plugin);
+        super(plugin);
         this.psm = psm;
         this.device = device;
     }
@@ -3616,11 +3623,7 @@ class L2CapServerChannel extends L2CapChannel {
 
 
     public L2CapServerChannel(final BluetoothSocket socket, final FlutterBlueMaxPlugin plugin) {
-        this(socket, DEFAULT_READ_BUFFER_SIZE, plugin);
-    }
-
-    public L2CapServerChannel(final BluetoothSocket socket, final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        super(readBufferSize, plugin);
+        super(plugin);
         this.socket = socket;
     }
 
