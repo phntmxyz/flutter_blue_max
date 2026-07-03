@@ -19,7 +19,9 @@ import io.flutter.plugin.common.MethodChannel.Result;
 
 public abstract class L2CapChannel {
 
-    protected static final int DEFAULT_READ_BUFFER_SIZE = 256;
+    // Large enough to cover the local L2CAP CoC MTU, so a backlogged
+    // input stream can be drained in few reads instead of small chunks.
+    protected static final int DEFAULT_READ_BUFFER_SIZE = 2048;
     protected final byte[] readBuffer;
     protected BluetoothSocket socket;
     protected OutputStream outputStream;

@@ -29,7 +29,9 @@ private class LogUtil: NSObject {
 }
 
 class L2CapServerInfo {
-    private static let defaultBufferSizeInByte = 50
+    // Large enough to cover the local L2CAP CoC MTU, so a backlogged
+    // input stream can be drained in few reads instead of 50-byte chunks.
+    private static let defaultBufferSizeInByte = 2048
     
     
     private let psm: CBL2CAPPSM
