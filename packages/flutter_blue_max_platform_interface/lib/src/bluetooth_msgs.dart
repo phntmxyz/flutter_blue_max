@@ -1016,24 +1016,6 @@ class PhySupport {
   }
 }
 
-/// Represents an L2CAP channel connection event.
-///
-/// This class is used internally to handle L2CAP channel connection events
-/// from the platform layer. It contains information about which device
-/// connected and on which PSM.
-class L2CapChannelConnected {
-  /// The device identifier of the remote device that connected
-  final DeviceIdentifier remoteId;
-  
-  /// The Protocol Service Multiplexer (PSM) of the connected channel
-  final int psm;
-
-  /// Creates an [L2CapChannelConnected] from a platform message map
-  L2CapChannelConnected.fromMap(Map<dynamic, dynamic> map)
-      : remoteId = DeviceIdentifier(map['remote_id']),
-        psm = map['psm'];
-}
-
 /// Request message for starting an L2CAP server.
 ///
 /// Used internally to communicate with the platform layer when
