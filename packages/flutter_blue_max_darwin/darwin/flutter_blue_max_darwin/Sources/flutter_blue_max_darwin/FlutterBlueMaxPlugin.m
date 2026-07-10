@@ -67,6 +67,12 @@ typedef NS_ENUM(NSUInteger, LogLevel) {
 // entire traffic in memory until the OS kills the app.
 static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
 
+// How much a single HasBytesAvailable handler pass drains from the input
+// stream before yielding back to the run loop. Bounds main-thread work per
+// pass; a remaining backlog is drained on the next pass (see
+// handleBytesAvailableForChannel).
+static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
+
 // A queued outgoing write. NSOutputStream may accept fewer bytes than offered
 // (partial write) or none at all (no space); the unwritten remainder stays
 // queued and is flushed on HasSpaceAvailable. The Dart result completes only
@@ -3074,11 +3080,23 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
 {
     if (@available(iOS 11.0, *)) {
         NSInputStream *inputStream = channelInfo.channel.inputStream;
-        uint8_t buffer[1024];
-        NSInteger bytesRead = [inputStream read:buffer maxLength:sizeof(buffer)];
-        
-        if (bytesRead > 0) {
-            [channelInfo.readBuffer appendBytes:buffer length:bytesRead];
+        // Drain everything the OS has buffered, not just one fixed-size read:
+        // HasBytesAvailable is not guaranteed to fire again for data that is
+        // already buffered (only when new data arrives), so a single read
+        // could strand a backlog in the socket until the peer sends more.
+        NSMutableData *received = [[NSMutableData alloc] init];
+        uint8_t buffer[4096];
+        while (inputStream.hasBytesAvailable && received.length < kL2CapDrainBudgetPerPass) {
+            NSInteger bytesRead = [inputStream read:buffer maxLength:sizeof(buffer)];
+            if (bytesRead <= 0) {
+                // 0: nothing more; <0: error — the stream delivers ErrorOccurred separately
+                break;
+            }
+            [received appendBytes:buffer length:bytesRead];
+        }
+
+        if (received.length > 0) {
+            [channelInfo.readBuffer appendData:received];
             // keep only the most recent bytes (drop-oldest) — see kL2CapReadBufferCap
             if (channelInfo.readBuffer.length > kL2CapReadBufferCap) {
                 NSUInteger excess = channelInfo.readBuffer.length - kL2CapReadBufferCap;
@@ -3088,8 +3106,20 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
             [self.methodChannel invokeMethod:@"OnL2CapChannelReceived" arguments:@{
                 @"remote_id": channelInfo.remoteId,
                 @"psm": channelInfo.psm,
-                @"value": [NSData dataWithBytes:buffer length:bytesRead]
+                @"value": [NSData dataWithData:received]
             }];
+        }
+
+        // Budget exhausted with data still buffered: schedule the next drain
+        // pass ourselves instead of relying on another HasBytesAvailable event
+        // (which may never come for already-buffered data). Yielding between
+        // passes keeps a large backlog from monopolizing the main run loop.
+        if (inputStream.hasBytesAvailable) {
+            dispatch_async(dispatch_get_main_queue(), ^{
+                // the channel may have been closed or zombified in the meantime
+                if (![self.channels containsObject:channelInfo]) return;
+                [self handleBytesAvailableForChannel:channelInfo];
+            });
         }
     }
 }
