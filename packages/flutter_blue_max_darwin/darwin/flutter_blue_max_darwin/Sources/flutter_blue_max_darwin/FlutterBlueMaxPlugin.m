@@ -2533,6 +2533,59 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
             return;
         }
 
+        // A previous open for this remoteId+PSM may have been abandoned by the
+        // Dart side (open timeout) while the OS-level open was still in flight.
+        // Calling openL2CAPChannel: again would fail with "L2CAP PSM already
+        // connected" once that open completes — unrecoverable without a GATT
+        // disconnect. Attach this call to the in-flight open instead.
+        NSString *pendingKey = [NSString stringWithFormat:@"%@: %@", remoteId, psmValue];
+        if (self.pendingOpenResults[pendingKey]) {
+            NSLog(@"Open already in flight for PSM %@ — attaching to pending open", psmValue);
+            self.pendingOpenResults[pendingKey] = [result copy];
+            self.pendingOpenRequestedPsm[remoteId] = psmValue;
+            return;
+        }
+
+        // If the abandoned open already completed, the channel sits in
+        // self.channels with nobody on the Dart side owning it. Adopt it
+        // instead of opening a new one (which iOS would reject).
+        L2CapChannelInfo *orphan = [self findChannelByRemoteId:remoteId psm:psmValue];
+        if (orphan && orphan.channel) {
+            NSStreamStatus orphanInStatus = orphan.channel.inputStream.streamStatus;
+            NSStreamStatus orphanOutStatus = orphan.channel.outputStream.streamStatus;
+            BOOL orphanDead = orphanInStatus == NSStreamStatusAtEnd || orphanInStatus == NSStreamStatusClosed || orphanInStatus == NSStreamStatusError
+                           || orphanOutStatus == NSStreamStatusAtEnd || orphanOutStatus == NSStreamStatusClosed || orphanOutStatus == NSStreamStatusError;
+            if (!orphanDead) {
+                NSLog(@"Adopting already-open L2CAP channel for PSM %@", psmValue);
+                // Drop bytes received while nobody owned the channel so the new
+                // owner doesn't read another session's data.
+                [orphan.readBuffer setLength:0];
+                [self.methodChannel invokeMethod:@"OnL2CapChannelOpened" arguments:@{
+                    @"remote_id": remoteId,
+                    @"psm": psmValue
+                }];
+                result(nil);
+                return;
+            }
+            // The orphaned channel died before anyone re-claimed it. Zombify it
+            // (same as handleStreamEndForChannel) and fall through to a fresh
+            // OS-level open below.
+            NSInputStream *orphanIn = orphan.channel.inputStream;
+            NSOutputStream *orphanOut = orphan.channel.outputStream;
+            orphanIn.delegate = nil;
+            orphanOut.delegate = nil;
+            [orphanIn removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [orphanOut removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+            [self failPendingWritesForChannel:orphan
+                                        error:[FlutterError errorWithCode:@"writeL2CapChannel"
+                                                                  message:@"L2CAP channel closed"
+                                                                  details:nil]];
+            [self.channels removeObject:orphan];
+            if (![self.zombieChannels containsObject:orphan]) {
+                [self.zombieChannels addObject:orphan];
+            }
+        }
+
         // Check if a zombie channel exists for this remoteId+PSM.
         // If so, recycle it instead of opening a new one (iOS won't allow
         // opening a PSM that's still alive, even if logically closed).
@@ -2587,8 +2640,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         }
 
         // Defer the result until didOpenL2CAPChannel returns (success or error)
-        NSString *key = [NSString stringWithFormat:@"%@: %@", remoteId, psmValue];
-        self.pendingOpenResults[key] = [result copy];
+        self.pendingOpenResults[pendingKey] = [result copy];
         self.pendingOpenRequestedPsm[remoteId] = psmValue;
         [peripheral openL2CAPChannel:[psmValue unsignedShortValue]];
     } else {
