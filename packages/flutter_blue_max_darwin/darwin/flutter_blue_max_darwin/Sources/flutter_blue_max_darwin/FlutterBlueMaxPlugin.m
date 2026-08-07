@@ -125,6 +125,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)setupStreamsForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)reattachStreamsForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)cleanupChannelsForPeripheral:(NSString *)remoteId;
+- (void)cleanupAllChannels;
 - (void)completePendingOpenForRemoteId:(NSString *)remoteId psm:(CBL2CAPPSM)psm error:(NSError *)error;
 - (void)drainWritesForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)failPendingWritesForChannel:(L2CapChannelInfo *)channelInfo error:(FlutterError *)error;
@@ -1122,9 +1123,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         [self.currentlyConnectingPeripherals removeAllObjects];
     }
 
-    // Clear all L2CAP channels (including zombies)
-    [self.l2CapChannelManager.channels removeAllObjects];
-    [self.l2CapChannelManager.zombieChannels removeAllObjects];
+    // Tear down all L2CAP channels (including zombies). didDisconnectPeripheral
+    // is not delivered in these cases, so cleanupChannelsForPeripheral never
+    // runs for them.
+    [self.l2CapChannelManager cleanupAllChannels];
 
     // note: we do *not* clear self.knownPeripherals
     // Otherwise the peripheral would not have any strong references 
@@ -3016,6 +3018,12 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     if (@available(iOS 11.0, *)) {
         CBL2CAPChannel *channel = channelInfo.channel;
         dispatch_async(dispatch_get_main_queue(), ^{
+            // The channel may have been purged (adapter off, disconnect) since
+            // it was moved back into self.channels. The purge already failed
+            // the pending open — don't resurrect the dead streams.
+            if (![self.channels containsObject:channelInfo]) {
+                return;
+            }
             channel.inputStream.delegate = (id<NSStreamDelegate>)self;
             channel.outputStream.delegate = (id<NSStreamDelegate>)self;
 
@@ -3205,6 +3213,13 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     }];
 
     dispatch_async(dispatch_get_main_queue(), ^{
+        // The channel may have been purged (adapter off, disconnect) between
+        // the synchronous part above and this block running. Re-adding it to
+        // the zombie list would leak it past that cleanup, and its stale
+        // CBL2CAPChannel would stall the next open of the same PSM.
+        if (![self.channels containsObject:channelInfo]) {
+            return;
+        }
         if (channelInfo.channel) {
             NSInputStream *is = channelInfo.channel.inputStream;
             NSOutputStream *os = channelInfo.channel.outputStream;
@@ -3236,6 +3251,26 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     return nil;
 }
 
+// Detach a channel's streams from the run loop and close them. Idempotent, so
+// safe on already-detached streams. Must run before the CBL2CAPChannel is
+// released — a released stream still scheduled on the run loop, or a PSM whose
+// streams were never closed, leaves stale state behind that can stall the next
+// open of the same PSM.
+- (void)teardownStreamsForChannel:(L2CapChannelInfo *)channelInfo
+{
+    if (!channelInfo.channel) {
+        return;
+    }
+    NSInputStream *is = channelInfo.channel.inputStream;
+    NSOutputStream *os = channelInfo.channel.outputStream;
+    is.delegate = nil;
+    os.delegate = nil;
+    [is removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    [os removeFromRunLoop:[NSRunLoop mainRunLoop] forMode:NSRunLoopCommonModes];
+    [is close];
+    [os close];
+}
+
 - (void)cleanupChannelsForPeripheral:(NSString *)remoteId
 {
     // Remove active channels for this peripheral
@@ -3243,6 +3278,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     for (L2CapChannelInfo *info in self.channels) {
         if ([info.remoteId isEqualToString:remoteId]) {
             [toRemove addObject:info];
+            [self teardownStreamsForChannel:info];
             [self failPendingWritesForChannel:info
                                         error:[FlutterError errorWithCode:@"writeL2CapChannel"
                                                                   message:@"device disconnected"
@@ -3258,11 +3294,13 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     [self.channels removeObjectsInArray:toRemove];
 
     // Now safe to release zombie channels — the BLE connection is gone,
-    // so CBL2CAPChannel dealloc won't cascade to other channels.
+    // so CBL2CAPChannel dealloc won't cascade to other channels. Their streams
+    // were detached when zombified but never closed; close them before release.
     toRemove = [NSMutableArray array];
     for (L2CapChannelInfo *info in self.zombieChannels) {
         if ([info.remoteId isEqualToString:remoteId]) {
             [toRemove addObject:info];
+            [self teardownStreamsForChannel:info];
         }
     }
     [self.zombieChannels removeObjectsInArray:toRemove];
@@ -3295,6 +3333,49 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         }
     }
     [self.pendingOpenRequestedPsm removeObjectForKey:remoteId];
+}
+
+// Tear down every channel (active + zombie) when the whole adapter state is
+// reset (adapter turned off, hot restart). iOS delivers no
+// didDisconnectPeripheral in these cases, so cleanupChannelsForPeripheral
+// never runs and the channels would otherwise be released with their streams
+// still open and scheduled on the run loop — leaving stale PSM state that
+// makes the next open of the same PSM hang without any callback.
+- (void)cleanupAllChannels
+{
+    NSMutableArray<L2CapChannelInfo *> *all = [self.channels mutableCopy];
+    [all addObjectsFromArray:self.zombieChannels];
+    [self.channels removeAllObjects];
+    [self.zombieChannels removeAllObjects];
+
+    for (L2CapChannelInfo *info in all) {
+        [self teardownStreamsForChannel:info];
+        [self failPendingWritesForChannel:info
+                                    error:[FlutterError errorWithCode:@"writeL2CapChannel"
+                                                              message:@"bluetooth adapter was reset"
+                                                              details:nil]];
+    }
+
+    // Fail all pending open/ready callbacks — their didOpenL2CAPChannel or
+    // HasSpaceAvailable will never arrive after an adapter reset. Leaving them
+    // would hang the Dart futures and make later opens attach to a dead
+    // in-flight open.
+    NSError *resetError = [NSError errorWithDomain:@"flutter_blue_max"
+                                              code:-1
+                                          userInfo:@{NSLocalizedDescriptionKey: @"bluetooth adapter was reset"}];
+    for (NSString *key in self.pendingStreamReady.allKeys) {
+        void(^pendingBlock)(NSError *) = self.pendingStreamReady[key];
+        [self.pendingStreamReady removeObjectForKey:key];
+        pendingBlock(resetError);
+    }
+    for (NSString *key in self.pendingOpenResults.allKeys) {
+        FlutterResult pending = self.pendingOpenResults[key];
+        [self.pendingOpenResults removeObjectForKey:key];
+        pending([FlutterError errorWithCode:@"openL2CapChannel"
+                                    message:@"bluetooth adapter was reset"
+                                    details:nil]);
+    }
+    [self.pendingOpenRequestedPsm removeAllObjects];
 }
 
 @end

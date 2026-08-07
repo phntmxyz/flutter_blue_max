@@ -322,6 +322,20 @@ try {
 6. **Prefer the event streams over `read()`** — `read()` only returns already-buffered data
 7. **Use secure channels** unless specifically needing insecure connections
 
+## Known iOS CoreBluetooth Issues
+
+The iOS implementation works around several CoreBluetooth defects that Apple has not fixed. Reported to Apple:
+
+- **Closing one L2CAP channel closes a different one.** With two channels open on the same peripheral, closing the second channel tears down the first instead. Reported via Feedback Assistant; Apple DTS confirmed it is "under investigation" (Sep 2025) with no resolution. See [BLE l2cap close not correct](https://developer.apple.com/forums/thread/798454). This is why closed channels are kept alive as *zombies* instead of being released while the connection is up — releasing a `CBL2CAPChannel` triggers the same cascade.
+- **Multiple L2CAP channels are unreliable** (`rdar://46227689`, since iOS 12.1): `didOpenL2CAPChannel` can report the wrong PSM for the second channel, and data written to one channel can end up on the other. Never answered by Apple. See [Multiple L2CAP channels on iOS](https://developer.apple.com/forums/thread/111099).
+
+Observed behavior without a public Apple report, worked around in this plugin:
+
+- **No client-side close API.** `CBL2CAPChannel` has no `close`; the only teardown is releasing the object (which triggers the cascade above) or a GATT disconnect.
+- **"L2CAP PSM already connected" is a dead end.** Re-opening a PSM that iOS still considers connected fails unrecoverably until a GATT disconnect. The plugin therefore recycles or adopts existing channels instead of re-opening.
+- **`openL2CAPChannel:` has no timeout and can fail silently.** If stale channel state exists for the PSM, `didOpenL2CAPChannel` is simply never called — neither success nor error. The plugin tears down all channel state on adapter power-off to avoid leaving such stale state behind.
+- **No `didDisconnectPeripheral` on adapter power-off.** Connected peripherals silently vanish, so all per-peripheral cleanup must be triggered from the adapter state change instead.
+
 ## Architecture Alignment
 
 L2CAP implementation follows the exact same patterns as flutter_blue_max characteristics and services:
