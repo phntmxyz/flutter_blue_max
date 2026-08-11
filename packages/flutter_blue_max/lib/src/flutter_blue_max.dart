@@ -125,6 +125,27 @@ class FlutterBlueMax {
   /// ```
   static Stream<L2CapChannelData> get onL2capReceived => FlutterBlueMaxPlatform.instance.onL2CapChannelReceived;
 
+  /// Stream of L2CAP channel close events (any device, any PSM).
+  ///
+  /// Emitted when a channel dies — because the remote side closed it, a stream
+  /// error occurred, or the device disconnected — but not for a local
+  /// [BluetoothL2capChannel.close] call. For client channels prefer the
+  /// per-channel [BluetoothL2capChannel.onClosed]; this global stream also
+  /// covers server-side channels accepted via [listenL2capChannel].
+  static Stream<L2CapChannelClosed> get onL2capClosed => FlutterBlueMaxPlatform.instance.onL2CapChannelClosed;
+
+  /// Stream of L2CAP server connection events: emitted when a remote device
+  /// connects to a server started with [listenL2capChannel].
+  ///
+  /// Use the event's remoteId and psm to construct a [BluetoothL2capChannel]
+  /// for talking to the connected client. On Android the remoteId is the
+  /// client's MAC address; on iOS CoreBluetooth does not expose which central
+  /// opened the channel, so the placeholder id `server` is reported instead.
+  /// Both platforms accept either id for operations on server-accepted
+  /// channels, but data and close events always carry the same id as this
+  /// event — so always key channels by the id reported here.
+  static Stream<L2CapChannelConnected> get onL2capConnected => FlutterBlueMaxPlatform.instance.onL2CapChannelConnected;
+
   /// Set configurable options
   ///   - [showPowerAlert] Whether to show the power alert (iOS & MacOS only). i.e. CBCentralManagerOptionShowPowerAlertKey
   ///       To set this option you must call this method before any other method in this package.
@@ -452,6 +473,9 @@ class FlutterBlueMax {
   /// - [secure] - Whether to use a secure L2CAP server (default: true)
   ///   - **Android**: Uses `listenUsingL2capChannel()` vs `listenUsingInsecureL2capChannel()`
   ///   - **iOS**: Uses `publishL2CAPChannelWithEncryption(secure)`
+  /// - [timeout] - Seconds to wait for the server to start (default: 15). Without it,
+  ///   a platform-side listen that never completes would hold the package-wide
+  ///   operation mutex forever and block all further Bluetooth calls.
   ///
   /// **Returns:** The PSM value assigned to this server. Share this value with
   /// remote devices so they can connect to your server.
@@ -479,16 +503,20 @@ class FlutterBlueMax {
   /// // Remember to stop the server when done
   /// await FlutterBlueMax.stopL2capServer(serverPsm);
   /// ```
-  static Future<int> listenL2capChannel({bool secure = true}) async {
+  static Future<int> listenL2capChannel({bool secure = true, int timeout = 15}) async {
     // check platform support
     if (kIsWeb) {
       throw FlutterBlueMaxException(
           ErrorPlatform.fbp, "listenL2capChannel", FbpErrorCode.applePlatformOnly.index, "not supported on web");
     }
 
-    return await _invokeMethod(() => FlutterBlueMaxPlatform.instance.listenL2CapChannel(
+    // the timeout is applied inside _invokeMethod so that a platform call that
+    // never completes still releases the "invokeMethod" mutex
+    return await _invokeMethod(() => FlutterBlueMaxPlatform.instance
+        .listenL2CapChannel(
           ListenL2CapChannelRequest(secure: secure),
-        ));
+        )
+        .fbpTimeout(timeout, "listenL2capChannel"));
   }
 
   /// Stops the L2CAP server listening on the specified PSM.

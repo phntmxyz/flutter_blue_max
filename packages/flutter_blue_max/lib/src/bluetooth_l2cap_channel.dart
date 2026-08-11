@@ -68,11 +68,11 @@ class BluetoothL2capChannel {
 
   /// Reads data from the L2CAP channel.
   ///
-  /// Attempts to read data that has been received on this L2CAP channel.
-  /// This is a blocking operation that waits for data to become available.
+  /// Returns the data currently buffered for this channel. It does not wait
+  /// for data to arrive.
   ///
-  /// Returns a [List<int>] containing the received bytes. The list may be
-  /// empty if no data is available.
+  /// Returns a [List<int>] containing the received bytes. The list is
+  /// empty if no data is buffered.
   ///
   /// Throws [FlutterBlueMaxException] if the read operation fails or 
   /// the channel is not open.
@@ -133,6 +133,29 @@ class BluetoothL2capChannel {
     return FlutterBlueMaxPlatform.instance.onL2CapChannelReceived
       .where((d) => d.remoteId == deviceId && d.psm == psm)
       .map((d) => d.value);
+  }
+
+  /// Stream that emits an event when this channel dies — because the remote
+  /// device closed it, a stream error occurred, or the device disconnected.
+  ///
+  /// Without listening to this stream there is no way to learn that the
+  /// channel is gone other than a failing [write] or [read].
+  ///
+  /// Note: it does not emit for a local [close] call, and a single close may
+  /// be reported more than once in rare cases (e.g. a stream error racing a
+  /// device disconnect) — cancel the subscription on the first event if you
+  /// only care about the transition.
+  ///
+  /// Example:
+  /// ```dart
+  /// channel.onClosed.first.then((_) {
+  ///   print('L2CAP channel closed by remote');
+  /// });
+  /// ```
+  Stream<void> get onClosed {
+    return FlutterBlueMaxPlatform.instance.onL2CapChannelClosed
+      .where((e) => e.remoteId == deviceId && e.psm == psm)
+      .map((e) {});
   }
 
   @override

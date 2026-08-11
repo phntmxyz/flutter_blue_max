@@ -29,6 +29,8 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
   final _onServicesResetController = StreamController<BmBluetoothDevice>.broadcast();
   final _onTurnOnResponseController = StreamController<BmTurnOnResponse>.broadcast();
   final _onL2CapChannelReceivedController = StreamController<L2CapChannelData>.broadcast();
+  final _onL2CapChannelClosedController = StreamController<L2CapChannelClosed>.broadcast();
+  final _onL2CapChannelConnectedController = StreamController<L2CapChannelConnected>.broadcast();
 
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
@@ -103,6 +105,16 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
   @override
   Stream<L2CapChannelData> get onL2CapChannelReceived {
     return _onL2CapChannelReceivedController.stream;
+  }
+
+  @override
+  Stream<L2CapChannelClosed> get onL2CapChannelClosed {
+    return _onL2CapChannelClosedController.stream;
+  }
+
+  @override
+  Stream<L2CapChannelConnected> get onL2CapChannelConnected {
+    return _onL2CapChannelConnectedController.stream;
   }
 
   @override
@@ -621,6 +633,18 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
       case 'OnL2CapChannelReceived':
         return _onL2CapChannelReceivedController.add(
           L2CapChannelData.fromMap(
+            call.arguments,
+          ),
+        );
+      case 'OnL2CapChannelClosed':
+        return _onL2CapChannelClosedController.add(
+          L2CapChannelClosed.fromMap(
+            call.arguments,
+          ),
+        );
+      case 'OnL2CapChannelConnected':
+        return _onL2CapChannelConnectedController.add(
+          L2CapChannelConnected.fromMap(
             call.arguments,
           ),
         );

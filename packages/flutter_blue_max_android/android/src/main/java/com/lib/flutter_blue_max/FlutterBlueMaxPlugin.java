@@ -57,7 +57,11 @@ import java.util.UUID;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.io.StringWriter;
 import java.io.PrintWriter;
 import java.io.ByteArrayOutputStream;
@@ -133,11 +137,10 @@ public class FlutterBlueMaxPlugin implements
     private L2CapChannelManager l2CapChannelManager;
 
     private final L2CapChannelManager.DeviceConnected deviceConnectedCallback = (remoteDevice, psm) -> {
-        final DeviceConnectedToL2CapChannel newConnectedDeviceState = new DeviceConnectedToL2CapChannel(remoteDevice, psm);
-        final HashMap<String, Object> deviceConnectedData = new HashMap<>();
-        deviceConnectedData.put("psm", psm);
-        deviceConnectedData.put("bluetoothDevice", MarshallingUtil.bmBluetoothDevice(remoteDevice));
-        invokeMethodUIThread("connectToL2CapChannel", deviceConnectedData);
+        final HashMap<String, Object> data = new HashMap<>();
+        data.put("remote_id", remoteDevice.getAddress());
+        data.put("psm", psm);
+        invokeMethodUIThread("OnL2CapChannelConnected", data);
     };
 
     private final L2CapChannelManager.DataReceived dataReceivedCallback = (remoteDevice, psm, value) -> {
@@ -146,6 +149,13 @@ public class FlutterBlueMaxPlugin implements
         data.put("psm", psm);
         data.put("value", value);
         invokeMethodUIThread("OnL2CapChannelReceived", data);
+    };
+
+    private final L2CapChannelManager.ChannelClosed channelClosedCallback = (remoteDevice, psm) -> {
+        final HashMap<String, Object> data = new HashMap<>();
+        data.put("remote_id", remoteDevice.getAddress());
+        data.put("psm", psm);
+        invokeMethodUIThread("OnL2CapChannelClosed", data);
     };
 
     private interface OperationOnPermission {
@@ -346,7 +356,7 @@ public class FlutterBlueMaxPlugin implements
                 return;
             }
             if (l2CapChannelManager == null) {
-                l2CapChannelManager = new L2CapChannelManager(mBluetoothAdapter, deviceConnectedCallback, dataReceivedCallback, this);
+                l2CapChannelManager = new L2CapChannelManager(mBluetoothAdapter, deviceConnectedCallback, dataReceivedCallback, channelClosedCallback, this);
             }
 
             switch (call.method) {
@@ -1591,7 +1601,7 @@ public class FlutterBlueMaxPlugin implements
                     l2CapChannelManager.write(remoteId, psm, value, result);
                     break;
                 }
-                case "listenL2capChannel":
+                case "listenL2CapChannel":
                 {
                     ArrayList<String> permissions = new ArrayList<>();
                     if (Build.VERSION.SDK_INT >= 31) { // Android 12 (October 2021)
@@ -3246,13 +3256,15 @@ class L2CapChannelManager {
     private final BluetoothAdapter adapter;
     private final DeviceConnected deviceConnectedCallback;
     private final DataReceived dataReceivedCallback;
+    private final ChannelClosed channelClosedCallback;
     private final FlutterBlueMaxPlugin plugin;
     private final List<L2CapInfo> openL2CapChannelInfos = Collections.synchronizedList(new LinkedList<>());
 
-    public L2CapChannelManager(@NonNull final BluetoothAdapter adapter, @NonNull final DeviceConnected deviceConnectedCallback, @NonNull final DataReceived dataReceivedCallback, @NonNull final FlutterBlueMaxPlugin plugin) {
+    public L2CapChannelManager(@NonNull final BluetoothAdapter adapter, @NonNull final DeviceConnected deviceConnectedCallback, @NonNull final DataReceived dataReceivedCallback, @NonNull final ChannelClosed channelClosedCallback, @NonNull final FlutterBlueMaxPlugin plugin) {
         this.adapter = adapter;
         this.deviceConnectedCallback = deviceConnectedCallback;
         this.dataReceivedCallback = dataReceivedCallback;
+        this.channelClosedCallback = channelClosedCallback;
         this.plugin = plugin;
     }
 
@@ -3275,7 +3287,7 @@ class L2CapChannelManager {
             } else {
                 serverSocket = adapter.listenUsingInsecureL2capChannel();
             }
-            final ServerSocketInfo socketInfo = new ServerSocketInfo(serverSocket, deviceConnectedCallback, dataReceivedCallback, plugin);
+            final ServerSocketInfo socketInfo = new ServerSocketInfo(serverSocket, deviceConnectedCallback, dataReceivedCallback, channelClosedCallback, plugin);
             openL2CapChannelInfos.add(socketInfo);
             final int psm = serverSocket.getPsm();
             socketInfo.acceptConnections();
@@ -3286,7 +3298,7 @@ class L2CapChannelManager {
 
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e);
+            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e.toString());
         }
 
     }
@@ -3298,17 +3310,18 @@ class L2CapChannelManager {
         }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
 
-        L2CapInfo l2CapInfo = findInfo(psm);
-        if (l2CapInfo == null) {
-            plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "L2CAP Channel with for device " + device.getAddress() + " / psm " + psm + " not open yet. Create channel.");
-            l2CapInfo = new ClientSocketInfo(new L2CapClientChannel(device, psm, plugin));
-            openL2CapChannelInfos.add(l2CapInfo);
+        ClientSocketInfo clientInfo = findClientInfo(device, psm);
+        if (clientInfo == null) {
+            plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "L2CAP Channel for device " + device.getAddress() + " / psm " + psm + " not open yet. Create channel.");
+            clientInfo = new ClientSocketInfo(new L2CapClientChannel(device, psm, plugin));
+            openL2CapChannelInfos.add(clientInfo);
         }
-        final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) l2CapInfo.getL2CapChannel(device));
-        l2CapChannel.connectToL2CapChannel(secure, resultCallback);
-        // set data callback and start reader loop
+        final L2CapClientChannel l2CapChannel = ((L2CapClientChannel) clientInfo.getL2CapChannel(device));
+        // set callbacks before connecting; the channel starts its reader loop
+        // itself once the asynchronous connect succeeds
         l2CapChannel.setDataReceivedCallback(dataReceivedCallback);
-        l2CapChannel.startReaderLoop(psm);
+        l2CapChannel.setChannelClosedCallback(channelClosedCallback);
+        l2CapChannel.connectToL2CapChannel(secure, resultCallback);
     }
 
     public void read(String remoteId, int psm, final Result resultCallback) {
@@ -3316,10 +3329,9 @@ class L2CapChannelManager {
             firePlatformNotSupportedError(resultCallback);
             return;
         }
-        final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(psm, device);
+        final L2CapChannel channel = findChannelForRemoteId(remoteId, psm);
         if (channel == null) {
-            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
+            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + remoteId + " / psm " + psm, null);
             return;
         }
         channel.read(remoteId, psm, resultCallback);
@@ -3330,10 +3342,9 @@ class L2CapChannelManager {
             firePlatformNotSupportedError(resultCallback);
             return;
         }
-        final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapChannel channel = findChannel(psm, device);
+        final L2CapChannel channel = findChannelForRemoteId(remoteId, psm);
         if (channel == null) {
-            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + device.getAddress() + " / psm " + psm, null);
+            resultCallback.error("no_open_l2cap_channel_found", "No open channel found for device " + remoteId + " / psm " + psm, null);
             return;
         }
         channel.write(remoteId, psm, value, resultCallback);
@@ -3344,17 +3355,32 @@ class L2CapChannelManager {
             firePlatformNotSupportedError(resultCallback);
             return;
         }
+        if (SERVER_REMOTE_ID.equals(remoteId)) {
+            final ServerSocketInfo serverInfo = findServerInfo(psm);
+            final L2CapServerChannel channel = serverInfo != null ? serverInfo.getAnyL2CapChannel() : null;
+            if (channel != null) {
+                serverInfo.closeChannel(channel);
+            } else {
+                plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "No server-accepted channel found for psm " + psm);
+            }
+            resultCallback.success(null);
+            return;
+        }
         final BluetoothDevice device = adapter.getRemoteDevice(remoteId);
-        final L2CapInfo channelInfo = findInfo(psm);
+        // prefer the client channel for this exact device+psm; fall back to a
+        // server-side channel accepted from this device
+        final ClientSocketInfo clientInfo = findClientInfo(device, psm);
+        final L2CapInfo channelInfo = clientInfo != null ? clientInfo : findServerInfo(psm);
         if (channelInfo != null) {
             try {
                 channelInfo.close(device);
             } catch (IOException e) {
                 plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
                 resultCallback.error("close_l2cap_channel_failed", "Can't close channel with psm " + psm, null);
+                return; // returning both error and success would throw "Reply already submitted"
             }
-            if (channelInfo.getType() == L2CapInfo.Type.CLIENT) {
-                openL2CapChannelInfos.remove(channelInfo);
+            if (clientInfo != null) {
+                openL2CapChannelInfos.remove(clientInfo);
             }
         } else {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.DEBUG, "No channel found which is matching device " + device.getAddress() + " / psm " + psm);
@@ -3363,10 +3389,10 @@ class L2CapChannelManager {
     }
 
     public synchronized void closeServerSocket(int psm, final Result resultCallback) {
-        final L2CapInfo channelInfo = findInfo(psm);
-        if (channelInfo != null && channelInfo.getType() == L2CapInfo.Type.SERVER) {
-            ((ServerSocketInfo) channelInfo).closeSocket();
-            openL2CapChannelInfos.remove(channelInfo);
+        final ServerSocketInfo serverInfo = findServerInfo(psm);
+        if (serverInfo != null) {
+            serverInfo.closeSocket();
+            openL2CapChannelInfos.remove(serverInfo);
         } else {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.WARNING, "[FBP] No server socket found with psm " + psm);
         }
@@ -3377,23 +3403,63 @@ class L2CapChannelManager {
         resultCallback.error("platform_not_supported", "The device is running an older Android version. Minimum version is Android Q.", null);
     }
 
+    // Lookups must be keyed by device AND psm: the same PSM is commonly used by
+    // multiple devices of the same product (a fixed PSM in the firmware), and a
+    // PSM-only lookup then returns another device's channel — leading to NPEs,
+    // ClassCastExceptions, or closing the wrong device's channel.
     @Nullable
-    private L2CapInfo findInfo(final int psm) {
-        for (L2CapInfo channelInfo : openL2CapChannelInfos) {
-            if (psm == channelInfo.getPsm()) {
-                return channelInfo;
+    private ClientSocketInfo findClientInfo(final BluetoothDevice remoteDevice, final int psm) {
+        synchronized (openL2CapChannelInfos) {
+            for (L2CapInfo channelInfo : openL2CapChannelInfos) {
+                if (channelInfo.getType() == L2CapInfo.Type.CLIENT
+                        && psm == channelInfo.getPsm()
+                        && channelInfo.getL2CapChannel(remoteDevice) != null) {
+                    return (ClientSocketInfo) channelInfo;
+                }
             }
         }
         return null;
     }
 
     @Nullable
-    private L2CapChannel findChannel(final int psm, final BluetoothDevice remoteDevice) {
-        final L2CapInfo l2CapInfo = findInfo(psm);
-        if (l2CapInfo == null) {
-            return null;
+    private ServerSocketInfo findServerInfo(final int psm) {
+        synchronized (openL2CapChannelInfos) {
+            for (L2CapInfo channelInfo : openL2CapChannelInfos) {
+                if (channelInfo.getType() == L2CapInfo.Type.SERVER && psm == channelInfo.getPsm()) {
+                    return (ServerSocketInfo) channelInfo;
+                }
+            }
         }
-        return l2CapInfo.getL2CapChannel(remoteDevice);
+        return null;
+    }
+
+    @Nullable
+    private L2CapChannel findChannel(final BluetoothDevice remoteDevice, final int psm) {
+        final ClientSocketInfo clientInfo = findClientInfo(remoteDevice, psm);
+        if (clientInfo != null) {
+            return clientInfo.getL2CapChannel(remoteDevice);
+        }
+        // fall back to a server-side channel accepted from this device
+        final ServerSocketInfo serverInfo = findServerInfo(psm);
+        if (serverInfo != null) {
+            return serverInfo.getL2CapChannel(remoteDevice);
+        }
+        return null;
+    }
+
+    // iOS cannot know which central connected to an L2CAP server, so Dart may
+    // address a server-accepted channel with the placeholder remoteId "server".
+    // Accept it here too; data and close events still carry the client's real
+    // MAC address (which is likewise accepted, via findChannel's server fallback).
+    static final String SERVER_REMOTE_ID = "server";
+
+    @Nullable
+    private L2CapChannel findChannelForRemoteId(final String remoteId, final int psm) {
+        if (SERVER_REMOTE_ID.equals(remoteId)) {
+            final ServerSocketInfo serverInfo = findServerInfo(psm);
+            return serverInfo != null ? serverInfo.getAnyL2CapChannel() : null;
+        }
+        return findChannel(adapter.getRemoteDevice(remoteId), psm);
     }
 
 
@@ -3404,25 +3470,39 @@ class L2CapChannelManager {
     public interface DataReceived {
         void data(BluetoothDevice remoteDevice, int psm, byte[] value);
     }
+
+    public interface ChannelClosed {
+        void closed(BluetoothDevice remoteDevice, int psm);
+    }
 }
 
 
 abstract class L2CapChannel {
 
-    // TODO: Find root cause of why 50 bytes is insufficient and implement a more graceful solution
-    // (e.g., dynamic buffer sizing or configurable buffer size). This is a quick fix to make L2CAP work.
-    protected static final int DEFAULT_READ_BUFFER_SIZE = 512;
-    protected final byte[] readBuffer;
+    // Fallback in case the socket cannot report its local MTU.
+    protected static final int FALLBACK_READ_BUFFER_SIZE = 512;
     protected final FlutterBlueMaxPlugin plugin;
     protected BluetoothSocket socket;
     protected OutputStream outputStream;
     protected InputStream inputStream;
     protected L2CapChannelManager.DataReceived dataReceivedCallback;
-    private volatile boolean readerRunning = false;
+    protected L2CapChannelManager.ChannelClosed channelClosedCallback;
+    // Incremented whenever the current reader loop must stop (close, reconnect).
+    // Each reader thread only runs while its own generation is still current,
+    // so a reconnect can never end up with two threads competing for the stream.
+    private final AtomicInteger readerGeneration = new AtomicInteger(0);
 
-    public L2CapChannel(final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        readBuffer = new byte[readBufferSize];
+    public L2CapChannel(final FlutterBlueMaxPlugin plugin) {
         this.plugin = plugin;
+    }
+
+    // L2CAP CoC sockets are packet-oriented: a read with a buffer smaller than
+    // the incoming SDU silently discards the rest of the packet. Size read
+    // buffers from the socket's local MTU so no SDU can ever be truncated.
+    @TargetApi(Build.VERSION_CODES.Q)
+    protected static int readBufferSize(final BluetoothSocket socket) {
+        final int mtu = socket != null ? socket.getMaxReceivePacketSize() : 0;
+        return Math.max(mtu, FALLBACK_READ_BUFFER_SIZE);
     }
 
     public BluetoothSocket getSocket() {
@@ -3433,30 +3513,77 @@ abstract class L2CapChannel {
         this.dataReceivedCallback = cb;
     }
 
-    public void startReaderLoop(final int psm) {
+    public void setChannelClosedCallback(L2CapChannelManager.ChannelClosed cb) {
+        this.channelClosedCallback = cb;
+    }
+
+    // Stop the current reader loop without notifying Dart — for intentional
+    // teardown (close, reconnect), as opposed to the channel dying on its own.
+    protected void invalidateReader() {
+        readerGeneration.incrementAndGet();
+    }
+
+    // Single-threaded executor for this channel's blocking socket I/O (connect,
+    // write). One thread per channel keeps operations ordered — writes queue
+    // behind a pending connect — without blocking the main thread or other
+    // channels. Shut down by close().
+    protected final ExecutorService ioExecutor = Executors.newSingleThreadExecutor();
+
+    protected void runOnIoThread(final Runnable task, final Result resultCallback) {
+        try {
+            ioExecutor.execute(task);
+        } catch (RejectedExecutionException e) {
+            resultCallback.error("channel_closed", "The L2CAP channel is closed.", null);
+        }
+    }
+
+    public synchronized void startReaderLoop(final int psm) {
+        // Snapshot socket and stream: the loop must never touch the mutable fields,
+        // which close() and reconnects modify from other threads (previously an NPE
+        // here would kill the whole app, as only IOException was caught).
+        final BluetoothSocket socket = this.socket;
+        final InputStream inputStream = this.inputStream;
         if (inputStream == null || socket == null) return;
-        readerRunning = true;
+        final BluetoothDevice remoteDevice = socket.getRemoteDevice();
+        final int generation = readerGeneration.incrementAndGet();
         new Thread(() -> {
-            while (readerRunning && socket != null && socket.isConnected()) {
+            final byte[] buffer = new byte[readBufferSize(socket)];
+            while (generation == readerGeneration.get() && socket.isConnected()) {
                 try {
                     int available = inputStream.available();
                     if (available <= 0) {
                         try { Thread.sleep(20); } catch (InterruptedException ignored) {}
                         continue;
                     }
-                    int bytesRead = inputStream.read(readBuffer);
-                    if (bytesRead > 0 && dataReceivedCallback != null) {
-                        byte[] emit = Arrays.copyOf(readBuffer, bytesRead);
-                        dataReceivedCallback.data(socket.getRemoteDevice(), psm, emit);
+                    int bytesRead = inputStream.read(buffer);
+                    if (bytesRead < 0) {
+                        break; // end of stream
+                    }
+                    if (bytesRead > 0 && generation == readerGeneration.get() && dataReceivedCallback != null) {
+                        byte[] emit = Arrays.copyOf(buffer, bytesRead);
+                        dataReceivedCallback.data(remoteDevice, psm, emit);
                     }
                 } catch (IOException e) {
                     break;
+                } catch (Exception e) {
+                    // an uncaught exception on this thread would kill the app process
+                    plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, "L2CAP reader loop error: " + e);
+                    break;
                 }
+            }
+            // If our generation is still current, the loop ended because the channel
+            // died on its own (EOF, IO error, disconnect) — not because close() or a
+            // reconnect intentionally stopped it. Tell Dart the channel is gone.
+            if (generation == readerGeneration.get() && channelClosedCallback != null) {
+                channelClosedCallback.closed(remoteDevice, psm);
             }
         }).start();
     }
 
     public void read(String remoteId, int psm, final Result resultCallback) {
+        // snapshot: close() can modify these fields concurrently
+        final BluetoothSocket socket = this.socket;
+        final InputStream inputStream = this.inputStream;
         if (inputStream == null || socket == null || !socket.isConnected()) {
             resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the input stream is not open.", null);
             return;
@@ -3472,42 +3599,56 @@ abstract class L2CapChannel {
                 return;
             }
 
-            final int bytesRead = inputStream.read(readBuffer);
+            // fresh buffer per call: the reader loop may read concurrently, so a
+            // shared buffer could be overwritten between read and serialization
+            final byte[] buffer = new byte[readBufferSize(socket)];
+            final int bytesRead = inputStream.read(buffer);
+            final byte[] value = bytesRead > 0 ? Arrays.copyOf(buffer, bytesRead) : new byte[0];
             final Map<String, Object> responseData = new HashMap<>();
             responseData.put("remote_id", remoteId);
             responseData.put("psm", psm);
-            responseData.put("bytes_read", bytesRead);
-            responseData.put("value", readBuffer);
+            responseData.put("bytes_read", value.length);
+            responseData.put("value", value);
             resultCallback.success(responseData);
 
             // push event
             if (dataReceivedCallback != null && bytesRead > 0) {
-                byte[] emit = Arrays.copyOf(readBuffer, bytesRead);
-                dataReceivedCallback.data(socket.getRemoteDevice(), psm, emit);
+                dataReceivedCallback.data(socket.getRemoteDevice(), psm, value);
             }
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("input_stream_read_failed", e.getMessage(), e);
+            // e.toString(), not e: an exception object is not codec-encodable
+            resultCallback.error("input_stream_read_failed", e.getMessage(), e.toString());
         }
     }
 
-    public void write(String remoteId, int psm, byte[] value, final Result resultCallback) {
-        if (outputStream == null || socket == null || !socket.isConnected()) {
-            resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the output stream is not open.", null);
-            return;
-        }
-        final byte[] data = value;
-        try {
-            outputStream.write(data);
-            resultCallback.success(null);
-        } catch (IOException e) {
-            plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("output_stream_write_failed", e.getMessage(), e);
-        }
+    public void write(String remoteId, int psm, byte[] value, final Result rawResult) {
+        // OutputStream.write() blocks when the peer's L2CAP flow-control credits
+        // run out; on the main thread that froze the UI and stalled all other
+        // method calls. Run it on the io thread and post the result back.
+        final Result resultCallback = new MainThreadResult(rawResult);
+        runOnIoThread(() -> {
+            // snapshot inside the task: it runs after any queued connect, and
+            // close() can modify these fields concurrently
+            final BluetoothSocket socket = this.socket;
+            final OutputStream outputStream = this.outputStream;
+            if (outputStream == null || socket == null || !socket.isConnected()) {
+                resultCallback.error("no_socket_or_stream_is_open", "The bluetooth socket or the output stream is not open.", null);
+                return;
+            }
+            try {
+                outputStream.write(value);
+                resultCallback.success(null);
+            } catch (IOException e) {
+                plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
+                resultCallback.error("output_stream_write_failed", e.getMessage(), e.toString());
+            }
+        }, resultCallback);
     }
 
     public synchronized void close() {
-        readerRunning = false;
+        // invalidate the running reader; closing the streams below also unblocks it
+        invalidateReader();
         if (outputStream != null) {
             try {
                 outputStream.close();
@@ -3535,6 +3676,9 @@ abstract class L2CapChannel {
                 socket = null;
             }
         }
+        // closing the socket above unblocks any in-flight connect/write; tasks
+        // still queued will fail fast on the closed streams
+        ioExecutor.shutdown();
     }
 }
 
@@ -3543,39 +3687,70 @@ class L2CapClientChannel extends L2CapChannel {
     private final int psm;
 
     public L2CapClientChannel(final BluetoothDevice device, final int psm, final FlutterBlueMaxPlugin plugin) {
-        this(device, psm, DEFAULT_READ_BUFFER_SIZE, plugin);
-    }
-
-    public L2CapClientChannel(final BluetoothDevice device, final int psm, final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        super(readBufferSize, plugin);
+        super(plugin);
         this.psm = psm;
         this.device = device;
     }
 
+    public void connectToL2CapChannel(final boolean secure, final Result rawResult) {
+        // BluetoothSocket.connect() blocks, potentially for tens of seconds. On
+        // the main thread that froze the UI (ANR) and — because onMethodCall
+        // holds mMethodCallMutex — stalled GATT callbacks for all devices. Run
+        // it on the io thread and post the result back to the main thread.
+        final Result resultCallback = new MainThreadResult(rawResult);
+        runOnIoThread(() -> connectBlocking(secure, resultCallback), resultCallback);
+    }
+
     @SuppressLint("MissingPermission")
     @TargetApi(Build.VERSION_CODES.Q)
-    public synchronized void connectToL2CapChannel(final boolean secure, final Result resultCallback) {
+    private void connectBlocking(final boolean secure, final Result resultCallback) {
         try {
-            // Close existing socket if present before creating a new one
-            if (socket != null) {
-                try {
-                    socket.close();
-                } catch (IOException ignored) {}
-                socket = null;
+            final BluetoothSocket newSocket;
+            synchronized (this) {
+                // Close existing socket if present before creating a new one.
+                // Also drop the old streams so a failed connect doesn't leave stale
+                // references to the closed socket (startReaderLoop checks them).
+                if (socket != null) {
+                    // this close is intentional — stop the old reader without it
+                    // reporting the channel as died
+                    invalidateReader();
+                    try {
+                        socket.close();
+                    } catch (IOException ignored) {}
+                    socket = null;
+                    inputStream = null;
+                    outputStream = null;
+                }
+
+                if (secure) {
+                    newSocket = device.createL2capChannel(psm);
+                } else {
+                    newSocket = device.createInsecureL2capChannel(psm);
+                }
+                socket = newSocket;
             }
 
-            if (secure) {
-                socket = device.createL2capChannel(psm);
-            } else {
-                socket = device.createInsecureL2capChannel(psm);
+            // blocking call — deliberately outside the monitor, so close() can
+            // abort a hanging connect by closing the socket
+            newSocket.connect();
+
+            synchronized (this) {
+                if (socket != newSocket) {
+                    // closed or replaced while connecting
+                    try {
+                        newSocket.close();
+                    } catch (IOException ignored) {}
+                    resultCallback.error("open_l2cap_channel_failed", "The channel was closed while connecting.", null);
+                    return;
+                }
+                inputStream = newSocket.getInputStream();
+                outputStream = newSocket.getOutputStream();
             }
-            socket.connect();
-            inputStream = socket.getInputStream();
-            outputStream = socket.getOutputStream();
+            startReaderLoop(psm);
             resultCallback.success(null);
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e);
+            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e.toString());
         }
     }
 
@@ -3592,11 +3767,7 @@ class L2CapServerChannel extends L2CapChannel {
 
 
     public L2CapServerChannel(final BluetoothSocket socket, final FlutterBlueMaxPlugin plugin) {
-        this(socket, DEFAULT_READ_BUFFER_SIZE, plugin);
-    }
-
-    public L2CapServerChannel(final BluetoothSocket socket, final int readBufferSize, final FlutterBlueMaxPlugin plugin) {
-        super(readBufferSize, plugin);
+        super(plugin);
         this.socket = socket;
     }
 
@@ -3664,13 +3835,17 @@ class ServerSocketInfo implements L2CapInfo {
     private final List<L2CapServerChannel> openChannels;
     private final L2CapChannelManager.DeviceConnected deviceConnectedCallback;
     private final L2CapChannelManager.DataReceived dataReceivedCallback;
+    private final L2CapChannelManager.ChannelClosed channelClosedCallback;
     private final FlutterBlueMaxPlugin plugin;
-    private boolean isAcceptingConnections;
+    // volatile: written on the main thread (closeSocket), read on the accept
+    // thread — without it the accept loop may never observe the shutdown
+    private volatile boolean isAcceptingConnections;
 
-    public ServerSocketInfo(BluetoothServerSocket serverSocket, final L2CapChannelManager.DeviceConnected deviceConnectedCallback, final L2CapChannelManager.DataReceived dataReceivedCallback, final FlutterBlueMaxPlugin plugin) {
+    public ServerSocketInfo(BluetoothServerSocket serverSocket, final L2CapChannelManager.DeviceConnected deviceConnectedCallback, final L2CapChannelManager.DataReceived dataReceivedCallback, final L2CapChannelManager.ChannelClosed channelClosedCallback, final FlutterBlueMaxPlugin plugin) {
         this.serverSocket = serverSocket;
         this.deviceConnectedCallback = deviceConnectedCallback;
         this.dataReceivedCallback = dataReceivedCallback;
+        this.channelClosedCallback = channelClosedCallback;
         this.plugin = plugin;
         openChannels = Collections.synchronizedList(new LinkedList<>());
         isAcceptingConnections = false;
@@ -3692,9 +3867,14 @@ class ServerSocketInfo implements L2CapInfo {
 
     @Override
     public L2CapServerChannel getL2CapChannel(final BluetoothDevice remoteDevice) {
-        for (L2CapServerChannel openChannel : openChannels) {
-            if (remoteDevice.getAddress().equals(openChannel.getSocket().getRemoteDevice().getAddress())) {
-                return openChannel;
+        // iterating a synchronizedList is not atomic and the accept thread
+        // adds connections concurrently — synchronize manually
+        synchronized (openChannels) {
+            for (L2CapServerChannel openChannel : openChannels) {
+                final BluetoothSocket socket = openChannel.getSocket();
+                if (socket != null && remoteDevice.getAddress().equals(socket.getRemoteDevice().getAddress())) {
+                    return openChannel;
+                }
             }
         }
         return null;
@@ -3706,8 +3886,21 @@ class ServerSocketInfo implements L2CapInfo {
         if (channelToDelete == null) {
             return;
         }
-        channelToDelete.close();
-        openChannels.remove(channelToDelete);
+        closeChannel(channelToDelete);
+    }
+
+    // For operations addressed with the placeholder remoteId "server" (see
+    // L2CapChannelManager.SERVER_REMOTE_ID): the first accepted channel.
+    @Nullable
+    L2CapServerChannel getAnyL2CapChannel() {
+        synchronized (openChannels) {
+            return openChannels.isEmpty() ? null : openChannels.get(0);
+        }
+    }
+
+    void closeChannel(final L2CapServerChannel channel) {
+        channel.close();
+        openChannels.remove(channel);
     }
 
     public void acceptConnections() {
@@ -3723,24 +3916,32 @@ class ServerSocketInfo implements L2CapInfo {
                     final L2CapServerChannel l2capChannel = new L2CapServerChannel(socket, plugin);
                     l2capChannel.openStreams();
                     l2capChannel.setDataReceivedCallback(dataReceivedCallback);
+                    l2capChannel.setChannelClosedCallback(channelClosedCallback);
                     l2capChannel.startReaderLoop(getPsm());
                     addConnection(l2capChannel);
                     deviceConnectedCallback.deviceConnected(socket.getRemoteDevice(), getPsm());
                 } catch (IOException e) {
                     if (isAcceptingConnections) {
-                        Log.e(TAG, "Accepting incoming connection failed.", e);
+                        Log.e(TAG, "Accepting incoming connection failed. Stop accepting.", e);
+                        isAcceptingConnections = false;
                     }
+                    // a server socket whose accept() throws is dead (closed or
+                    // adapter off) — retrying would busy-spin on the same error
+                    break;
                 }
             }
         }).start();
     }
 
     public void closeSocket() {
-        for (L2CapServerChannel openChannel : openChannels) {
-            openChannel.close();
+        isAcceptingConnections = false;
+        synchronized (openChannels) {
+            for (L2CapServerChannel openChannel : openChannels) {
+                openChannel.close();
+            }
+            openChannels.clear();
         }
         try {
-            isAcceptingConnections = false;
             serverSocket.close();
         } catch (IOException e) {
             Log.e(TAG, "Closing server socket failed.", e);
@@ -3751,15 +3952,30 @@ class ServerSocketInfo implements L2CapInfo {
 
 
 
-class DeviceConnectedToL2CapChannel {
-    public final BluetoothDevice device;
-    public final int psm;
+// MethodChannel results must be invoked on the platform (main) thread; work
+// running on background threads wraps its Result with this.
+class MainThreadResult implements Result {
+    private final Result inner;
+    private final Handler handler = new Handler(Looper.getMainLooper());
 
-    public DeviceConnectedToL2CapChannel(BluetoothDevice device, int psm) {
-        this.device = device;
-        this.psm = psm;
+    MainThreadResult(final Result inner) {
+        this.inner = inner;
     }
 
+    @Override
+    public void success(final Object result) {
+        handler.post(() -> inner.success(result));
+    }
+
+    @Override
+    public void error(final String errorCode, final String errorMessage, final Object errorDetails) {
+        handler.post(() -> inner.error(errorCode, errorMessage, errorDetails));
+    }
+
+    @Override
+    public void notImplemented() {
+        handler.post(inner::notImplemented);
+    }
 }
 
 

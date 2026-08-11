@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -28,10 +29,16 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
   final TextEditingController _psmController = TextEditingController();
   final TextEditingController _l2capDataController = TextEditingController();
   final List<String> _l2capReceivedList = [];
+  int _rxBytesTotal = 0;
   StreamSubscription<L2CapChannelData>? _l2capSubscription;
+  StreamSubscription<L2CapChannelConnected>? _l2capConnectedSubscription;
+  StreamSubscription<L2CapChannelClosed>? _l2capClosedSubscription;
   bool _l2capSecure = false;
   bool _isServerMode = true;
   bool _hasValidPsm = false;
+
+  static const int _maxLogEntries = 300;
+  static const int _maxDataEntries = 200;
 
   void _onPsmControllerChanged() {
     {
@@ -55,12 +62,39 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
   void _log(String message) {
     final ts = DateTime.now().toIso8601String();
     _logMessages.insert(0, '[$ts] $message');
-    if (_logMessages.length > 500) {
-      _logMessages.removeRange(500, _logMessages.length);
+    if (_logMessages.length > _maxLogEntries) {
+      _logMessages.removeRange(_maxLogEntries, _logMessages.length);
     }
     if (mounted && _tabController.index == 1) {
       setState(() {});
     }
+  }
+
+  void _addReceivedEntry(String entry) {
+    _l2capReceivedList.insert(0, entry);
+    if (_l2capReceivedList.length > _maxDataEntries) {
+      _l2capReceivedList.removeRange(_maxDataEntries, _l2capReceivedList.length);
+    }
+  }
+
+  // Show text payloads as text, binary payloads as a length + hex preview
+  String _formatBytes(List<int> value) {
+    if (value.isEmpty) {
+      return '0 bytes';
+    }
+    final bool printable =
+        value.every((b) => b == 0x09 || b == 0x0a || b == 0x0d || (b >= 0x20 && b <= 0x7e));
+    if (printable) {
+      return utf8.decode(value, allowMalformed: true);
+    }
+    final hex = value.take(16).map((b) => b.toRadixString(16).padLeft(2, '0')).join(' ');
+    return '${value.length} bytes: $hex${value.length > 16 ? ' …' : ''}';
+  }
+
+  /// The channel addressed by the PSM text field, or null if none is open.
+  BluetoothL2capChannel? _channelForPsmField() {
+    final int? psm = int.tryParse(_psmController.text);
+    return psm != null ? _activeL2CapChannels[psm] : null;
   }
 
   @override
@@ -87,30 +121,52 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
     // Subscribe to FBP logs for the Logs view
     _logsSubscription = FlutterBlueMax.logs.listen((line) {
       _logMessages.insert(0, line);
-      if (_logMessages.length > 300) {
-        _logMessages.removeRange(300, _logMessages.length);
+      if (_logMessages.length > _maxLogEntries) {
+        _logMessages.removeRange(_maxLogEntries, _logMessages.length);
       }
       if (mounted && _tabController.index == 1) {
         setState(() {});
       }
     });
 
-    // Subscribe to L2CAP received data stream
+    // Subscribe to L2CAP received data, scoped to the channels this screen
+    // opened or accepted (matched by device + PSM, not PSM alone)
     _l2capSubscription = FlutterBlueMax.onL2capReceived.listen((evt) {
-      // Route only events for active channels or server placeholder
-      final bool isServerEvent = evt.remoteId.str == 'server';
-      final bool isClientEvent = _activeL2CapChannels.containsKey(evt.psm);
-      if (!isServerEvent && !isClientEvent) return;
+      final channel = _activeL2CapChannels[evt.psm];
+      if (channel == null || channel.deviceId != evt.remoteId) return;
 
-      final receivedData = String.fromCharCodes(evt.value);
+      _rxBytesTotal += evt.value.length;
+      final receivedData = _formatBytes(evt.value);
       _log('L2CAP RX psm=${evt.psm} remote=${evt.remoteId.str} bytes=${evt.value.length} data="$receivedData"');
-      _l2capReceivedList.insert(0, receivedData);
-      if (_l2capReceivedList.length > 200) {
-        _l2capReceivedList.removeRange(200, _l2capReceivedList.length);
-      }
+      _addReceivedEntry(receivedData);
       if (mounted && _tabController.index == 0) {
         setState(() {});
       }
+    });
+
+    // A client connected to our L2CAP server: track the accepted channel so
+    // Send/Read target it. The event's remoteId is the client's MAC address
+    // on Android and the placeholder 'server' on iOS.
+    _l2capConnectedSubscription = FlutterBlueMax.onL2capConnected.listen((evt) {
+      if (!_isListeningL2Cap || evt.psm != _listeningPsm) return;
+      _log('Server: client connected remote=${evt.remoteId.str} psm=${evt.psm}');
+      if (!mounted) return;
+      setState(() {
+        _activeL2CapChannels[evt.psm] = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+      });
+    });
+
+    // The remote closed a channel (or it died from a stream error/disconnect):
+    // drop it from the UI instead of finding out on the next failed write
+    _l2capClosedSubscription = FlutterBlueMax.onL2capClosed.listen((evt) {
+      final channel = _activeL2CapChannels[evt.psm];
+      if (channel == null || channel.deviceId != evt.remoteId) return;
+      _log('Channel closed by remote remote=${evt.remoteId.str} psm=${evt.psm}');
+      Snackbar.show(ABC.c, "L2CAP channel closed - PSM: ${evt.psm}", success: false);
+      if (!mounted) return;
+      setState(() {
+        _activeL2CapChannels.remove(evt.psm);
+      });
     });
   }
 
@@ -122,16 +178,19 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
     _l2capDataController.dispose();
     _logsSubscription?.cancel();
     _l2capSubscription?.cancel();
+    _l2capConnectedSubscription?.cancel();
+    _l2capClosedSubscription?.cancel();
     _tabController.dispose();
     super.dispose();
   }
 
   // L2CAP Methods
   Future<void> resetL2cap({bool keepServerListening = true, bool clearLogs = false}) async {
-    // Close all client-side channels (keep server placeholder if requested)
-    final channelsToClose = _activeL2CapChannels.entries
-        .where((e) => e.value.deviceId.str != 'server')
-        .map((e) => e.value)
+    // Close the client channels opened to this screen's device. Server-accepted
+    // channels are left alone — their lifecycle is driven by the
+    // onL2capConnected / onL2capClosed events and by stopping the server.
+    final channelsToClose = _activeL2CapChannels.values
+        .where((ch) => ch.deviceId == widget.device.remoteId)
         .toList(growable: false);
 
     for (final ch in channelsToClose) {
@@ -155,26 +214,19 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
     setState(() {
       _l2capDataController.clear();
       _l2capReceivedList.clear();
+      _rxBytesTotal = 0;
       if (clearLogs) _logMessages.clear();
 
-      final bool keepServer = keepServerListening && _isListeningL2Cap && _listeningPsm != null;
-
-      // Reset channel map
-      _activeL2CapChannels.removeWhere((psm, ch) => ch.deviceId.str != 'server');
-      if (keepServer) {
-        // Ensure server placeholder exists
-        _activeL2CapChannels[_listeningPsm!] = BluetoothL2capChannel(
-          deviceId: DeviceIdentifier('server'),
-          psm: _listeningPsm!,
-        );
-      } else {
+      for (final ch in channelsToClose) {
+        _activeL2CapChannels.remove(ch.psm);
+      }
+      if (!keepServerListening) {
         _activeL2CapChannels.clear();
         _isListeningL2Cap = false;
         _listeningPsm = null;
       }
 
-      // Reset PSM input (no placeholder for demo)
-      _psmController.text = keepServer && _listeningPsm != null ? _listeningPsm!.toString() : '';
+      _psmController.text = _listeningPsm?.toString() ?? '';
     });
   }
 
@@ -190,14 +242,9 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
       setState(() {
         _isListeningL2Cap = true;
         _listeningPsm = psm;
-        // Update the PSM text field with the actual assigned PSM
+        // Update the PSM text field with the actual assigned PSM.
+        // The accepted channel is added once onL2capConnected fires.
         _psmController.text = psm.toString();
-        // Create a server-side channel placeholder so Read/Write work on the server
-        // We use a special remoteId 'server' that the native layer recognizes
-        _activeL2CapChannels[psm] = BluetoothL2capChannel(
-          deviceId: DeviceIdentifier('server'),
-          psm: psm,
-        );
       });
 
       Snackbar.show(ABC.c, "L2CAP Server started on PSM: $_listeningPsm", success: true);
@@ -293,19 +340,16 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
   }
 
   Future onDisconnectL2CapPressed() async {
-    int psm = int.tryParse(_psmController.text) ?? 1001;
-
-    if (!_activeL2CapChannels.containsKey(psm)) {
-      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: $psm", success: false);
+    final channel = _channelForPsmField();
+    if (channel == null) {
+      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: ${_psmController.text}", success: false);
       return;
     }
+    final int psm = channel.psm;
 
     try {
-      var channel = _activeL2CapChannels[psm];
-      if (channel != null) {
-        _log('Closing client channel psm=$psm');
-        await channel.close();
-      }
+      _log('Closing client channel psm=$psm');
+      await channel.close();
 
       setState(() {
         _activeL2CapChannels.remove(psm);
@@ -324,7 +368,6 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
   }
 
   Future onWriteL2CapPressed() async {
-    int psm = int.tryParse(_psmController.text) ?? 1001;
     String data = _l2capDataController.text;
 
     if (data.isEmpty) {
@@ -332,24 +375,20 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
       return;
     }
 
-    if (!_activeL2CapChannels.containsKey(psm)) {
-      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: $psm", success: false);
+    final channel = _channelForPsmField();
+    if (channel == null) {
+      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: ${_psmController.text}", success: false);
       return;
     }
+    final int psm = channel.psm;
 
     try {
-      List<int> bytes = data.codeUnits;
-      var channel = _activeL2CapChannels[psm];
-      if (channel == null) {
-        throw Exception("Channel not found for PSM $psm");
-      }
+      final List<int> bytes = utf8.encode(data);
 
       _log('Write attempt psm=$psm len=${bytes.length}');
       await channel.write(bytes);
 
       Snackbar.show(ABC.c, "L2CAP data sent - ${bytes.length} bytes", success: true);
-      // ignore: avoid_print
-      print("L2CAP Data sent - PSM: $psm, Data: $data, Bytes: ${bytes.length}");
       _l2capDataController.clear();
       _log('Write success psm=$psm len=${bytes.length}');
     } catch (e, backtrace) {
@@ -362,41 +401,81 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
     }
   }
 
-  Future onReadL2CapPressed() async {
-    int psm = int.tryParse(_psmController.text) ?? 1001;
+  // Patterned payload (byte i = i & 0xff) so truncated or corrupted data is
+  // recognizable on the receiving side
+  List<int> _testPayload(int length) => List<int>.generate(length, (i) => i & 0xff);
 
-    if (!_activeL2CapChannels.containsKey(psm)) {
-      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: $psm", success: false);
+  /// Sends one large payload — exercises SDU handling above the MTU size.
+  Future onSendTestPayloadPressed() async {
+    final channel = _channelForPsmField();
+    if (channel == null) {
+      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: ${_psmController.text}", success: false);
+      return;
+    }
+    const int size = 10 * 1024;
+
+    try {
+      _log('Write attempt psm=${channel.psm} len=$size (test payload)');
+      await channel.write(_testPayload(size));
+      Snackbar.show(ABC.c, "L2CAP test payload sent - $size bytes", success: true);
+      _log('Write success psm=${channel.psm} len=$size (test payload)');
+    } catch (e) {
+      Snackbar.show(ABC.c, prettyException("Write L2CAP Channel Error:", e), success: false);
+      _log('Write error psm=${channel.psm} err=$e');
+    }
+  }
+
+  /// Fires many writes without awaiting in between — exercises write
+  /// queueing and backpressure handling.
+  Future onSendBurstPressed() async {
+    final channel = _channelForPsmField();
+    if (channel == null) {
+      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: ${_psmController.text}", success: false);
+      return;
+    }
+    const int count = 20;
+    const int size = 1024;
+
+    _log('Burst write attempt psm=${channel.psm} ${count}x$size bytes');
+    final results = await Future.wait(
+      List.generate(count, (_) {
+        return channel.write(_testPayload(size)).then((_) => true).catchError((e) {
+          _log('Burst write error psm=${channel.psm} err=$e');
+          return false;
+        });
+      }),
+    );
+    final int ok = results.where((r) => r).length;
+    Snackbar.show(ABC.c, "L2CAP burst: $ok/$count writes succeeded", success: ok == count);
+    _log('Burst write done psm=${channel.psm} ok=$ok/$count');
+  }
+
+  Future onReadL2CapPressed() async {
+    final channel = _channelForPsmField();
+    if (channel == null) {
+      Snackbar.show(ABC.c, "No L2CAP channel open for PSM: ${_psmController.text}", success: false);
       return;
     }
 
     try {
-      var channel = _activeL2CapChannels[psm];
-      String receivedData;
-      if (channel != null) {
-        var result = await channel.read();
-        receivedData = String.fromCharCodes(result);
-      } else {
-        // For demo purposes, simulate received data
-        receivedData = "Sample L2CAP data received at ${DateTime.now().toIso8601String()}";
+      final result = await channel.read();
+
+      if (result.isNotEmpty) {
+        setState(() {
+          _addReceivedEntry(_formatBytes(result));
+        });
       }
 
-      setState(() {
-        _l2capReceivedList.insert(0, receivedData);
-        if (_l2capReceivedList.length > 200) {
-          _l2capReceivedList.removeRange(200, _l2capReceivedList.length);
-        }
-      });
-
-      Snackbar.show(ABC.c, "L2CAP data received - ${receivedData.length} chars", success: true);
-      // ignore: avoid_print
-      print("L2CAP Data received - PSM: $psm, Data: $receivedData");
+      Snackbar.show(ABC.c, result.isEmpty ? "L2CAP read - no data available" : "L2CAP read - ${result.length} bytes",
+          success: true);
+      _log('Read psm=${channel.psm} bytes=${result.length}');
     } catch (e, backtrace) {
       Snackbar.show(ABC.c, prettyException("Read L2CAP Channel Error:", e), success: false);
       // ignore: avoid_print
       print(e);
       // ignore: avoid_print
       print("backtrace: $backtrace");
+      _log('Read error psm=${channel.psm} err=$e');
     }
   }
 
@@ -504,7 +583,9 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
               children: [
                 // Data tab
                 Builder(builder: (context) {
-                  final bool canSend = _isServerMode ? _isListeningL2Cap : _activeL2CapChannels.isNotEmpty;
+                  final bool canSend = _isServerMode
+                      ? (_listeningPsm != null && _activeL2CapChannels.containsKey(_listeningPsm))
+                      : _activeL2CapChannels.isNotEmpty;
                   return L2CapListSection(
                     entries: _l2capReceivedList,
                     title: 'Data Transfer',
@@ -513,7 +594,11 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
                         Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Text(
-                            _isServerMode ? 'Start the server to enable sending' : 'Open a channel to enable sending',
+                            _isServerMode
+                                ? (_isListeningL2Cap
+                                    ? 'Waiting for a client to connect…'
+                                    : 'Start the server to enable sending')
+                                : 'Open a channel to enable sending',
                             style: const TextStyle(color: Colors.grey),
                           ),
                         ),
@@ -535,11 +620,37 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
                         maxLines: 1,
                         enabled: true,
                       ),
+                      // Test traffic: one large payload (SDU/MTU handling) and a
+                      // write burst (queueing/backpressure)
+                      Row(
+                        children: [
+                          TextButton.icon(
+                            onPressed: canSend ? onSendTestPayloadPressed : null,
+                            icon: const Icon(Icons.data_usage, size: 16),
+                            label: const Text('Send 10 KB'),
+                          ),
+                          TextButton.icon(
+                            onPressed: canSend ? onSendBurstPressed : null,
+                            icon: const Icon(Icons.bolt, size: 16),
+                            label: const Text('Burst 20×1 KB'),
+                          ),
+                        ],
+                      ),
                     ],
-                    topRightWidget: ElevatedButton.icon(
-                      onPressed: onReadL2CapPressed,
-                      icon: const Icon(Icons.download),
-                      label: const Text('Read Data'),
+                    topRightWidget: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'RX $_rxBytesTotal B',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
+                        ),
+                        const SizedBox(width: 8),
+                        ElevatedButton.icon(
+                          onPressed: onReadL2CapPressed,
+                          icon: const Icon(Icons.download),
+                          label: const Text('Read Data'),
+                        ),
+                      ],
                     ),
                   );
                 }),
@@ -598,6 +709,17 @@ class _L2CapSectionState extends State<L2CapSection> with SingleTickerProviderSt
                 'Server listening on PSM: $_listeningPsm (${_l2capSecure ? "Secure" : "Insecure"})',
                 style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold),
               ),
+            ),
+          if (_isListeningL2Cap)
+            Padding(
+              padding: const EdgeInsets.only(top: 4.0),
+              child: Builder(builder: (context) {
+                final client = _listeningPsm != null ? _activeL2CapChannels[_listeningPsm] : null;
+                return Text(
+                  client != null ? 'Client connected: ${client.deviceId.str}' : 'Waiting for a client to connect…',
+                  style: TextStyle(color: client != null ? Colors.green[700] : Colors.grey),
+                );
+              }),
             ),
         ],
       ),

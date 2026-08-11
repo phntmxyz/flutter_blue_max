@@ -87,6 +87,14 @@ abstract base class FlutterBlueMaxPlatform {
     return Stream.empty();
   }
 
+  Stream<L2CapChannelClosed> get onL2CapChannelClosed {
+    return Stream.empty();
+  }
+
+  Stream<L2CapChannelConnected> get onL2CapChannelConnected {
+    return Stream.empty();
+  }
+
   Stream<BmBluetoothDevice> get onServicesReset {
     return Stream.empty();
   }

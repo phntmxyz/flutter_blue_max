@@ -709,13 +709,16 @@ class BluetoothDevice {
   /// - [secure] - Whether to use a secure L2CAP channel (default: true)
   ///   - **Android**: Uses `createL2capChannel()` vs `createInsecureL2capChannel()`
   ///   - **iOS**: Security is controlled by the server's `publishL2CAPChannelWithEncryption` setting
+  /// - [timeout] - Seconds to wait for the channel to open (default: 35). Without it,
+  ///   a platform-side open that never completes would hold the package-wide operation
+  ///   mutexes forever and block all further Bluetooth calls.
   ///
   /// **Returns:** A [BluetoothL2capChannel] instance for reading and writing data.
   ///
   /// **Throws:**
   /// - [FlutterBlueMaxException] if the device is not connected
   /// - [FlutterBlueMaxException] if the platform doesn't support L2CAP (e.g., Web)
-  /// - [FlutterBlueMaxException] if the channel cannot be opened
+  /// - [FlutterBlueMaxException] if the channel cannot be opened or the timeout elapses
   ///
   /// **Platform Support:** Android and iOS only (not supported on Web)
   ///
@@ -734,7 +737,7 @@ class BluetoothDevice {
   /// // Always close the channel when done
   /// await channel.close();
   /// ```
-  Future<BluetoothL2capChannel> openL2CapChannel(int psm, {bool secure = true}) async {
+  Future<BluetoothL2capChannel> openL2CapChannel(int psm, {bool secure = true, int timeout = 35}) async {
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
@@ -752,13 +755,17 @@ class BluetoothDevice {
     await mtx.take();
 
     try {
-      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.openL2CapChannel(
+      // the timeout is applied inside _invokeMethod so that a platform call that
+      // never completes still releases the "invokeMethod" and "global" mutexes
+      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance
+          .openL2CapChannel(
             OpenL2CapChannelRequest(
               remoteId: remoteId.str,
               psm: psm,
               secure: secure,
             ),
-          ));
+          )
+          .fbpTimeout(timeout, "openL2CapChannel"));
 
       return BluetoothL2capChannel(deviceId: remoteId, psm: psm);
     } finally {

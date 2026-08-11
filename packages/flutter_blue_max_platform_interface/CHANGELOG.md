@@ -1,3 +1,7 @@
+## 5.0.0
+* First public release as `flutter_blue_max_platform_interface` (fork of `flutter_blue_plus_platform_interface`). Version numbers below 5.0.0 refer to the original FlutterBluePlus history.
+* Add L2CAP platform methods and message types (open/close/read/write/listen/stop, connected/received/closed events)
+
 ## 4.0.2
 * Added `androidCheckLocationServices` to `BmScanSettings` (#1199)
 
