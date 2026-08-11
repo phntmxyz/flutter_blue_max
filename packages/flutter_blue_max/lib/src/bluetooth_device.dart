@@ -131,18 +131,7 @@ class BluetoothDevice {
         FlutterBlueMax._connectTimestamp[remoteId] = DateTime.now();
       }
 
-      // invoke.
-      // Exception: for autoConnect while bluetooth is off we skip the doomed
-      // platform call, but still throw like this call always did so existing
-      // callers keep getting their "bluetooth is off" signal. The device stays
-      // registered in _autoConnect, so the adapter-state listener issues the
-      // connection once the adapter comes back on.
-      bool adapterIsOff = FlutterBlueMax._adapterStateNow == BmAdapterStateEnum.off ||
-          FlutterBlueMax._adapterStateNow == BmAdapterStateEnum.turningOff;
-      if (autoConnect && adapterIsOff) {
-        throw FlutterBlueMaxException(
-            ErrorPlatform.fbp, "connect", FbpErrorCode.adapterIsOff.index, "Bluetooth adapter is off");
-      }
+      // invoke
       bool changed = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.connect(request));
 
       // we return the disconnect mutex now so that this
