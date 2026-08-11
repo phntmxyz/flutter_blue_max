@@ -645,7 +645,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
         },
       );
 
-      final value = await characteristic.readValue();
+      final value = await descriptor.readValue();
 
       _onDescriptorReadController.add(
         BmDescriptorData(

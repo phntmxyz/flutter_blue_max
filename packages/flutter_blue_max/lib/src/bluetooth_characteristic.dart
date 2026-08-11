@@ -53,7 +53,7 @@ class BluetoothCharacteristic {
   ///   - anytime a notification arrives (if subscribed)
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key = "$serviceUuid:$characteristicUuid";
+    String key = FlutterBlueMax._chrCacheKey(serviceUuid, characteristicUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastChrs[remoteId]?[key] ?? [];
   }
 
@@ -336,7 +336,7 @@ class BluetoothCharacteristic {
         'serviceUuid: $serviceUuid, '
         'characteristicUuid: $characteristicUuid, '
         'primaryServiceUuid: $primaryServiceUuid, '
-        'instanceId: $instanceId'
+        'instanceId: $instanceId, '
         'descriptors: $descriptors, '
         'properties: $properties, '
         'value: $lastValue'
