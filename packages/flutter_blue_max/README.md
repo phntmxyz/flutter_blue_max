@@ -1,4 +1,4 @@
-[![pub package](https://img.shields.io/pub/v/flutter_blue_max.svg)](https://pub.dartlang.org/packages/flutter_blue_max)
+[![pub package](https://img.shields.io/pub/v/flutter_blue_max.svg)](https://pub.dev/packages/flutter_blue_max)
 
 ---
 
@@ -85,27 +85,36 @@ flutter run
 
 FlutterBlueMax adds full L2CAP (Logical Link Control and Adaptation Protocol) support on top of FlutterBluePlus. L2CAP provides a raw, high-throughput channel between two Bluetooth devices — useful when GATT characteristics are too small or too slow.
 
-For the full L2CAP API reference see [L2CAP_README.md](../../L2CAP_README.md).
+For the full L2CAP API reference see [L2CAP_README.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/L2CAP_README.md).
 
 ### Platform support
 
-| Platform    | Client | Server | Minimum version |
-|-------------|--------|--------|-----------------|
-| **iOS**     | ✅      | ✅      | iOS 11.0        |
-| **Android** | ✅      | ✅      | API 21          |
-| **Web**     | ❌      | ❌      | —               |
+| Platform    | Client | Server | Minimum version     |
+|-------------|--------|--------|---------------------|
+| **iOS**     | ✅      | ✅      | iOS 11.0            |
+| **macOS**   | ✅      | ✅      | macOS 10.14         |
+| **Android** | ✅      | ✅      | Android 10 (API 29) |
+| **Web**     | ❌      | ❌      | —                   |
 
 ### Server (listening for connections)
 
 ```dart
-// Start an L2CAP server — PSM is assigned automatically
-int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
-print('L2CAP server listening on PSM: $psm');
+// Subscribe to the events *before* starting the server so a fast client
+// connecting right away cannot be missed.
+
+// A client connected: build a channel handle from the event to talk to it
+FlutterBlueMax.onL2capConnected.listen((L2CapChannelConnected evt) {
+    var channel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+});
 
 // Receive data from any connected client
 FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
-    print('Received ${data.bytes.length} bytes from ${data.remoteId}');
+    print('Received ${data.value.length} bytes from ${data.remoteId}');
 });
+
+// Start an L2CAP server — PSM is assigned automatically
+int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
+print('L2CAP server listening on PSM: $psm');
 
 // Stop the server when done
 await FlutterBlueMax.stopL2capServer(psm);
@@ -130,6 +139,9 @@ List<int> response = await channel.read();
 channel.onL2CapChannelReceived.listen((List<int> data) {
     print('Received: $data');
 });
+
+// Notice when the channel dies (remote close, stream error, disconnect)
+channel.onClosed.first.then((_) => print('Channel closed'));
 
 // Close the channel when done
 await channel.close();
@@ -539,7 +551,7 @@ FlutterBlueMax.events.onConnectionStateChanged.listen((event)) {
 
 ## Mocking
 
-To mock `FlutterBlueMax` for development, refer to the [Mocking Guide](MOCKING.md).
+To mock `FlutterBlueMax` for development, refer to the [Mocking Guide](https://github.com/phntmxyz/flutter_blue_max/blob/master/packages/flutter_blue_max/MOCKING.md).
 
 ## Getting Started
 
@@ -715,6 +727,8 @@ Note: When functionality is unsupported on a platform, sensible defaults are ret
 | listenL2capChannel🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
 | stopL2capServer   🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stop an L2CAP server by PSM                                 |
 | onL2capReceived   🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of incoming L2CAP data from all channels             |
+| onL2capConnected  🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of clients connecting to an L2CAP server             |
+| onL2capClosed     🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of L2CAP channel close events from all channels      |
 
 ### FlutterBlueMax Events API
 
@@ -766,6 +780,7 @@ Note: When functionality is unsupported on a platform, sensible defaults are ret
 | read                  🔥| ✔️      | ✔️  | ✔️    | Read bytes from the L2CAP channel (polling)        |
 | close                 🔥| ✔️      | ✔️  | ✔️    | Close the L2CAP channel and free resources         |
 | onL2CapChannelReceived🌀| ✔️      | ✔️  | ✔️    | Stream of incoming bytes for this specific channel |
+| onClosed              🌀| ✔️      | ✔️  | ✔️    | Emits when the channel dies (not on local close()) |
 
 ### BluetoothCharacteristic API
 

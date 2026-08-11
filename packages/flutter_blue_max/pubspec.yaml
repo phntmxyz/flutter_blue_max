@@ -1,5 +1,5 @@
 name: flutter_blue_max
-description: Flutter plugin for connecting and communicating with Bluetooth Low Energy devices.
+description: Flutter plugin for connecting and communicating with Bluetooth Low Energy devices, with L2CAP channel support (client & server) on iOS, macOS and Android.
 version: 1.35.10
 homepage: https://github.com/phntmxyz/flutter_blue_max
 

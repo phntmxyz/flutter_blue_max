@@ -18,9 +18,8 @@ flutter_blue_max provides L2CAP CoC (Connection-oriented Channel) support on iOS
 ```dart
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
-// Start L2CAP server
-int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
-print('L2CAP server listening on PSM: $psm');
+// Subscribe to the events *before* starting the server so a fast client
+// connecting right away cannot be missed.
 
 // A client connected: build a channel handle from the event to talk to it
 BluetoothL2capChannel? clientChannel;
@@ -38,6 +37,10 @@ FlutterBlueMax.onL2capReceived.listen((data) {
 FlutterBlueMax.onL2capClosed.listen((evt) {
   print('Channel closed: ${evt.remoteId} / PSM ${evt.psm}');
 });
+
+// Start L2CAP server
+int psm = await FlutterBlueMax.listenL2capChannel(secure: true);
+print('L2CAP server listening on PSM: $psm');
 
 // Stop server when done
 await FlutterBlueMax.stopL2capServer(psm);
@@ -208,6 +211,7 @@ FlutterBlueMax.onL2capClosed.listen((L2CapChannelClosed evt) {
 | Platform | Client Support | Server Support | Minimum Version |
 |----------|----------------|----------------|------------------|
 | **iOS**     | ✅ Full        | ✅ Full        | iOS 11.0         |
+| **macOS**   | ✅ Full        | ✅ Full        | macOS 10.14      |
 | **Android** | ✅ Full        | ✅ Full        | Android 10 (API 29) |
 | **Web**     | ❌ Not supported | ❌ Not supported | N/A            |
 
@@ -223,9 +227,7 @@ class L2CAPExample {
 
   // Start L2CAP server
   Future<void> startServer() async {
-    serverPsm = await FlutterBlueMax.listenL2capChannel(secure: true);
-    print('L2CAP server started on PSM: $serverPsm');
-
+    // subscribe before starting the server so no early event is missed
     FlutterBlueMax.onL2capConnected.listen((evt) {
       if (evt.psm != serverPsm) return;
       serverChannel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
@@ -245,6 +247,9 @@ class L2CAPExample {
         serverChannel = null;
       }
     });
+
+    serverPsm = await FlutterBlueMax.listenL2capChannel(secure: true);
+    print('L2CAP server started on PSM: $serverPsm');
   }
 
   // Connect as client
@@ -321,6 +326,21 @@ try {
 5. **Stop servers when done** to prevent resource leaks
 6. **Prefer the event streams over `read()`** — `read()` only returns already-buffered data
 7. **Use secure channels** unless specifically needing insecure connections
+8. **Subscribe to the global event streams before `listenL2capChannel`** — they are broadcast streams, so events fired before you subscribe are lost
+
+## Known iOS CoreBluetooth Issues
+
+The iOS implementation works around several CoreBluetooth defects that Apple has not fixed. Reported to Apple:
+
+- **Closing one L2CAP channel closes a different one.** With two channels open on the same peripheral, closing the second channel tears down the first instead. Reported via Feedback Assistant; Apple DTS confirmed it is "under investigation" (Sep 2025) with no resolution. See [BLE l2cap close not correct](https://developer.apple.com/forums/thread/798454). This is why closed channels are kept alive as *zombies* instead of being released while the connection is up — releasing a `CBL2CAPChannel` triggers the same cascade.
+- **Multiple L2CAP channels are unreliable** (`rdar://46227689`, since iOS 12.1): `didOpenL2CAPChannel` can report the wrong PSM for the second channel, and data written to one channel can end up on the other. Never answered by Apple. See [Multiple L2CAP channels on iOS](https://developer.apple.com/forums/thread/111099).
+
+Observed behavior without a public Apple report, worked around in this plugin:
+
+- **No client-side close API.** `CBL2CAPChannel` has no `close`; the only teardown is releasing the object (which triggers the cascade above) or a GATT disconnect.
+- **"L2CAP PSM already connected" is a dead end.** Re-opening a PSM that iOS still considers connected fails unrecoverably until a GATT disconnect. The plugin therefore recycles or adopts existing channels instead of re-opening.
+- **`openL2CAPChannel:` has no timeout and can fail silently.** If stale channel state exists for the PSM, `didOpenL2CAPChannel` is simply never called — neither success nor error. The plugin tears down all channel state on adapter power-off to avoid leaving such stale state behind.
+- **No `didDisconnectPeripheral` on adapter power-off.** Connected peripherals silently vanish, so all per-peripheral cleanup must be triggered from the adapter state change instead.
 
 ## Architecture Alignment
 

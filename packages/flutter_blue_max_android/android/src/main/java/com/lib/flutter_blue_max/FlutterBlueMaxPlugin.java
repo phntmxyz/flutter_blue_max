@@ -3307,7 +3307,7 @@ class L2CapChannelManager {
 
         } catch (IOException e) {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.ERROR, e.getMessage());
-            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e);
+            resultCallback.error("open_l2cap_channel_failed", e.getMessage(), e.toString());
         }
 
     }

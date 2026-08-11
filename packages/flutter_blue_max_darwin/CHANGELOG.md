@@ -1,3 +1,10 @@
+## 5.0.1
+* First public release as `flutter_blue_max_darwin` (fork of `flutter_blue_plus_darwin`). Version numbers below 5.0.0 refer to the original FlutterBluePlus history.
+* Add L2CAP CoC support (client & server)
+  * writes are queued per channel and drained on `HasSpaceAvailable`; partial `NSOutputStream` writes no longer drop bytes
+  * L2CAP connected/closed events are surfaced to Dart
+  * works around several CoreBluetooth L2CAP defects (channel-close cascade, stale channel state) — see L2CAP_README.md
+
 ## 4.0.1
 * fix unrecognized selector sent to instance (regression from 4.0.0)
 

@@ -1,3 +1,13 @@
+## 1.35.10
+
+First public release of `flutter_blue_max`, the [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) fork maintained by [PHNTM](https://github.com/phntmxyz). Version numbers below 1.35.10 refer to the original FlutterBluePlus history.
+
+* **[Feature]** L2CAP CoC support on iOS, macOS & Android — client & server. See [L2CAP_README.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/L2CAP_README.md)
+  * `device.openL2CapChannel()` returns a `BluetoothL2capChannel` with `write`, `read`, `close`, `onL2CapChannelReceived` and `onClosed`
+  * `FlutterBlueMax.listenL2capChannel()` starts an L2CAP server, `FlutterBlueMax.stopL2capServer()` stops it
+  * global event streams `onL2capConnected`, `onL2capReceived` and `onL2capClosed`
+  * `timeout` parameters on `openL2CapChannel` / `listenL2capChannel` so a hung platform call cannot block the package-wide mutexes
+
 ## 1.35.5
 
 * **[Feature]** Android: added `androidCheckLocationServices` to `startScan` (#1199)

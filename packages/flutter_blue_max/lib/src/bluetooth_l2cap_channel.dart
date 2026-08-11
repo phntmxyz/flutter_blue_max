@@ -68,11 +68,11 @@ class BluetoothL2capChannel {
 
   /// Reads data from the L2CAP channel.
   ///
-  /// Attempts to read data that has been received on this L2CAP channel.
-  /// This is a blocking operation that waits for data to become available.
+  /// Returns the data currently buffered for this channel. It does not wait
+  /// for data to arrive.
   ///
-  /// Returns a [List<int>] containing the received bytes. The list may be
-  /// empty if no data is available.
+  /// Returns a [List<int>] containing the received bytes. The list is
+  /// empty if no data is buffered.
   ///
   /// Throws [FlutterBlueMaxException] if the read operation fails or 
   /// the channel is not open.
