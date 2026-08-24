@@ -6,6 +6,8 @@
 >
 > It is maintained by [PHNTM](https://github.com/phntmxyz) and continues under the same [BSD-3-Clause license](./LICENSE) that FlutterBluePlus originally shipped with.
 >
+> FlutterBlueMax is maintained independently and is not affiliated with or endorsed by the FlutterBluePlus maintainers.
+>
 > Key additions over FlutterBluePlus:
 > - **L2CAP support** on iOS and Android (client & server)
 
