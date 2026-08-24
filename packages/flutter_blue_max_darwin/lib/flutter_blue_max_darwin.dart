@@ -9,7 +9,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_blue_max/methods');
 
-  var _initialized = false;
+  Future<void>? _restartHandshake;
   var _logLevel = LogLevel.none;
   var _logColor = true;
 
@@ -351,8 +351,28 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     String method, [
     dynamic arguments,
   ]) async {
-    // initialize
-    await _initFlutterBlueMax();
+    // Make sure callbacks from the native plugin are routed to this Dart
+    // isolate before the restart handshake starts.
+    methodChannel.setMethodCallHandler(_methodCallHandler);
+
+    // A hot restart creates a new Dart wrapper while the native plugin stays
+    // attached to the Flutter engine. Share one handshake between concurrent
+    // first calls so no operation can race the old native session teardown.
+    // Options and logging must be delivered before the handshake creates a
+    // CBCentralManager, otherwise options such as restoreState are too late.
+    if (method != 'setOptions' && method != 'setLogLevel') {
+      final handshake = _restartHandshake ??= _drainOldSession();
+      try {
+        await handshake;
+      } catch (_) {
+        // A failed handshake must be retryable. The identity check avoids an
+        // older failure clearing a newer retry.
+        if (identical(_restartHandshake, handshake)) {
+          _restartHandshake = null;
+        }
+        rethrow;
+      }
+    }
 
     // log args
     if (_logLevel == LogLevel.verbose) {
@@ -378,22 +398,22 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     return out;
   }
 
-  Future<void> _initFlutterBlueMax() async {
-    if (_initialized) {
-      return;
-    }
+  Future<void> _drainOldSession() async {
+    const pollInterval = Duration(milliseconds: 50);
+    const timeout = Duration(seconds: 10);
+    final stopwatch = Stopwatch()..start();
 
-    _initialized = true;
-
-    // set platform method handler
-    methodChannel.setMethodCallHandler(_methodCallHandler);
-
-    // flutter restart - wait for all devices to disconnect
-    if ((await methodChannel.invokeMethod('flutterRestart')) != 0) {
-      await Future.delayed(Duration(milliseconds: 50));
-      while ((await methodChannel.invokeMethod('connectedCount')) != 0) {
-        await Future.delayed(Duration(milliseconds: 50));
+    var remaining = await methodChannel.invokeMethod<int>('flutterRestart') ?? 0;
+    while (remaining != 0) {
+      if (stopwatch.elapsed >= timeout) {
+        throw TimeoutException(
+          'Timed out waiting for $remaining native BLE connection(s) '
+          'to close after hot restart',
+          timeout,
+        );
       }
+      await Future<void>.delayed(pollInterval);
+      remaining = await methodChannel.invokeMethod<int>('connectedCount') ?? 0;
     }
   }
 

@@ -119,6 +119,11 @@ public class FlutterBlueMaxPlugin implements
     private final Semaphore mMethodCallMutex = new Semaphore(1);
     private final Map<String, BluetoothGatt> mConnectedDevices = new ConcurrentHashMap<>();
     private final Map<String, BluetoothGatt> mCurrentlyConnectingDevices = new ConcurrentHashMap<>();
+    // GATT handles owned by the previous Dart isolate. They stay here until
+    // Android confirms disconnection, so a hot-restarted isolate cannot race a
+    // new connection against callbacks from the old handle.
+    private final Set<BluetoothGatt> mHotRestartGatt = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final long HOT_RESTART_DISCONNECT_TIMEOUT_MS = 5000;
     private final Map<String, BluetoothDevice> mBondingDevices = new ConcurrentHashMap<>();
     private final Map<String, byte[]> mBondingPins = new ConcurrentHashMap<>();
     private final Map<String, Integer> mMtu = new ConcurrentHashMap<>();
@@ -377,13 +382,14 @@ public class FlutterBlueMaxPlugin implements
                         mIsScanning = false;
                     }
 
-                    // all dart state is reset after flutter restart
-                    // (i.e. Hot Restart) so also reset native state
-                    disconnectAllDevices("flutterRestart");
+                    // All Dart state is reset after hot restart. Retire every
+                    // native GATT handle and wait for its asynchronous teardown
+                    // before accepting work from the new isolate.
+                    disconnectForHotRestart();
 
-                    log(LogLevel.DEBUG, "connectedPeripherals: " + mConnectedDevices.size());
+                    log(LogLevel.DEBUG, "hotRestartConnections: " + mHotRestartGatt.size());
 
-                    result.success(mConnectedDevices.size());
+                    result.success(mHotRestartGatt.size());
                     break;
                 }
 
@@ -396,11 +402,11 @@ public class FlutterBlueMaxPlugin implements
 
                 case "connectedCount":
                 {
-                    log(LogLevel.DEBUG, "connectedPeripherals: " + mConnectedDevices.size());
-                    if (mConnectedDevices.size() == 0) {
+                    log(LogLevel.DEBUG, "hotRestartConnections: " + mHotRestartGatt.size());
+                    if (mHotRestartGatt.isEmpty()) {
                         log(LogLevel.DEBUG, "Hot Restart: complete");
                     }
-                    result.success(mConnectedDevices.size());
+                    result.success(mHotRestartGatt.size());
                     break;
                 }
 
@@ -1943,6 +1949,7 @@ public class FlutterBlueMaxPlugin implements
         // merge connected & autoconnected
         Map<String, BluetoothGatt> allDevices = new HashMap<>();
         allDevices.putAll(mConnectedDevices);
+        allDevices.putAll(mCurrentlyConnectingDevices);
         allDevices.putAll(mAutoConnected);
 
         // request disconnections
@@ -1981,6 +1988,81 @@ public class FlutterBlueMaxPlugin implements
         mWriteChr.clear();
         mWriteDesc.clear();
         mAutoConnected.clear();
+
+        if (l2CapChannelManager != null) {
+            l2CapChannelManager.closeAllChannels();
+        }
+    }
+
+    private void disconnectForHotRestart()
+    {
+        // A second first-call handshake can arrive while the previous teardown
+        // is still running. Existing retired handles remain authoritative.
+        Set<BluetoothGatt> allDevices = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        allDevices.addAll(mConnectedDevices.values());
+        allDevices.addAll(mCurrentlyConnectingDevices.values());
+        allDevices.addAll(mAutoConnected.values());
+        mHotRestartGatt.addAll(allDevices);
+
+        // Remove the handles from active lookup maps immediately. Their later
+        // callbacks are recognized by identity through mHotRestartGatt and are
+        // never allowed to mutate a newer connection for the same remote id.
+        mConnectedDevices.clear();
+        mCurrentlyConnectingDevices.clear();
+        mAutoConnected.clear();
+        mBondingDevices.clear();
+        mBondingPins.clear();
+        mMtu.clear();
+        mWriteChr.clear();
+        mWriteDesc.clear();
+
+        if (l2CapChannelManager != null) {
+            l2CapChannelManager.closeAllChannels();
+        }
+
+        for (BluetoothGatt gatt : allDevices) {
+            String remoteId = gatt.getDevice().getAddress();
+            log(LogLevel.DEBUG, "Hot Restart: disconnecting old GATT " + remoteId);
+            try {
+                gatt.disconnect();
+            } catch (Exception e) {
+                log(LogLevel.WARNING, "Hot Restart: disconnect failed for " + remoteId + ": " + e);
+                closeHotRestartGatt(gatt);
+            }
+        }
+
+        if (mHotRestartGatt.isEmpty()) {
+            return;
+        }
+
+        // Some Android stacks never deliver a terminal callback for a GATT
+        // that was still connecting. Bound the handshake and force-close those
+        // handles rather than hanging the new Dart isolate forever.
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            acquireMutex(mMethodCallMutex);
+            try {
+                if (!mHotRestartGatt.isEmpty()) {
+                    log(LogLevel.WARNING, "Hot Restart: force-closing " + mHotRestartGatt.size()
+                        + " GATT handle(s) after timeout");
+                    for (BluetoothGatt gatt : new ArrayList<>(mHotRestartGatt)) {
+                        closeHotRestartGatt(gatt);
+                    }
+                }
+            } finally {
+                mMethodCallMutex.release();
+            }
+        }, HOT_RESTART_DISCONNECT_TIMEOUT_MS);
+    }
+
+    private void closeHotRestartGatt(BluetoothGatt gatt)
+    {
+        try {
+            gatt.close();
+        } catch (Exception e) {
+            log(LogLevel.WARNING, "Hot Restart: close failed: " + e);
+        } finally {
+            mHotRestartGatt.remove(gatt);
+        }
     }
 
     int getAppearanceFromScanRecord(ScanRecord adv) {
@@ -2358,6 +2440,25 @@ public class FlutterBlueMaxPlugin implements
 
                 String remoteId = gatt.getDevice().getAddress();
 
+                // This handle belonged to the Dart isolate that was replaced
+                // by hot restart. Never let its late callbacks remove or
+                // replace a newer GATT stored under the same remote id.
+                if (mHotRestartGatt.contains(gatt)) {
+                    if (newState == BluetoothProfile.STATE_CONNECTED) {
+                        log(LogLevel.DEBUG, "Hot Restart: old GATT connected late; disconnecting " + remoteId);
+                        try {
+                            gatt.disconnect();
+                        } catch (Exception e) {
+                            log(LogLevel.WARNING, "Hot Restart: late disconnect failed for " + remoteId + ": " + e);
+                            closeHotRestartGatt(gatt);
+                        }
+                    } else {
+                        log(LogLevel.DEBUG, "Hot Restart: old GATT disconnected " + remoteId);
+                        closeHotRestartGatt(gatt);
+                    }
+                    return;
+                }
+
                 // edge case. see function for details
                 if (handleUnexpectedConnectionEvents(gatt, newState, remoteId)) {
                     return;
@@ -2369,7 +2470,9 @@ public class FlutterBlueMaxPlugin implements
                     mConnectedDevices.put(remoteId, gatt);
 
                     // remove from currently connecting devices
-                    mCurrentlyConnectingDevices.remove(remoteId);
+                    if (mCurrentlyConnectingDevices.get(remoteId) == gatt) {
+                        mCurrentlyConnectingDevices.remove(remoteId);
+                    }
 
                     // default minimum mtu
                     mMtu.put(remoteId, 23);
@@ -2379,10 +2482,14 @@ public class FlutterBlueMaxPlugin implements
                 if(newState == BluetoothProfile.STATE_DISCONNECTED) {
 
                     // remove from connected devices
-                    mConnectedDevices.remove(remoteId);
+                    if (mConnectedDevices.get(remoteId) == gatt) {
+                        mConnectedDevices.remove(remoteId);
+                    }
 
                     // remove from currently connecting devices
-                    mCurrentlyConnectingDevices.remove(remoteId);
+                    if (mCurrentlyConnectingDevices.get(remoteId) == gatt) {
+                        mCurrentlyConnectingDevices.remove(remoteId);
+                    }
 
                     // remove from currently bonding devices
                     mBondingDevices.remove(remoteId);
@@ -2422,14 +2529,16 @@ public class FlutterBlueMaxPlugin implements
         {
             boolean unexpectedEvent = false;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                if (mCurrentlyConnectingDevices.get(remoteId) == null && mAutoConnected.get(remoteId) == null) {
+                if (mCurrentlyConnectingDevices.get(remoteId) != gatt && mAutoConnected.get(remoteId) != gatt) {
                     log(LogLevel.DEBUG, "[unexpected connection] disconnecting now");
 
                     // this is an unexpected connection
                     unexpectedEvent = true;
 
                     // remove from connected devices
-                    mConnectedDevices.remove(remoteId);
+                    if (mConnectedDevices.get(remoteId) == gatt) {
+                        mConnectedDevices.remove(remoteId);
+                    }
 
                     // remove from currently bonding devices
                     mBondingDevices.remove(remoteId);
@@ -2444,9 +2553,9 @@ public class FlutterBlueMaxPlugin implements
 
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
-                if (mCurrentlyConnectingDevices.get(remoteId) == null &&
-                    mConnectedDevices.get(remoteId) == null &&
-                    mAutoConnected.get(remoteId) == null) {
+                if (mCurrentlyConnectingDevices.get(remoteId) != gatt &&
+                    mConnectedDevices.get(remoteId) != gatt &&
+                    mAutoConnected.get(remoteId) != gatt) {
 
                     log(LogLevel.DEBUG, "[unexpected connection] disconnect complete");
 
@@ -3399,6 +3508,20 @@ class L2CapChannelManager {
         resultCallback.success(null);
     }
 
+    public synchronized void closeAllChannels() {
+        // Dart loses every L2CAP channel/server handle during hot restart, so
+        // retaining native sockets would leave resources that the new isolate
+        // cannot address or close.
+        for (L2CapInfo channelInfo : new ArrayList<>(openL2CapChannelInfos)) {
+            if (channelInfo instanceof ClientSocketInfo) {
+                ((ClientSocketInfo) channelInfo).l2capChannel.close();
+            } else if (channelInfo instanceof ServerSocketInfo) {
+                ((ServerSocketInfo) channelInfo).closeSocket();
+            }
+        }
+        openL2CapChannelInfos.clear();
+    }
+
     private void firePlatformNotSupportedError(Result resultCallback) {
         resultCallback.error("platform_not_supported", "The device is running an older Android version. Minimum version is Android Q.", null);
     }
@@ -4317,7 +4440,4 @@ class MarshallingUtil {
         return 0;
     }
 }
-
-
-
 

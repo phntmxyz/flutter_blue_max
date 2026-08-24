@@ -151,6 +151,8 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 @property(nonatomic) NSNumber *showPowerAlert;
 @property(nonatomic) NSNumber *restoreState;
 @property(nonatomic, retain) L2CapChannelManager *l2CapChannelManager;
+@property(nonatomic) BOOL flutterRestarting;
+- (NSUInteger)restartConnectionCount;
 @end
 
 @implementation FlutterBlueMaxPlugin
@@ -173,6 +175,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     instance.logLevel = LDEBUG;
     instance.showPowerAlert = @(YES);
     instance.restoreState = @(NO);
+    instance.flutterRestarting = NO;
     instance.l2CapChannelManager = [[L2CapChannelManager alloc] initWithMethodChannel:methodChannel plugin:instance];
 
     [registrar addMethodCallDelegate:instance channel:methodChannel];
@@ -277,27 +280,33 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
                 [self.centralManager stopScan];
             }
 
-            // all dart state is reset after flutter restart
-            // (i.e. Hot Restart) so also reset native state
+            // All Dart state is reset after hot restart. Disconnect both
+            // established and in-flight peripherals before accepting work from
+            // the new isolate.
+            self.flutterRestarting = [self restartConnectionCount] > 0;
             [self disconnectAllDevices:@"flutterRestart"];
 
-            Log(LDEBUG, @"connectedPeripherals: %lu", self.connectedPeripherals.count);
+            NSUInteger remaining = [self restartConnectionCount];
+            Log(LDEBUG, @"hotRestartConnections: %lu", remaining);
 
-            if (self.connectedPeripherals.count == 0) {
+            if (remaining == 0) {
+                self.flutterRestarting = NO;
                 [self.knownPeripherals removeAllObjects];
             }
             
-            result(@(self.connectedPeripherals.count));
+            result(@(remaining));
             return;
         }
         else if ([@"connectedCount" isEqualToString:call.method])
         {
-            Log(LDEBUG, @"connectedPeripherals: %lu", self.connectedPeripherals.count);
-            if (self.connectedPeripherals.count == 0) {
+            NSUInteger remaining = [self restartConnectionCount];
+            Log(LDEBUG, @"hotRestartConnections: %lu", remaining);
+            if (remaining == 0) {
                 Log(LDEBUG, @"Hot Restart: complete");
+                self.flutterRestarting = NO;
                 [self.knownPeripherals removeAllObjects];
             }
-            result(@(self.connectedPeripherals.count));
+            result(@(remaining));
             return;
         }
         else if ([@"isSupported" isEqualToString:call.method])
@@ -1083,10 +1092,16 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 {
     Log(LDEBUG, @"disconnectAllDevices(%@)", func);
 
+    // A peripheral can be in either map when the Dart isolate disappears.
+    // Merge by remote id so every in-flight CoreBluetooth connection is reset.
+    NSMutableDictionary<NSString *, CBPeripheral *> *allPeripherals =
+        [self.connectedPeripherals mutableCopy];
+    [allPeripherals addEntriesFromDictionary:self.currentlyConnectingPeripherals];
+
     // request disconnections
-    for (NSString *key in self.connectedPeripherals)
+    for (NSString *key in allPeripherals)
     {
-        CBPeripheral *peripheral = [self.connectedPeripherals objectForKey:key];
+        CBPeripheral *peripheral = [allPeripherals objectForKey:key];
 
         Log(LDEBUG, @"calling disconnect: %@", key);
 
@@ -1139,6 +1154,14 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     [self.peripheralMtu removeAllObjects];
     [self.writeChrs removeAllObjects];
     [self.writeDescs removeAllObjects];
+}
+
+- (NSUInteger)restartConnectionCount
+{
+    NSMutableSet<NSString *> *remoteIds =
+        [NSMutableSet setWithArray:self.connectedPeripherals.allKeys];
+    [remoteIds addObjectsFromArray:self.currentlyConnectingPeripherals.allKeys];
+    return remoteIds.count;
 }
 
 ////////////////////////////////////
@@ -1379,6 +1402,15 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     // Register self as delegate for peripheral
     peripheral.delegate = self;
 
+    // cancelPeripheralConnection can race a connection completion. Keep the
+    // restart handshake pending and cancel again instead of exposing this old
+    // connection to the new Dart isolate.
+    if (self.flutterRestarting) {
+        Log(LDEBUG, @"Hot Restart: peripheral connected late; cancelling again: %@", remoteId);
+        [self.centralManager cancelPeripheralConnection:peripheral];
+        return;
+    }
+
     // See BmConnectionStateResponse
     NSDictionary *result = @{
         @"remote_id":                remoteId,
@@ -1387,8 +1419,11 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         @"disconnect_reason_string": [NSNull null],
     };
 
-    // Send connection state
-    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    // The new Dart isolate starts with empty state. Do not emit teardown events
+    // from the previous isolate; it is gated on connectedCount instead.
+    if (!self.flutterRestarting) {
+        [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    }
 }
 
 - (void)centralManager:(CBCentralManager *)central
@@ -1430,8 +1465,9 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         @"disconnect_reason_string": error ? [error localizedDescription] : @("connection canceled"),
     };
 
-    // Send connection state
-    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    if (!self.flutterRestarting) {
+        [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    }
 }
 
 - (void)centralManager:(CBCentralManager *)central
@@ -1458,8 +1494,9 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         @"disconnect_reason_string": error ? [error localizedDescription] : [NSNull null],
     };
 
-    // Send connection state
-    [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    if (!self.flutterRestarting) {
+        [self.methodChannel invokeMethod:@"OnConnectionStateChanged" arguments:result];
+    }
 }
 
 /////////////////////////////////////////////////////////////////////////////////////////////////////////
