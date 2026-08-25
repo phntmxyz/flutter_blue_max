@@ -1,5 +1,5 @@
-## 5.0.1
-* First public release as `flutter_blue_max_darwin` (fork of `flutter_blue_plus_darwin`). Version numbers below 5.0.0 refer to the original FlutterBluePlus history.
+## 6.0.0
+* First public release as `flutter_blue_max_darwin` (fork of `flutter_blue_plus_darwin`). Version numbers below 6.0.0 refer to the original FlutterBluePlus history and are not published under this name.
 * Add L2CAP CoC support (client & server)
   * writes are queued per channel and drained on `HasSpaceAvailable`; partial `NSOutputStream` writes no longer drop bytes
   * L2CAP connected/closed events are surfaced to Dart
