@@ -16,18 +16,6 @@ dependencies:
   flutter_blue_max_linux: 6.0.0
   flutter_blue_max_web: 6.0.0
 
-dependency_overrides:
-  flutter_blue_max_platform_interface:
-    path: ../flutter_blue_max_platform_interface
-  flutter_blue_max_android:
-    path: ../flutter_blue_max_android
-  flutter_blue_max_darwin:
-    path: ../flutter_blue_max_darwin
-  flutter_blue_max_linux:
-    path: ../flutter_blue_max_linux
-  flutter_blue_max_web:
-    path: ../flutter_blue_max_web
-
 dev_dependencies:
   flutter_lints: ^5.0.0
   flutter_test:
