@@ -8,8 +8,10 @@
 #define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBP-iOS] " FORMAT, ##__VA_ARGS__]
 
 NSString * const CCCD = @"2902";
-const NSMutableDictionary<NSNumber *, CBCharacteristic *> *instanceIdToCharMap = nil;
-NSMutableDictionary<NSValue *, NSNumber *> *charToInstanceIdMap = nil;
+// file-scope on purpose: these must not get external linkage,
+// and they are mutated, so 'const' would be wrong here
+static NSMutableDictionary<NSNumber *, CBCharacteristic *> *instanceIdToCharMap = nil;
+static NSMutableDictionary<NSValue *, NSNumber *> *charToInstanceIdMap = nil;
 
 __attribute__((constructor))
 static void initializeInstanceIdToCharMap(void) {
@@ -1512,11 +1514,9 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     [self.characteristicsToDiscover addObjectsFromArray:service.characteristics];
     for (CBCharacteristic *c in [service characteristics])
     {
-        int instanceId = [UniqueCharacteristicInstanceId next];
-        instanceIdToCharMap[@(instanceId)] = c;
-
-        NSValue *key = [NSValue valueWithNonretainedObject:c];
-        charToInstanceIdMap[key] = @(instanceId);
+        // a characteristic we already handed out an id for must keep it,
+        // otherwise ids held on the dart side stop matching our events
+        [self registerInstanceIdFor:c];
 
         Log(LDEBUG, @"    chr: %@", [c.UUID uuidStr]);
         [peripheral discoverDescriptorsForCharacteristic:c];
@@ -2363,6 +2363,20 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 {
     NSValue *key = [NSValue valueWithNonretainedObject:characteristic];
     return charToInstanceIdMap[key];
+}
+
+// look up the id for this characteristic, minting one only on first sight
+- (NSNumber *)registerInstanceIdFor:(CBCharacteristic *)characteristic
+{
+    NSValue *key = [NSValue valueWithNonretainedObject:characteristic];
+    NSNumber *existing = charToInstanceIdMap[key];
+    if (existing != nil) {
+        return existing;
+    }
+    NSNumber *fresh = @([UniqueCharacteristicInstanceId next]);
+    instanceIdToCharMap[fresh] = characteristic;
+    charToInstanceIdMap[key] = fresh;
+    return fresh;
 }
 
 - (void)resetInstanceIds:(NSString *)discoveredDeviceId {
