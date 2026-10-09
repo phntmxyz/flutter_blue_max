@@ -1489,7 +1489,6 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     [self.servicesToDiscover addObjectsFromArray:peripheral.services];
     for (CBService *s in [peripheral services]) {
         Log(LDEBUG, @"  svc: %@", [s.UUID uuidStr]);
-        [peripheral discoverCharacteristics:nil forService:s];
         [peripheral discoverIncludedServices:nil forService:s];
     }
 }
