@@ -26,6 +26,18 @@ class FlutterBlueMax {
   static final List<StreamSubscription> _scanSubscriptions = [];
   static final Set<DeviceIdentifier> _autoConnect = {};
 
+  /// lookup key for _lastChrs. The store side and the lookup side must
+  /// build the exact same string, otherwise lastValue silently comes back empty
+  static String _chrCacheKey(Guid serviceUuid, Guid characteristicUuid, int? instanceId, Guid? primaryServiceUuid) {
+    return "$serviceUuid:$characteristicUuid:${instanceId ?? '-'}:${primaryServiceUuid ?? '-'}";
+  }
+
+  /// lookup key for _lastDescs, same contract as _chrCacheKey
+  static String _descCacheKey(
+      Guid serviceUuid, Guid characteristicUuid, Guid descriptorUuid, int? instanceId, Guid? primaryServiceUuid) {
+    return "$serviceUuid:$characteristicUuid:$descriptorUuid:${instanceId ?? '-'}:${primaryServiceUuid ?? '-'}";
+  }
+
   /// stream used for the isScanning public api
   static final _isScanning = _StreamControllerReEmit<bool>(initialValue: false);
 
@@ -695,7 +707,8 @@ class FlutterBlueMax {
       ]).listen((r) {
         if (r.success == true) {
           _lastChrs[r.remoteId] ??= {};
-          _lastChrs[r.remoteId]!["${r.serviceUuid}:${r.characteristicUuid}${r.instanceId ?? 'noinst'}"] = r.value;
+          _lastChrs[r.remoteId]![_chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] =
+              r.value;
         }
       });
     } on UnimplementedError {
@@ -709,8 +722,8 @@ class FlutterBlueMax {
           .listen((r) {
         if (r.success == true) {
           _lastDescs[r.remoteId] ??= {};
-          _lastDescs[r.remoteId]![
-              "${r.serviceUuid}:${r.characteristicUuid}:${r.descriptorUuid}:${r.instanceId ?? 'noinst'}"] = r.value;
+          _lastDescs[r.remoteId]![_descCacheKey(
+              r.serviceUuid, r.characteristicUuid, r.descriptorUuid, r.instanceId, r.primaryServiceUuid)] = r.value;
         }
       });
     } on UnimplementedError {
