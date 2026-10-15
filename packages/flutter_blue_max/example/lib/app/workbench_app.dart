@@ -1,11 +1,12 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/workbench/activity_panel.dart';
-import 'package:flutter_blue_max_example/workbench/devices_panel.dart';
-import 'package:flutter_blue_max_example/workbench/l2cap_server_panel.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/activity/activity_panel.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/devices/devices_panel.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 
 /// A responsive diagnostic app for the real plugin on Android, iOS and macOS.
 class WorkbenchApp extends StatefulWidget {
@@ -129,7 +130,7 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
               child: Column(
                 children: [
                   const Divider(height: 1),
-                  if (!c.ready) _AdapterBanner(state: c.adapter),
+                  if (!c.ready) _AdapterBanner(controller: c),
                   if (c.error != null)
                     Container(
                       width: double.infinity,
@@ -204,12 +205,12 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
 }
 
 class _AdapterBanner extends StatelessWidget {
-  const _AdapterBanner({required this.state});
-  final BluetoothAdapterState state;
+  const _AdapterBanner({required this.controller});
+  final WorkbenchController controller;
 
   @override
   Widget build(BuildContext context) {
-    final message = switch (state) {
+    final message = switch (controller.adapter) {
       BluetoothAdapterState.unauthorized =>
         'Bluetooth permission is denied. Allow access in system settings, then reopen the app.',
       BluetoothAdapterState.unavailable => 'Bluetooth is not available on this device.',
@@ -225,6 +226,11 @@ class _AdapterBanner extends StatelessWidget {
           const Icon(Icons.info_outline, size: 18),
           const SizedBox(width: 12),
           Expanded(child: Text(message)),
+          if (defaultTargetPlatform == TargetPlatform.android && controller.adapter == BluetoothAdapterState.off)
+            TextButton(
+              onPressed: controller.busy('adapter') ? null : controller.turnOn,
+              child: const Text('Turn on Bluetooth'),
+            ),
         ],
       ),
     );

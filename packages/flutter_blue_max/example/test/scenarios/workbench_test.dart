@@ -1,11 +1,19 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/workbench_robot.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   final platform = FakeBluetoothPlatform();
+  // Plugin subscriptions outlive each widget test's fake clock, as they do app screens.
+  setUpAll(() async {
+    FlutterBlueMaxPlatform.instance = platform;
+    await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
+  });
 
   testWidgets('desktop: discover GATT, validate PSM and preserve server across navigation', (tester) async {
     final robot = WorkbenchRobot(tester, platform);

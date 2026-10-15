@@ -21,6 +21,124 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   Completer<int>? pendingServer;
   bool failNextWrite = false;
   int serverStarts = 0;
+  bool holdConnections = false;
+  bool includeGattExtras = false;
+  bool failNextOpen = false;
+  bool disconnectOnOpenFailure = false;
+  final connectRequests = <BmConnectRequest>[];
+  final systemDeviceRequests = <BmSystemDevicesRequest>[];
+  final openRequests = <OpenL2CapChannelRequest>[];
+  final readRequests = <ReadL2CapChannelRequest>[];
+  final characteristicReads = <BmReadCharacteristicRequest>[];
+  final descriptorWrites = <BmWriteDescriptorRequest>[];
+  final notifyRequests = <BmSetNotifyValueRequest>[];
+  final systemPeers = <BmBluetoothDevice>[];
+  final rssiValues = StreamController<BmReadRssiResult>.broadcast(sync: true);
+  final descriptorRead = StreamController<BmDescriptorData>.broadcast(sync: true);
+  final descriptorWritten = StreamController<BmDescriptorData>.broadcast(sync: true);
+  final turnOnResponses = StreamController<BmTurnOnResponse>.broadcast(sync: true);
+  List<int> bufferedBytes = [];
+  Completer<void>? pendingWrites;
+  int turnOnRequests = 0;
+  int scanStarts = 0;
+
+  @override
+  Stream<BmReadRssiResult> get onReadRssi => rssiValues.stream;
+  @override
+  Stream<BmDescriptorData> get onDescriptorRead => descriptorRead.stream;
+  @override
+  Stream<BmDescriptorData> get onDescriptorWritten => descriptorWritten.stream;
+  @override
+  Stream<BmTurnOnResponse> get onTurnOnResponse => turnOnResponses.stream;
+
+  @override
+  Future<BmDevicesList> getSystemDevices(BmSystemDevicesRequest request) async {
+    systemDeviceRequests.add(request);
+    return BmDevicesList(devices: List.of(systemPeers));
+  }
+
+  @override
+  Future<bool> turnOn(BmTurnOnRequest request) async {
+    turnOnRequests++;
+    turnOnResponses.add(BmTurnOnResponse(userAccepted: true));
+    adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
+    return true;
+  }
+
+  @override
+  Future<bool> readRssi(BmReadRssiRequest request) async {
+    rssiValues.add(
+      BmReadRssiResult(remoteId: request.remoteId, rssi: -47, success: true, errorCode: 0, errorString: ''),
+    );
+    return true;
+  }
+
+  @override
+  Future<List<int>> readL2CapChannel(ReadL2CapChannelRequest request) async {
+    readRequests.add(request);
+    final bytes = bufferedBytes;
+    bufferedBytes = [];
+    return bytes;
+  }
+
+  @override
+  Future<bool> readDescriptor(BmReadDescriptorRequest request) async {
+    descriptorRead.add(
+      BmDescriptorData(
+        remoteId: request.remoteId,
+        serviceUuid: request.serviceUuid,
+        characteristicUuid: request.characteristicUuid,
+        descriptorUuid: request.descriptorUuid,
+        primaryServiceUuid: request.primaryServiceUuid,
+        instanceId: request.instanceId,
+        value: [0x41],
+        success: true,
+        errorCode: 0,
+        errorString: '',
+      ),
+    );
+    return true;
+  }
+
+  @override
+  Future<bool> writeDescriptor(BmWriteDescriptorRequest request) async {
+    descriptorWrites.add(request);
+    descriptorWritten.add(
+      BmDescriptorData(
+        remoteId: request.remoteId,
+        serviceUuid: request.serviceUuid,
+        characteristicUuid: request.characteristicUuid,
+        descriptorUuid: request.descriptorUuid,
+        primaryServiceUuid: request.primaryServiceUuid,
+        instanceId: request.instanceId,
+        value: request.value,
+        success: true,
+        errorCode: 0,
+        errorString: '',
+      ),
+    );
+    return true;
+  }
+
+  @override
+  Future<bool> setNotifyValue(BmSetNotifyValueRequest request) async {
+    notifyRequests.add(request);
+    descriptorWritten.add(
+      BmDescriptorData(
+        remoteId: request.remoteId,
+        serviceUuid: request.serviceUuid,
+        characteristicUuid: request.characteristicUuid,
+        descriptorUuid: Guid('2902'),
+        primaryServiceUuid: request.primaryServiceUuid,
+        instanceId: request.instanceId,
+        value: [request.enable ? 1 : 0, 0],
+        success: true,
+        errorCode: 0,
+        errorString: '',
+      ),
+    );
+    return true;
+  }
 
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged => adapters.stream;
@@ -47,11 +165,21 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Future<bool> setLogLevel(BmSetLogLevelRequest request) async => true;
   @override
-  Future<bool> startScan(BmScanSettings request) async => true;
+  Future<bool> startScan(BmScanSettings request) async {
+    scanStarts++;
+    return true;
+  }
+
   @override
   Future<bool> stopScan(BmStopScanRequest request) async => true;
 
-  void advertise({String id = 'AA:BB:CC:DD:EE:01', String name = 'Test peripheral', int rssi = -45}) {
+  void advertise({
+    String id = 'AA:BB:CC:DD:EE:01',
+    String name = 'Test peripheral',
+    int rssi = -45,
+    bool connectable = true,
+    int? appearance,
+  }) {
     advertisements.add(
       BmScanResponse(
         advertisements: [
@@ -59,9 +187,9 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
             remoteId: DeviceIdentifier(id),
             platformName: name,
             advName: name,
-            connectable: true,
+            connectable: connectable,
             txPowerLevel: null,
-            appearance: null,
+            appearance: appearance,
             manufacturerData: {},
             serviceData: {},
             serviceUuids: [Guid('180F')],
@@ -77,6 +205,10 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
 
   @override
   Future<bool> connect(BmConnectRequest request) async {
+    connectRequests.add(request);
+    if (holdConnections) {
+      return true;
+    }
     connected.add(request.remoteId);
     connections.add(
       BmConnectionStateResponse(
@@ -120,13 +252,24 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
                 characteristicUuid: Guid('2A19'),
                 primaryServiceUuid: null,
                 instanceId: 1,
-                descriptors: [],
+                descriptors: [
+                  if (includeGattExtras)
+                    for (final uuid in ['2901', '2902'])
+                      BmBluetoothDescriptor(
+                        remoteId: request.remoteId,
+                        serviceUuid: Guid('180F'),
+                        characteristicUuid: Guid('2A19'),
+                        descriptorUuid: Guid(uuid),
+                        primaryServiceUuid: null,
+                        instanceId: 1,
+                      ),
+                ],
                 properties: BmCharacteristicProperties(
                   broadcast: false,
                   read: true,
                   writeWithoutResponse: true,
-                  write: false,
-                  notify: false,
+                  write: includeGattExtras,
+                  notify: includeGattExtras,
                   indicate: false,
                   authenticatedSignedWrites: false,
                   extendedProperties: false,
@@ -153,6 +296,7 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
 
   @override
   Future<bool> readCharacteristic(BmReadCharacteristicRequest request) async {
+    characteristicReads.add(request);
     characteristicValues.add(
       BmCharacteristicData(
         remoteId: request.remoteId,
@@ -194,7 +338,16 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   }
 
   @override
-  Future<void> openL2CapChannel(OpenL2CapChannelRequest request) async {}
+  Future<void> openL2CapChannel(OpenL2CapChannelRequest request) async {
+    openRequests.add(request);
+    if (failNextOpen) {
+      failNextOpen = false;
+      if (disconnectOnOpenFailure) {
+        await disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(request.remoteId)));
+      }
+      throw StateError('Temporary channel failure');
+    }
+  }
 
   @override
   Future<void> closeL2CapChannel(CloseL2CapChannelRequest request) async {
@@ -209,5 +362,6 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
       throw StateError('Peer rejected the write');
     }
     writes.add(request);
+    await pendingWrites?.future;
   }
 }

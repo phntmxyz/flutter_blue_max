@@ -2,8 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/workbench/channel_session.dart';
-import 'package:flutter_blue_max_example/workbench/payload_codec.dart';
+import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 /// Owns the example's Bluetooth session across navigation and device selection.
 /// The package remains responsible for platform I/O and operation serialization.
@@ -17,6 +17,10 @@ class WorkbenchController extends ChangeNotifier {
   bool _disposed = false;
   bool _started = false;
   bool _startingServer = false;
+
+  List<BluetoothDevice> systemDevices = [];
+  BluetoothDevice? connectingDevice;
+  bool _cancelConnection = false;
 
   BluetoothAdapterState adapter = BluetoothAdapterState.unknown;
   List<ScanResult> scanResults = [];
@@ -34,8 +38,7 @@ class WorkbenchController extends ChangeNotifier {
   List<String> get logs => List.unmodifiable(_logs);
   List<ChannelSession> get channels => List.unmodifiable(_channels.values);
   List<BluetoothService> get services => _services[selected?.remoteId] ?? [];
-  List<BluetoothDevice> get connectedDevices =>
-      _watched.map((id) => BluetoothDevice(remoteId: id)).where((device) => device.isConnected).toList();
+  List<BluetoothDevice> get connectedDevices => FlutterBlueMax.connectedDevices;
   ScanResult? get selectedAdvertisement {
     for (final result in scanResults) {
       if (result.device == selected) {
@@ -107,7 +110,7 @@ class WorkbenchController extends ChangeNotifier {
           return;
         }
         session.received += event.value.length;
-        session.lastReceived = List.of(event.value);
+        session.recordReceived(event.value, source: 'Stream');
         log(
           'RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · '
           '${PayloadCodec.hex(event.value.take(64).toList())}',
@@ -161,7 +164,13 @@ class WorkbenchController extends ChangeNotifier {
             _services.remove(device.remoteId);
             _channels.removeWhere((key, _) => key.$1 == device.remoteId);
           }
-          log('${nameOf(device)}: ${state.name}');
+          log(
+            '${nameOf(device)}: ${state.name}'
+            '${state == BluetoothConnectionState.disconnected ? ' · ${device.disconnectReason}' : ''}',
+          );
+          if (state == BluetoothConnectionState.connected && selected == device) {
+            unawaited(readRssi());
+          }
         }),
       );
       _subscriptions.add(
@@ -180,21 +189,60 @@ class WorkbenchController extends ChangeNotifier {
     if (scanning) {
       await FlutterBlueMax.stopScan();
     } else {
+      await refreshSystemDevices();
       await FlutterBlueMax.startScan(timeout: const Duration(seconds: 15));
     }
   });
 
+  Future<void> refreshScan() async {
+    if (!scanning && ready) {
+      await scan();
+    }
+  }
+
+  Future<void> refreshSystemDevices() => run('systemDevices', () async {
+    systemDevices = await FlutterBlueMax.systemDevices([Guid('180f')]);
+  });
+
   Future<void> connect() => run('connection', () async {
     final device = selected!;
-    await FlutterBlueMax.stopScan();
-    await device.connect(mtu: null);
-    if (_disposed) {
-      await device.disconnect();
+    connectingDevice = device;
+    _cancelConnection = false;
+    _update();
+    try {
+      await FlutterBlueMax.stopScan();
+      if (_cancelConnection) {
+        return;
+      }
+      await device.connect(mtu: null);
+      if (_disposed || _cancelConnection) {
+        await device.disconnect(queue: false);
+      }
+    } on FlutterBlueMaxException catch (error, stackTrace) {
+      if (!_cancelConnection) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+    } finally {
+      connectingDevice = null;
     }
+  });
+
+  /// Cancellation bypasses both the sample's connection lock and the plugin queue.
+  Future<void> cancelConnect() => run('cancelConnection', () async {
+    final device = connectingDevice;
+    if (device == null) {
+      return;
+    }
+    _cancelConnection = true;
+    await device.disconnect(queue: false);
   });
 
   Future<void> disconnect() => run('connection', () async {
     await selected!.disconnect();
+  });
+
+  Future<void> turnOn() => run('adapter', () async {
+    await FlutterBlueMax.turnOn();
   });
 
   Future<void> discover() => run('discover', () async {
@@ -261,7 +309,20 @@ class WorkbenchController extends ChangeNotifier {
     if (_channels.containsKey(key)) {
       throw StateError('This peer already has a channel on PSM $psm.');
     }
-    final channel = await device.openL2CapChannel(psm, secure: secure);
+    late final BluetoothL2capChannel channel;
+    try {
+      channel = await device.openL2CapChannel(psm, secure: secure);
+    } catch (error, stackTrace) {
+      if (_disposed || !ready) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+      log('L2CAP open failed; retrying once: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      if (!device.isConnected) {
+        await device.connect(mtu: null);
+      }
+      channel = await device.openL2CapChannel(psm, secure: secure);
+    }
     if (_disposed || !device.isConnected) {
       await channel.close();
       return;
@@ -278,6 +339,35 @@ class WorkbenchController extends ChangeNotifier {
       '${PayloadCodec.hex(bytes.take(64).toList())}',
     );
   });
+
+  /// Explicit reads drain the native buffer; streamed bytes are not counted twice.
+  Future<void> readChannel(ChannelSession session) => run('channel:${session.key}', () async {
+    final bytes = await session.channel.read();
+    session.recordReceived(bytes, source: 'Buffer read');
+    log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
+  });
+
+  /// Patterned traffic exposes truncation; concurrent writes exercise native backpressure.
+  Future<void> sendTestTraffic(ChannelSession session, {required int size, required int count}) =>
+      run('channel:${session.key}', () async {
+        if (size <= 0 || count <= 0) {
+          throw const FormatException('Payload size and write count must be positive.');
+        }
+        final payload = List<int>.generate(size, (i) => i & 0xff);
+        var successes = 0;
+        await Future.wait(
+          List.generate(count, (_) async {
+            await session.channel.write(payload);
+            session.transmitted += payload.length;
+            successes++;
+          }),
+        ).whenComplete(() {
+          log(
+            'Test traffic ${session.channel.deviceId} / ${session.channel.psm}: '
+            '$successes/$count writes of $size B completed',
+          );
+        });
+      });
 
   Future<void> closeChannel(ChannelSession session) => run('channel:${session.key}', () async {
     await session.channel.close();

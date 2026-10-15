@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/workbench/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 /// Shared, validated byte input for GATT writes and L2CAP transmissions.
 class PayloadEditor extends StatefulWidget {

@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 

@@ -1,4 +1,4 @@
-import 'package:flutter_blue_max_example/workbench/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

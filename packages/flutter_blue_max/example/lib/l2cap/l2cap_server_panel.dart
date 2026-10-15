@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_max_example/workbench/l2cap_channel_card.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_card.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
+import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// The receiving role waits for peers; it does not open a channel to a selected device.
 class L2capServerPanel extends StatefulWidget {

@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/workbench/l2cap_channel_card.dart';
-import 'package:flutter_blue_max_example/workbench/payload_codec.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_card.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// Opens outgoing channels only for the device shown in the inspector.
 class DeviceL2capPanel extends StatefulWidget {

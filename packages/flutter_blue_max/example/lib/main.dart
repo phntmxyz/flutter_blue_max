@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_app.dart';
+import 'package:flutter_blue_max_example/app/workbench_app.dart';
 
 void main() {
   WidgetsFlutterBinding.ensureInitialized();

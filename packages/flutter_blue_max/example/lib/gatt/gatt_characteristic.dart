@@ -1,8 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/workbench/payload_codec.dart';
-import 'package:flutter_blue_max_example/workbench/payload_editor.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 
 /// Inspects the actual characteristic instance and its descriptors.
 class GattCharacteristic extends StatefulWidget {
@@ -18,7 +20,34 @@ class GattCharacteristic extends StatefulWidget {
 class _GattCharacteristicState extends State<GattCharacteristic> {
   bool _withoutResponse = false;
   bool _writing = false;
+  late bool _notifying = widget.characteristic.isNotifying;
   late final Stream<List<int>> _values = widget.characteristic.lastValueStream;
+
+  StreamSubscription<List<int>>? _notificationChanges;
+
+  @override
+  void initState() {
+    super.initState();
+    for (final descriptor in widget.characteristic.descriptors) {
+      if (descriptor.uuid == Guid('2902')) {
+        // CCCD events may arrive after the operation future and also after direct writes.
+        _notificationChanges = descriptor.lastValueStream.listen((value) {
+          if (mounted) {
+            setState(() {
+              _notifying = value.isNotEmpty && (value.first & 0x03) != 0;
+            });
+          }
+        });
+        break;
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    unawaited(_notificationChanges?.cancel());
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -97,14 +126,14 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                     OutlinedButton.icon(
                       onPressed: enabled
                           ? () => widget.controller.run(key, () async {
-                              await c.setNotifyValue(!c.isNotifying);
+                              await c.setNotifyValue(!_notifying);
+                              if (p.read) {
+                                await c.read();
+                              }
                             })
                           : null,
-                      icon: Icon(
-                        c.isNotifying ? Icons.notifications_active_outlined : Icons.notifications_none,
-                        size: 16,
-                      ),
-                      label: Text(c.isNotifying ? 'Unsubscribe' : 'Subscribe'),
+                      icon: Icon(_notifying ? Icons.notifications_active_outlined : Icons.notifications_none, size: 16),
+                      label: Text(_notifying ? 'Unsubscribe' : 'Subscribe'),
                     ),
                 ],
               ),
@@ -122,6 +151,9 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                   label: 'Write characteristic',
                   onSend: (value) => widget.controller.run(key, () async {
                     await c.write(value, withoutResponse: !p.write || _withoutResponse);
+                    if (p.read) {
+                      await c.read();
+                    }
                   }),
                 ),
               ],
@@ -170,16 +202,18 @@ class _DescriptorState extends State<_Descriptor> {
             child: const Text('Read descriptor'),
           ),
         ),
-        if (d.uuid != Guid('2902'))
-          PayloadEditor(
-            enabled: enabled,
-            label: 'Write descriptor',
-            onSend: (value) => widget.controller.run(key, () async {
-              await d.write(value);
-            }),
-          )
-        else
-          const Padding(padding: EdgeInsets.all(8), child: Text('Use Subscribe above to configure notifications.')),
+        PayloadEditor(
+          enabled: enabled,
+          label: 'Write descriptor',
+          onSend: (value) => widget.controller.run(key, () async {
+            await d.write(value);
+          }),
+        ),
+        if (d.uuid == Guid('2902'))
+          const Padding(
+            padding: EdgeInsets.all(8),
+            child: Text('Subscribe configures this descriptor. Direct CCCD writes may be rejected by the platform.'),
+          ),
       ],
     );
   }

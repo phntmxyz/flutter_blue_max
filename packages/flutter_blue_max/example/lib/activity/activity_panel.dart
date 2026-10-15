@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 
 /// Searchable session output includes native diagnostics and payload previews.
 class ActivityPanel extends StatefulWidget {

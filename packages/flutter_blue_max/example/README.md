@@ -50,17 +50,27 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
 
 ## Workspaces
 
-- **Devices:** scan for 15 seconds, filter by name, identifier or service UUID, and inspect advertisements and signal strength.
+- **Devices:** scan for 15 seconds, pull to refresh, filter by name, identifier or service UUID, and inspect advertisements and signal strength.
+  System-connected devices are queried on each scan, including peers connected through another app.
+  As in the original example, Apple system-device lookup uses the Battery Service UUID (`180F`).
+  Pending connections can be cancelled; broadcast-only advertisements cannot be connected.
+  RSSI is read after connecting, and the Android adapter banner can request that Bluetooth be enabled.
   Connected devices remain accessible above the result list when a new scan starts.
   Select a device, connect, then choose **GATT** or **L2CAP** in its inspector.
   GATT exposes service discovery, characteristic/descriptor reads and writes, and notifications.
+  Readable characteristics are read back after writing or changing subscriptions.
+  Direct CCCD writes remain available, although the platform may reject them; Subscribe is the portable notification control.
   L2CAP opens a channel to that device's server using its PSM and only shows that device's outgoing channels.
   The PSM form is available after connecting; GATT service discovery is not required unless the peer uses GATT to publish its PSM.
   Android also exposes bonding and MTU requests.
 - **Local server:** prepare this device to accept incoming L2CAP channels, independently of the selected peripheral.
   Starting the server only begins listening; it does not mean another device is connected.
   The screen distinguishes waiting for a peer from accepted channels and explains the separate discovery/PSM exchange requirement.
-  Each channel has its own payload editor, TX/RX byte counters and latest received chunk.
+  Each channel has its own payload editor, TX/RX byte counters, latest received chunk and bounded receive history.
+  Both incoming and outgoing channels expose buffered reads, a patterned 10 KB test write and a 20 × 1 KB burst.
+  Buffered reads may repeat data already delivered by the stream, so they are labelled separately and do not increment the stream RX counter.
+  The burst submits concurrent public-API calls; the library controls their native serialization.
+  Failed channel opens are retried once, reconnecting the original peer if necessary.
   Channel identity includes both the peer and PSM.
 - **Activity:** search and copy the most recent 500 log entries, including native diagnostics and payload previews.
 
@@ -70,6 +80,47 @@ The header switches between light and dark themes.
 Bluetooth sessions survive navigation between workspaces.
 Hex input accepts complete byte pairs with optional whitespace; UTF-8 input sends encoded text.
 Invalid payloads and PSMs are rejected before reaching the plugin.
+
+## Source layout
+
+`lib/main.dart` starts the application.
+The remaining files are grouped by responsibility:
+
+| Directory | Responsibility |
+| --- | --- |
+| `lib/app/` | App shell and Bluetooth session lifecycle |
+| `lib/devices/` | Scan results, system devices, connection and advertisement inspection |
+| `lib/gatt/` | Characteristics, subscriptions and descriptors |
+| `lib/l2cap/` | Device channels, local server, transfers and receive history |
+| `lib/activity/` | Session log search, copy and clearing |
+| `lib/shared/` | Cards and validated payload input/formatting |
+
+## Original example feature parity
+
+The baseline is commit `4d0ca15`, before the example refresh.
+The table tracks the original user-facing operations, including its L2CAP diagnostic controls.
+Widget and controller tests execute the production example and public plugin API with native I/O faked.
+They do not validate radio behavior or operating-system permission dialogs.
+
+| Original capability | Current location | Automated coverage |
+| --- | --- | --- |
+| Adapter state and Android Turn On | App header/banner | Adapter transition and Android button |
+| Scan, stop, pull to refresh | Devices | All three actions |
+| System-connected devices | Devices → Connected to the system | Connect without an advertisement |
+| Connect, cancel, disconnect | Device inspector | Pending cancellation; disconnect cleanup |
+| Advertisement data, including appearance | Device → Advertisement | Appearance and broadcast-only connection guard |
+| RSSI and MTU | Device header | Automatic RSSI; MTU requires Android hardware validation |
+| Service discovery | Device → GATT | Discover and expand a service |
+| Characteristic read/write | GATT characteristic | Both write modes, read-back and payload validation |
+| Subscribe/unsubscribe | GATT characteristic | Both transitions and read-back |
+| Descriptor read/write, including CCCD control | GATT descriptor | Ordinary descriptor read/write; direct CCCD control is reachable |
+| L2CAP server start/stop and security choice | Local server | Lifecycle, incoming channel and shutdown cleanup |
+| L2CAP client open/close | Device → L2CAP | Per-peer channels, closure cleanup and reconnect/retry |
+| L2CAP send and live receive | Channel card | Writes, per-peer RX/TX counts and error handling |
+| Buffered L2CAP read | Channel → Read buffered data | Peer routing and no double-counting |
+| Large payload and burst | Channel → Send 10 KB / Burst 20×1 KB | Payload content/size, queued completion and partial failure |
+| Receive history and RX count | Channel → Receive history | Bounded history and stream/read distinction |
+| Logs and Clear | Activity | Bounded logging; search/copy/clear available in UI |
 
 ## Hardware checks
 

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/workbench/l2cap_channel_card.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_app.dart';
-import 'package:flutter_blue_max_example/workbench/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_app.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -28,6 +28,9 @@ class WorkbenchRobot {
 
   Future<void> dispose() async {
     logEvent('Close the workbench');
+    platform.holdConnections = false;
+    platform.includeGattExtras = false;
+    platform.systemPeers.clear();
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();
     await idle();
@@ -38,10 +41,13 @@ class WorkbenchRobot {
 
   Future<void> idle() async {
     await tester.runAsync(() async {});
-    if (controller.scanning) {
-      await tester.pump(const Duration(milliseconds: 250));
-    } else {
-      await tester.pumpAndSettle();
+    await tester.pump();
+    for (var frame = 0; frame < 30 && tester.binding.hasScheduledFrame; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(() async {});
+      if (controller.scanning) {
+        break;
+      }
     }
     await tester.runAsync(() async {});
     await tester.pump();
@@ -53,14 +59,14 @@ class WorkbenchRobot {
   }
 
   Future<void> scanForPeripheral({bool includeSecondPeer = false}) async {
-    await _tap('Start scan');
+    await tapLabel('Start scan');
     logEvent('Receive a peripheral advertisement from native I/O');
     platform.advertise();
     if (includeSecondPeer) {
       platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
     }
     await idle();
-    await _tap('Stop scan');
+    await tapLabel('Stop scan');
     spotText('Test peripheral').existsOnce();
   }
 
@@ -68,7 +74,7 @@ class WorkbenchRobot {
     await selectPeripheral();
     await connectSelected();
     expect(controller.connected, isTrue);
-    await _tap('Discover services');
+    await tapLabel('Discover services');
     spotText('180F').existsOnce();
   }
 
@@ -81,7 +87,7 @@ class WorkbenchRobot {
     await idle();
   }
 
-  Future<void> connectSelected() => _tap('Connect');
+  Future<void> connectSelected() => tapLabel('Connect');
 
   void expectConnectionRequired() {
     logEvent('Verify that the device must be connected before entering a remote PSM');
@@ -96,34 +102,34 @@ class WorkbenchRobot {
     expect(field.snapshotWidget().controller!.text, isEmpty);
   }
 
-  Future<void> openL2cap() => _tap('L2CAP');
-  Future<void> openLocalServer() => _tap('Local server');
+  Future<void> openL2cap() => tapLabel('L2CAP');
+  Future<void> openLocalServer() => tapLabel('Local server');
   Future<void> readAndWriteCharacteristic() async {
-    await _tap('180F');
-    await _tap('2A19');
-    await _tap('Read');
+    await tapLabel('180F');
+    await tapLabel('2A19');
+    await tapLabel('Read');
     spotText('64', exact: true).existsOnce();
-    await _tap('Write');
+    await tapLabel('Write');
     logEvent('Enter a malformed payload and verify that it is not transmitted');
     final field = spot<TextFormField>()..existsOnce();
     await tester.ensureVisible(find.byType(TextFormField));
     await act.enterText(field, 'F');
     await idle();
     final count = platform.characteristicWrites.length;
-    await _tap('Write characteristic');
+    await tapLabel('Write characteristic');
     expect(platform.characteristicWrites, hasLength(count));
     logEvent('Send valid hex using the characteristic’s write-without-response capability');
     field.existsOnce();
     await act.enterText(field, '01 A2 FF');
     await idle();
-    await _tap('Write characteristic');
+    await tapLabel('Write characteristic');
     expect(platform.characteristicWrites.last.value, [1, 162, 255]);
     expect(platform.characteristicWrites.last.writeType, BmWriteType.withoutResponse);
   }
 
-  Future<void> startServer() => _tap('Start server');
-  Future<void> stopServer() => _tap('Stop server');
-  Future<void> openActivity() => _tap('Activity');
+  Future<void> startServer() => tapLabel('Start server');
+  Future<void> stopServer() => tapLabel('Stop server');
+  Future<void> openActivity() => tapLabel('Activity');
 
   Future<void> filterWithKeyboard() async {
     logEvent('Filter devices while the phone keyboard reduces the viewport');
@@ -187,7 +193,7 @@ class WorkbenchRobot {
     await idle();
     await act.enterText(field, '0');
     await idle();
-    await _tap('Open channel');
+    await tapLabel('Open channel');
     spotText('Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.').existsOnce();
     expect(controller.channels, isEmpty);
   }
@@ -199,7 +205,7 @@ class WorkbenchRobot {
     await idle();
     await act.enterText(field, '131');
     await idle();
-    await _tap('Open channel');
+    await tapLabel('Open channel');
     final session = controller.channels.where((s) => s.channel.deviceId == controller.selected!.remoteId).single;
     expect(session.incoming, isFalse);
     await expectOnlySelectedChannel();
@@ -220,7 +226,7 @@ class WorkbenchRobot {
     spotText('Remote PSM', exact: true).doesNotExist();
   }
 
-  Future<void> _tap(String label) async {
+  Future<void> tapLabel(String label) async {
     logEvent('Tap "$label"');
     final target = spotText(label, exact: true)..existsOnce();
     await tester.ensureVisible(find.text(label));
