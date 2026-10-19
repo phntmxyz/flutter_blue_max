@@ -9,7 +9,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   @visibleForTesting
   final methodChannel = const MethodChannel('flutter_blue_max/methods');
 
-  var _initialized = false;
+  Future<void>? _restartHandshake;
   var _logLevel = LogLevel.none;
   var _logColor = true;
 
@@ -351,8 +351,28 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     String method, [
     dynamic arguments,
   ]) async {
-    // initialize
-    await _initFlutterBlueMax();
+    // make sure we can receive platform callbacks
+    methodChannel.setMethodCallHandler(_methodCallHandler);
+
+    // Complete the hot-restart handshake before the first real call.
+    // 'setOptions' and 'setLogLevel' are deliberately allowed through
+    // beforehand: the handshake causes the native side to create the
+    // CBCentralManager, and options like showPowerAlert must already
+    // be delivered by then to have any effect.
+    if (method != 'setOptions' && method != 'setLogLevel') {
+      Future<void> handshake = _restartHandshake ??= _drainOldConnections();
+      try {
+        await handshake;
+      } catch (_) {
+        // don't cache a failed handshake - the next call retries it. The
+        // identical() check keeps a late failure from wiping out a newer,
+        // still-running retry started by another caller
+        if (identical(_restartHandshake, handshake)) {
+          _restartHandshake = null;
+        }
+        rethrow;
+      }
+    }
 
     // log args
     if (_logLevel == LogLevel.verbose) {
@@ -378,17 +398,9 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     return out;
   }
 
-  Future<void> _initFlutterBlueMax() async {
-    if (_initialized) {
-      return;
-    }
-
-    _initialized = true;
-
-    // set platform method handler
-    methodChannel.setMethodCallHandler(_methodCallHandler);
-
-    // flutter restart - wait for all devices to disconnect
+  /// after a hot restart the native side may still hold connections
+  /// from the previous dart vm - tell it to drop them and wait until done
+  Future<void> _drainOldConnections() async {
     if ((await methodChannel.invokeMethod('flutterRestart')) != 0) {
       await Future.delayed(Duration(milliseconds: 50));
       while ((await methodChannel.invokeMethod('connectedCount')) != 0) {
