@@ -22,6 +22,39 @@ puro -e 3.47.7 flutter run -d <device-id>
 Select your development team in Xcode before running on a physical iPhone.
 The iOS Simulator can validate layout and builds, but cannot test Bluetooth communication.
 
+## Download builds from GitHub Actions
+
+The [Build example downloads](../../../.github/workflows/example_build.yml) workflow runs manually through **Actions → Build example downloads → Run workflow**.
+Select a branch and either `all` or one platform.
+After the run, download the files from **Artifacts** or the links in the job summaries; downloads are retained for 14 days.
+GitHub requires the workflow to exist on the repository's default branch before its manual trigger is available.
+See [GitHub's manual workflow instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+| Platform | Download | Usage |
+| --- | --- | --- |
+| Android | `blue-max-android-release.apk` | Install on an Android device; the sample uses debug-key signing for its release builds. |
+| iOS Simulator | `blue-max-ios-simulator-arm64-debug.tar.gz` | Extract `Runner.app` and install it in an Apple Silicon iOS Simulator. |
+| macOS | `blue-max-macos-arm64-debug.tar.gz` | Extract `Blue Max.app` and open it on an Apple Silicon Mac. |
+| Linux | `blue-max-linux-x64-release.tar.gz` | Extract the complete `bundle` directory and run `bundle/flutter_blue_max_example`. |
+
+The workflow installs [Puro2](https://puro2.phntm.xyz/) and pins Flutter 3.47.7 through `FLUTTER_VERSION`.
+Local `.puro.json` files are not tracked and are not required by CI.
+It builds the local package implementations from the selected checkout and does not publish packages or releases.
+The existing `Publish Flutter Blue Plus…` workflows publish library packages to pub.dev when their version tags are pushed.
+Windows and web are omitted because this sample has no runner for either platform.
+
+The macOS download uses debug mode because of the [release compiler limitation](#macos-release-compiler-limitation) below.
+It is ad-hoc signed rather than notarized; macOS may require approval in **System Settings → Privacy & Security** when opening a downloaded build.
+The Android signing key is generated on each fresh runner, so installing a later build may require uninstalling the previous build first.
+Linux needs GTK 3 and BlueZ on the target system; keep the bundle's `lib` and `data` directories beside the executable.
+The iOS download is a simulator app, not an IPA for physical iPhones; no Apple signing secrets are required.
+
+With an iOS Simulator booted, install the extracted app using:
+
+```sh
+xcrun simctl install booted Runner.app
+```
+
 ## Toolchain and minimum versions
 
 | Component | Example configuration |

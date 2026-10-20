@@ -1,0 +1,118 @@
+name: Build example downloads
+
+on:
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - android
+          - ios
+          - macos
+          - linux
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.7'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: packages/flutter_blue_max/example
+
+jobs:
+  build:
+    name: Build ${{ matrix.platform }}
+    runs-on: ${{ (matrix.platform == 'ios' || matrix.platform == 'macos') && 'macos-15' || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: >-
+          ${{ fromJSON(inputs.platform == 'all' && '["android","ios","macos","linux"]' ||
+          format('["{0}"]', inputs.platform)) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            packages/flutter_blue_max/example/android/**/*.gradle.kts
+            packages/flutter_blue_max/example/android/gradle.properties
+            packages/flutter_blue_max/example/android/gradle/wrapper/gradle-wrapper.properties
+            packages/flutter_blue_max_android/android/*.gradle
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+
+      - name: Install Puro2
+        run: |
+          curl --fail --location --retry 3 https://puro2.phntm.xyz/install.sh \
+            --output "$RUNNER_TEMP/install-puro2.sh"
+          bash "$RUNNER_TEMP/install-puro2.sh"
+          echo "$HOME/.puro/bin" >> "$GITHUB_PATH"
+
+      - name: Install the example's Flutter version
+        run: |
+          puro2 create "$FLUTTER_VERSION" "$FLUTTER_VERSION"
+          puro2 -e "$FLUTTER_VERSION" flutter pub get
+          mkdir -p dist
+
+      - name: Build Android APK
+        if: matrix.platform == 'android'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" flutter build apk --release --no-pub
+          cp build/app/outputs/flutter-apk/app-release.apk dist/blue-max-android-release.apk
+
+      - name: Build iOS Simulator app
+        if: matrix.platform == 'ios'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" flutter build ios --simulator --debug --no-codesign --no-pub
+          tar -czf "dist/blue-max-ios-simulator-$(uname -m)-debug.tar.gz" \
+            -C build/ios/iphonesimulator Runner.app
+
+      # Flutter 3.47.7 cannot AOT-compile this app on macOS; see flutter/flutter#191575.
+      - name: Build macOS debug app
+        if: matrix.platform == 'macos'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" flutter build macos --debug --no-pub
+          tar -czf "dist/blue-max-macos-$(uname -m)-debug.tar.gz" \
+            -C build/macos/Build/Products/Debug "Blue Max.app"
+
+      - name: Build Linux bundle
+        if: matrix.platform == 'linux'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" flutter build linux --release --no-pub
+          tar -czf dist/blue-max-linux-x64-release.tar.gz -C build/linux/x64/release bundle
+
+      - name: Upload download
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: packages/flutter_blue_max/example/dist/*
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Link download in summary
+        env:
+          BUILD_PLATFORM: ${{ matrix.platform }}
+          DOWNLOAD_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          printf '### Blue Max: %s\n\n[Download build](%s)\n' \
+            "$BUILD_PLATFORM" "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"
