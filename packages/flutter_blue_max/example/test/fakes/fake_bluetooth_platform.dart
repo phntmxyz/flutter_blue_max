@@ -43,6 +43,10 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   int scanStarts = 0;
 
   @override
+  Future<BmBluetoothAdapterName> getAdapterName(BmBluetoothAdapterNameRequest request) async =>
+      BmBluetoothAdapterName(adapterName: 'Test workstation');
+
+  @override
   Stream<BmReadRssiResult> get onReadRssi => rssiValues.stream;
   @override
   Stream<BmDescriptorData> get onDescriptorRead => descriptorRead.stream;

@@ -19,6 +19,9 @@ let package = Package(
             dependencies: [.product(name: "FlutterFramework", package: "FlutterFramework")],
             cSettings: [
                 .headerSearchPath("include/flutter_blue_max_darwin")
+            ],
+            linkerSettings: [
+                .linkedFramework("IOBluetooth", .when(platforms: [.macOS]))
             ]
         )
     ]

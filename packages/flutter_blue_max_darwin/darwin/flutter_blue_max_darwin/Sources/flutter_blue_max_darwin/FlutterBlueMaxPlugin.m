@@ -5,6 +5,10 @@
 #import "./include/flutter_blue_max_darwin/FlutterBlueMaxPlugin.h"
 #include <Foundation/NSObjCRuntime.h>
 
+#if TARGET_OS_OSX
+#import <IOBluetooth/IOBluetooth.h>
+#endif
+
 #define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBP-iOS] " FORMAT, ##__VA_ARGS__]
 
 NSString * const CCCD = @"2902";
@@ -311,9 +315,9 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     #if TARGET_OS_IOS
             result([[UIDevice currentDevice] name]);
     #else // MacOS
-            // TODO: support this via hostname?
-            result(@"Mac Bluetooth Adapter");
+            result([[IOBluetoothHostController defaultController] nameAsString] ?: @"");
     #endif
+            return;
         }
         if ([@"getAdapterState" isEqualToString:call.method])
         {

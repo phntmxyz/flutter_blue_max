@@ -18,6 +18,7 @@ void main() {
   testWidgets('desktop: discover GATT, validate PSM and preserve server across navigation', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
+    robot.expectLocalDeviceName();
     await robot.scanForPeripheral();
     await robot.inspectPeripheral();
     await robot.readAndWriteCharacteristic();
@@ -37,6 +38,7 @@ void main() {
   testWidgets('phone: local server is available without selecting a peripheral', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
+    robot.expectLocalDeviceName();
     await robot.openLocalServer();
     await robot.startServer();
     await robot.openActivity();

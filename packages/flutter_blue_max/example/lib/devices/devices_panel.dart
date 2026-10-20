@@ -70,6 +70,10 @@ class _DevicesPanelState extends State<DevicesPanel> {
                   Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 6),
                   Text('Explore advertisements and GATT services.', style: Theme.of(context).textTheme.bodySmall),
+                  if (c.localName?.isNotEmpty ?? false) ...[
+                    const SizedBox(height: 6),
+                    Text('This device: ${c.localName}', style: Theme.of(context).textTheme.bodySmall),
+                  ],
                   const SizedBox(height: 20),
                   TextField(
                     onChanged: c.setQuery,

@@ -89,6 +89,11 @@ class WorkbenchRobot {
 
   Future<void> connectSelected() => tapLabel('Connect');
 
+  void expectLocalDeviceName() {
+    logEvent('Verify the local device name in discovery');
+    spotText('This device: Test workstation', exact: true).existsOnce();
+  }
+
   void expectConnectionRequired() {
     logEvent('Verify that the device must be connected before entering a remote PSM');
     spotText('Connect this device above to open an L2CAP channel.', exact: true).existsOnce();

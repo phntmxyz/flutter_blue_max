@@ -23,6 +23,9 @@ class WorkbenchController extends ChangeNotifier {
   bool _cancelConnection = false;
 
   BluetoothAdapterState adapter = BluetoothAdapterState.unknown;
+
+  /// The local Bluetooth name shown alongside nearby devices.
+  String? localName;
   List<ScanResult> scanResults = [];
   BluetoothDevice? selected;
   bool scanning = false;
@@ -131,6 +134,9 @@ class WorkbenchController extends ChangeNotifier {
       _subscriptions.add(
         FlutterBlueMax.adapterState.listen((state) {
           adapter = state;
+          if (state == BluetoothAdapterState.on && localName == null) {
+            unawaited(_loadLocalName());
+          }
           if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
             _channels.clear();
             _services.clear();
@@ -144,6 +150,16 @@ class WorkbenchController extends ChangeNotifier {
 
   void setQuery(String value) {
     query = value;
+    _update();
+  }
+
+  Future<void> _loadLocalName() async {
+    try {
+      localName = (await FlutterBlueMax.adapterName).trim();
+    } catch (exception, stackTrace) {
+      log('Local device name: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
     _update();
   }
 

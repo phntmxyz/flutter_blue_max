@@ -51,6 +51,7 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
 ## Workspaces
 
 - **Devices:** scan for 15 seconds, pull to refresh, filter by name, identifier or service UUID, and inspect advertisements and signal strength.
+  The discovery header also shows this device's local Bluetooth name when available.
   System-connected devices are queried on each scan, including peers connected through another app.
   As in the original example, Apple system-device lookup uses the Battery Service UUID (`180F`).
   Pending connections can be cancelled; broadcast-only advertisements cannot be connected.
