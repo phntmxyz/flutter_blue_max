@@ -1,6 +1,9 @@
 name: Build example downloads
 
 on:
+  push:
+    tags:
+      - 'example-test/**'
   workflow_dispatch:
     inputs:
       platform:
@@ -35,7 +38,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: >-
-          ${{ fromJSON(inputs.platform == 'all' && '["android","ios","macos","linux"]' ||
+          ${{ fromJSON((inputs.platform || 'all') == 'all' && '["android","ios","macos","linux"]' ||
           format('["{0}"]', inputs.platform)) }}
     steps:
       - name: Check out source

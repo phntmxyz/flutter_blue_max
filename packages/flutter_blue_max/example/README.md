@@ -27,8 +27,19 @@ The iOS Simulator can validate layout and builds, but cannot test Bluetooth comm
 The [Build example downloads](../../../.github/workflows/example_build.yml) workflow runs manually through **Actions → Build example downloads → Run workflow**.
 Select a branch and either `all` or one platform.
 After the run, download the files from **Artifacts** or the links in the job summaries; downloads are retained for 14 days.
-GitHub requires the workflow to exist on the repository's default branch before its manual trigger is available.
+GitHub requires the workflow on the repository's default branch to show the **Run workflow** button.
 See [GitHub's manual workflow instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow).
+
+To test a branch before merging the workflow, check out that branch and deliberately push a new `example-test/` tag:
+
+```sh
+git tag example-test/my-build HEAD
+git push origin refs/tags/example-test/my-build
+```
+
+Choose a unique tag name for each build.
+These tags build all four platforms from the tagged commit; ordinary branch pushes do not start builds.
+The [tag push trigger](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push) works with workflows that have not been merged into the default branch.
 
 | Platform | Download | Usage |
 | --- | --- | --- |
