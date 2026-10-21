@@ -1,0 +1,12 @@
+# Local development only — applied by `pub get`, ignored by `pub publish`.
+dependency_overrides:
+  flutter_blue_max_platform_interface:
+    path: ../flutter_blue_max_platform_interface
+  flutter_blue_max_android:
+    path: ../flutter_blue_max_android
+  flutter_blue_max_darwin:
+    path: ../flutter_blue_max_darwin
+  flutter_blue_max_linux:
+    path: ../flutter_blue_max_linux
+  flutter_blue_max_web:
+    path: ../flutter_blue_max_web

@@ -1,6 +1,6 @@
 name: flutter_blue_max_platform_interface
 description: A common platform interface for the flutter_blue_max plugin.
-version: 5.0.0
+version: 6.0.0
 homepage: https://github.com/phntmxyz/flutter_blue_max
 
 environment:

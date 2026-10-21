@@ -37,6 +37,7 @@ import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.ParcelUuid;
+import android.os.SystemClock;
 import android.provider.Settings;
 import android.util.Log;
 import android.util.SparseArray;
@@ -362,6 +363,27 @@ public class FlutterBlueMaxPlugin implements
             }
             if (l2CapChannelManager == null) {
                 l2CapChannelManager = new L2CapChannelManager(mBluetoothAdapter, deviceConnectedCallback, dataReceivedCallback, channelClosedCallback, this);
+            }
+
+            // defer gatt traffic while any device is bonding (increases reliability)
+            switch (call.method) {
+                case "connect":
+                case "discoverServices":
+                case "readCharacteristic":
+                case "writeCharacteristic":
+                case "readDescriptor":
+                case "writeDescriptor":
+                case "setNotifyValue":
+                case "requestMtu":
+                case "readRssi":
+                case "requestConnectionPriority":
+                case "setPreferredPhy":
+                    if (deferWhileBonding(call, result)) {
+                        // this call is re-invoked once bonding completes.
+                        // mMethodCallMutex is released by the finally below
+                        return;
+                    }
+                    break;
             }
 
             switch (call.method) {
@@ -770,9 +792,6 @@ public class FlutterBlueMaxPlugin implements
                             return;
                         }
 
-                        // wait if any device is bonding (increases reliability)
-                        waitIfBonding();
-
                         // connect
                         BluetoothGatt gatt = null;
                         BluetoothDevice device = mBluetoothAdapter.getRemoteDevice(remoteId);
@@ -889,9 +908,6 @@ public class FlutterBlueMaxPlugin implements
                         break;
                     }
 
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
-
                     // discover services
                     if(gatt.discoverServices() == false) {
                         result.error("discoverServices", "gatt.discoverServices() returned false", null);
@@ -919,9 +935,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("readCharacteristic", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // find characteristic
                     ChrFound found = locateCharacteristic(gatt, serviceUuid, characteristicUuid, primaryServiceUuid, instanceId);
@@ -973,9 +986,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("writeCharacteristic", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // find characteristic
                     ChrFound found = locateCharacteristic(gatt, serviceUuid, characteristicUuid, primaryServiceUuid, instanceId);
@@ -1068,9 +1078,6 @@ public class FlutterBlueMaxPlugin implements
                         break;
                     }
 
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
-
                     // find characteristic
                     ChrFound found = locateCharacteristic(gatt, serviceUuid, characteristicUuid, primaryServiceUuid, instanceId);
                     if (found.error != null) {
@@ -1117,9 +1124,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("writeDescriptor", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // find characteristic
                     ChrFound found = locateCharacteristic(gatt, serviceUuid, characteristicUuid, primaryServiceUuid, instanceId);
@@ -1199,9 +1203,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("setNotifyValue", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // find characteristic
                     ChrFound found = locateCharacteristic(gatt, serviceUuid, characteristicUuid, primaryServiceUuid, instanceId);
@@ -1310,9 +1311,6 @@ public class FlutterBlueMaxPlugin implements
                         break;
                     }
 
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
-
                     // request mtu
                     if(gatt.requestMtu(mtu) == false) {
                         result.error("requestMtu", "gatt.requestMtu() returned false", null);
@@ -1333,9 +1331,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("readRssi", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // read rssi
                     if(gatt.readRemoteRssi() == false) {
@@ -1360,9 +1355,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("requestConnectionPriority", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     int cpInteger = bmConnectionPriorityParse(connectionPriority);
 
@@ -1416,9 +1408,6 @@ public class FlutterBlueMaxPlugin implements
                         result.error("setPreferredPhy", "device is disconnected", null);
                         break;
                     }
-
-                    // wait if any device is bonding (increases reliability)
-                    waitIfBonding();
 
                     // set preferred phy
                     gatt.setPreferredPhy(txPhy, rxPhy, phyOptions);
@@ -1803,19 +1792,39 @@ public class FlutterBlueMaxPlugin implements
     //  ██████      ██     ██  ███████  ███████
 
     // for highest reliability, it is recommended to not do
-    // anything while the device is busy bonding.
-    private void waitIfBonding() {
-        int counter = 0;
-        while (mBondingDevices.isEmpty() == false) {
-            if (counter == 0) {
-                log(LogLevel.DEBUG, "[FBP] waiting for bonding to complete...");
+    // anything while a device is busy bonding. This wait must not block:
+    // the bond-state broadcast that ends it is delivered on this same
+    // (main) thread, so sleeping here would deadlock and ANR. Instead the
+    // whole method call is re-posted once bonding completes, with a cap
+    // in case the broadcast never arrives.
+    private static final long MAX_BONDING_WAIT_MS = 30000;
+    private final Set<Result> mBondingWaitExpired = Collections.newSetFromMap(new ConcurrentHashMap<>());
+
+    private boolean deferWhileBonding(MethodCall call, Result result) {
+        boolean waitExpired = mBondingWaitExpired.remove(result);
+        if (waitExpired || mBondingDevices.isEmpty()) {
+            return false;
+        }
+        log(LogLevel.DEBUG, "[FBP] waiting for bonding to complete...");
+        long deadline = SystemClock.uptimeMillis() + MAX_BONDING_WAIT_MS;
+        Handler handler = new Handler(Looper.getMainLooper());
+        handler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (mBondingDevices.isEmpty() == false && SystemClock.uptimeMillis() < deadline) {
+                    handler.postDelayed(this, 50);
+                    return;
+                }
+                if (mBondingDevices.isEmpty()) {
+                    log(LogLevel.DEBUG, "[FBP] bonding completed");
+                } else {
+                    log(LogLevel.WARNING, "[FBP] bonding still not complete after " + MAX_BONDING_WAIT_MS + "ms - proceeding anyway");
+                    mBondingWaitExpired.add(result);
+                }
+                onMethodCall(call, result);
             }
-            try{Thread.sleep(50);}catch(Exception e){}
-            counter++;
-        }
-        if (counter > 0) {
-            log(LogLevel.DEBUG, "[FBP] bonding completed");
-        }
+        }, 50);
+        return true;
     }
 
     class ChrFound {

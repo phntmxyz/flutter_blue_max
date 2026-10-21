@@ -44,7 +44,8 @@ class BluetoothDescriptor {
   ///   - anytime `write()` is called
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key = "$serviceUuid:$characteristicUuid:$descriptorUuid:${instanceId ?? 'noinst'}";
+    String key =
+        FlutterBlueMax._descCacheKey(serviceUuid, characteristicUuid, descriptorUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastDescs[remoteId]?[key] ?? [];
   }
 
@@ -195,8 +196,8 @@ class BluetoothDescriptor {
         'serviceUuid: $serviceUuid, '
         'characteristicUuid: $characteristicUuid, '
         'descriptorUuid: $descriptorUuid, '
-        'primaryServiceUuid: $primaryServiceUuid'
-        'instanceId: $instanceId'
+        'primaryServiceUuid: $primaryServiceUuid, '
+        'instanceId: $instanceId, '
         'lastValue: $lastValue'
         '}';
   }

@@ -1,5 +1,5 @@
-## 5.0.0
-* First public release as `flutter_blue_max_linux` (fork of `flutter_blue_plus_linux`). Version numbers below 5.0.0 refer to the original FlutterBluePlus history. No functional changes; L2CAP is not supported on Linux.
+## 6.0.0
+* First public release as `flutter_blue_max_linux` (fork of `flutter_blue_plus_linux`). Version numbers below 6.0.0 refer to the original FlutterBluePlus history and are not published under this name. No functional changes; L2CAP is not supported on Linux.
 
 ## 3.0.2
 * Return unknown state if adaptors list empty (#1190)

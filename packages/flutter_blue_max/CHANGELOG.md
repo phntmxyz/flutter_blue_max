@@ -1,6 +1,6 @@
-## 1.35.10
+## 2.0.0
 
-First public release of `flutter_blue_max`, the [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) fork maintained by [PHNTM](https://github.com/phntmxyz). Version numbers below 1.35.10 refer to the original FlutterBluePlus history.
+First public release of `flutter_blue_max`, the [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) fork maintained by [PHNTM](https://github.com/phntmxyz). Version numbers below 2.0.0 refer to the original FlutterBluePlus history and are not published under this name.
 
 * **[Feature]** L2CAP CoC support on iOS, macOS & Android — client & server. See [L2CAP_README.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/L2CAP_README.md)
   * `device.openL2CapChannel()` returns a `BluetoothL2capChannel` with `write`, `read`, `close`, `onL2CapChannelReceived` and `onClosed`
