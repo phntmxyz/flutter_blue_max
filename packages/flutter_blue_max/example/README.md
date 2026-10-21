@@ -1,26 +1,39 @@
 # Blue Max Bluetooth workbench
 
-A Material 3 example for exploring real Bluetooth peripherals on Android, iOS and macOS.
+A Material 3 example for exploring real Bluetooth peripherals on Android, iOS, macOS and Linux.
 It uses the local packages in this repository through `pubspec_overrides.yaml`.
 
 ## Run
 
-Use the Flutter 3.47.7 Puro environment from this directory:
+Tested with **Flutter 3.47.7 / Dart 3.13.5**.
+The minimum declared in `pubspec.yaml` is **Flutter 3.47.0 / Dart 3.13.0**.
+From the repository root:
 
 ```sh
-puro -e 3.47.7 flutter pub get
-puro -e 3.47.7 flutter run -d macos
+cd packages/flutter_blue_max/example
+flutter pub get
+flutter devices
 ```
 
-For Android or a physical iPhone, select the device reported by:
+Replace `<device-id>` below with the ID from `flutter devices`.
 
-```sh
-puro -e 3.47.7 flutter devices
-puro -e 3.47.7 flutter run -d <device-id>
-```
+| Platform | Start from the example directory | Current functionality |
+| --- | --- | --- |
+| Android 7+ | `flutter run -d <device-id>` | Scan, GATT, bonding and MTU requests; L2CAP client/server requires Android 10+. |
+| iPhone / iPad, iOS 15+ | `flutter run -d <device-id>` | Scan, GATT and L2CAP client/server. |
+| iOS Simulator | Start Simulator, then `flutter run -d <device-id>` | UI and build checks only; no real Bluetooth communication. |
+| macOS 12+ | `flutter run -d macos --debug` | Scan, GATT and L2CAP client/server; use debug mode with the tested Flutter version. |
+| Linux | `flutter run -d linux` | Scan and GATT backend; no L2CAP client/server. |
+| Windows | Not available | No example runner or Windows Bluetooth backend. |
+| Web | Not available | No example runner; a separate web backend exists, without L2CAP. |
 
-Select your development team in Xcode before running on a physical iPhone.
-The iOS Simulator can validate layout and builds, but cannot test Bluetooth communication.
+- Android: install the Android SDK/JDK, enable USB debugging and grant Bluetooth permissions; Android 7–11 also needs location permission/services for scanning.
+- iOS: build on macOS with Xcode and select a development team in `ios/Runner.xcodeproj` for a physical device; start Simulator with `open -a Simulator`.
+- macOS: install Xcode and allow Bluetooth access when prompted.
+- Linux: build on Linux with Clang, CMake, Ninja, pkg-config and GTK 3 development libraries; Bluetooth requires BlueZ and a usable adapter.
+
+The table describes implementation support, not completed hardware validation on every platform.
+Known UI limitation: L2CAP controls are still visible on Linux and older Android devices; unsupported calls show a dismissible error.
 
 ## Download builds from GitHub Actions
 
@@ -48,8 +61,7 @@ The [tag push trigger](https://docs.github.com/en/actions/reference/workflows-an
 | macOS | `blue-max-macos-arm64-debug.tar.gz` | Extract `Blue Max.app` and open it on an Apple Silicon Mac. |
 | Linux | `blue-max-linux-x64-release.tar.gz` | Extract the complete `bundle` directory and run `bundle/flutter_blue_max_example`. |
 
-The workflow installs [Puro2](https://puro2.phntm.xyz/) and pins Flutter 3.47.7 through `FLUTTER_VERSION`.
-Local `.puro.json` files are not tracked and are not required by CI.
+The workflow pins Flutter 3.47.7 through `FLUTTER_VERSION`.
 It builds the local package implementations from the selected checkout and does not publish packages or releases.
 The existing `Publish Flutter Blue Plus…` workflows publish library packages to pub.dev when their version tags are pushed.
 Windows and web are omitted because this sample has no runner for either platform.
@@ -70,7 +82,8 @@ xcrun simctl install booted Runner.app
 
 | Component | Example configuration |
 | --- | --- |
-| Flutter / Dart | 3.47.7 / 3.13.5 |
+| Flutter / Dart tested | 3.47.7 / 3.13.5 |
+| Flutter / Dart minimum (`pubspec.yaml`) | 3.47.0 / 3.13.0 |
 | Android Gradle Plugin / Gradle | 9.4.1 / 9.6.0 |
 | Kotlin | 2.4.0, with AGP built-in Kotlin |
 | Java | JDK 17 or newer; app bytecode targets Java 17 |
@@ -204,11 +217,11 @@ Received values are stream chunks, not application message boundaries.
 ## Verification
 
 ```sh
-puro -e 3.47.7 flutter analyze
-puro -e 3.47.7 flutter test
-puro -e 3.47.7 flutter build apk --debug
-puro -e 3.47.7 flutter build ios --simulator --debug
-puro -e 3.47.7 flutter build macos --debug
+flutter analyze
+flutter test
+flutter build apk --debug
+flutter build ios --simulator --debug
+flutter build macos --debug
 ```
 
 Tests import the production files in `lib/` and run the actual `flutter_blue_max` API.
@@ -222,6 +235,6 @@ They do not replace hardware validation of the Android or CoreBluetooth implemen
 ### macOS release compiler limitation
 
 With Flutter 3.47.2 and 3.47.7, this app's macOS release build currently aborts in Flutter's AOT snapshot generator with `Class with illegal cid` for `_window_macos.dart` / `_Rect`.
-This matches the open [Flutter issue #191575](https://github.com/flutter/flutter/issues/191575).
-The macOS debug build and real Bluetooth scanning work; use `puro -e 3.47.7 flutter run -d macos` for hardware testing.
+This matches [Flutter issue #191575](https://github.com/flutter/flutter/issues/191575).
+The macOS debug build and real Bluetooth scanning work; use `flutter run -d macos --debug` for hardware testing.
 No application-code or SDK patches are applied to hide the compiler failure.
