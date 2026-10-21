@@ -136,6 +136,24 @@ class WorkbenchRobot {
   Future<void> stopServer() => tapLabel('Stop server');
   Future<void> openActivity() => tapLabel('Activity');
 
+  Future<void> rejectUnsupportedServer() async {
+    logEvent('Report an unsupported server from the platform boundary');
+    platform.l2capFailure = UnimplementedError();
+    addTearDown(() => platform.l2capFailure = null);
+    await startServer();
+    spotText('This operation is not supported on this device.', exact: true).existsOnce();
+    expect(controller.serverPsm, isNull);
+    expect(controller.busy('server'), isFalse);
+  }
+
+  Future<void> dismissUnsupportedError() async {
+    logEvent('Dismiss the unsupported-operation message');
+    final close = spot<IconButton>().withTooltip('Dismiss error')..existsOnce();
+    await act.tap(close);
+    await idle();
+    spotText('This operation is not supported on this device.', exact: true).doesNotExist();
+  }
+
   Future<void> filterWithKeyboard() async {
     logEvent('Filter devices while the phone keyboard reduces the viewport');
     final field = spot<TextField>()..existsOnce();

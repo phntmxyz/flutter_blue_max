@@ -25,6 +25,7 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   bool includeGattExtras = false;
   bool failNextOpen = false;
   bool disconnectOnOpenFailure = false;
+  Object? l2capFailure;
   final connectRequests = <BmConnectRequest>[];
   final systemDeviceRequests = <BmSystemDevicesRequest>[];
   final openRequests = <OpenL2CapChannelRequest>[];
@@ -295,6 +296,10 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Future<int> listenL2CapChannel(ListenL2CapChannelRequest request) async {
     serverStarts++;
+    final failure = l2capFailure;
+    if (failure != null) {
+      throw failure;
+    }
     return pendingServer?.future ?? 129;
   }
 
@@ -344,6 +349,10 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Future<void> openL2CapChannel(OpenL2CapChannelRequest request) async {
     openRequests.add(request);
+    final failure = l2capFailure;
+    if (failure != null) {
+      throw failure;
+    }
     if (failNextOpen) {
       failNextOpen = false;
       if (disconnectOnOpenFailure) {

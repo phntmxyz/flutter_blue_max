@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
@@ -329,7 +330,7 @@ class WorkbenchController extends ChangeNotifier {
     try {
       channel = await device.openL2CapChannel(psm, secure: secure);
     } catch (error, stackTrace) {
-      if (_disposed || !ready) {
+      if (_disposed || !ready || _isUnsupported(error)) {
         Error.throwWithStackTrace(error, stackTrace);
       }
       log('L2CAP open failed; retrying once: $error');
@@ -400,8 +401,12 @@ class WorkbenchController extends ChangeNotifier {
     try {
       await action();
     } catch (exception, stackTrace) {
-      error = '$operation: $exception';
-      log('ERROR $error');
+      if (_isUnsupported(exception)) {
+        error = 'This operation is not supported on this device.';
+      } else {
+        error = '$operation: $exception';
+      }
+      log('ERROR $operation: $exception');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _busy.remove(operation);
@@ -471,4 +476,18 @@ class WorkbenchController extends ChangeNotifier {
       }
     }
   }
+}
+
+// Match typed failures and the native Android capability error, not arbitrary
+// error text: permission and connection failures must remain retryable.
+bool _isUnsupported(Object exception) {
+  if (exception is UnsupportedError || exception is UnimplementedError) {
+    return true;
+  }
+  if (exception is PlatformException) {
+    return exception.code == 'platform_not_supported';
+  }
+  return exception is FlutterBlueMaxException &&
+      exception.platform == ErrorPlatform.fbp &&
+      (exception.code == FbpErrorCode.androidOnly.index || exception.code == FbpErrorCode.applePlatformOnly.index);
 }

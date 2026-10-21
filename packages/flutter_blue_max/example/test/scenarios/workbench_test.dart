@@ -98,4 +98,16 @@ void main() {
     await robot.openL2cap();
     await robot.expectOnlySelectedChannel();
   });
+
+  testWidgets('unsupported server reports a dismissible message and GATT remains usable', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.openLocalServer();
+    await robot.rejectUnsupportedServer();
+    await robot.dismissUnsupportedError();
+    await robot.tapLabel('Devices');
+    await robot.scanForPeripheral();
+    await robot.inspectPeripheral();
+    await robot.readAndWriteCharacteristic();
+  });
 }

@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -100,6 +101,45 @@ void main() {
     expect(controller.logs, hasLength(WorkbenchController.maxLogEntries));
     expect(controller.logs.first, endsWith('entry 10'));
   });
+
+  test('an unimplemented server reports unsupported without leaving a pending session', () async {
+    final (:controller, :platform) = await _setup();
+    platform.l2capFailure = UnimplementedError();
+    addTearDown(() => platform.l2capFailure = null);
+
+    await controller.startServer(secure: true);
+
+    expect(controller.error, 'This operation is not supported on this device.');
+    expect(controller.serverPsm, isNull);
+    expect(controller.channels, isEmpty);
+    expect(controller.busy('server'), isFalse);
+    expect(controller.logs.last, contains('UnimplementedError'));
+  });
+
+  for (final failure in [
+    UnimplementedError(),
+    UnsupportedError('L2CAP is unavailable'),
+    PlatformException(code: 'platform_not_supported', message: 'Requires Android 10 or newer.'),
+  ]) {
+    test('unsupported channel errors are shown without retrying: ${failure.runtimeType}', () async {
+      final (:controller, :platform) = await _setup();
+      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:04');
+      controller.select(peer);
+      await controller.connect();
+      final before = platform.openRequests.length;
+      platform.l2capFailure = failure;
+      addTearDown(() => platform.l2capFailure = null);
+
+      await controller.openChannel(131, device: peer, secure: true);
+
+      expect(platform.openRequests, hasLength(before + 1));
+      expect(controller.error, 'This operation is not supported on this device.');
+      expect(controller.channels, isEmpty);
+      expect(controller.busy('open'), isFalse);
+      expect(peer.isConnected, isTrue);
+      expect(controller.logs.last, contains(failure.toString()));
+    });
+  }
 }
 
 Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setup({bool dispose = true}) async {

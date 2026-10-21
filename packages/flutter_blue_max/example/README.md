@@ -115,7 +115,8 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
   Both incoming and outgoing channels expose buffered reads, a patterned 10 KB test write and a 20 × 1 KB burst.
   Buffered reads may repeat data already delivered by the stream, so they are labelled separately and do not increment the stream RX counter.
   The burst submits concurrent public-API calls; the library controls their native serialization.
-  Failed channel opens are retried once, reconnecting the original peer if necessary.
+  Failed channel opens are retried once, reconnecting the original peer if necessary, unless the platform reports that the operation is unsupported.
+  Unsupported operations show a dismissible explanation; the original error remains in Activity for diagnosis.
   Channel identity includes both the peer and PSM.
 - **Activity:** search and copy the most recent 500 log entries, including native diagnostics and payload previews.
 
