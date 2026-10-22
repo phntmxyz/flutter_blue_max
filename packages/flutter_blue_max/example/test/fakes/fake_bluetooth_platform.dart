@@ -46,9 +46,16 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   int turnOnRequests = 0;
   int scanStarts = 0;
 
+  Future<BmBluetoothAdapterName> Function(BmBluetoothAdapterNameRequest request)? overrideGetAdapterName;
+
   @override
-  Future<BmBluetoothAdapterName> getAdapterName(BmBluetoothAdapterNameRequest request) async =>
-      BmBluetoothAdapterName(adapterName: 'Test workstation');
+  Future<BmBluetoothAdapterName> getAdapterName(BmBluetoothAdapterNameRequest request) async {
+    final override = overrideGetAdapterName;
+    if (override != null) {
+      return await override(request);
+    }
+    return BmBluetoothAdapterName(adapterName: 'Test workstation');
+  }
 
   @override
   Stream<BmReadRssiResult> get onReadRssi => rssiValues.stream;
@@ -59,22 +66,40 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Stream<BmTurnOnResponse> get onTurnOnResponse => turnOnResponses.stream;
 
+  Future<BmDevicesList> Function(BmSystemDevicesRequest request)? overrideGetSystemDevices;
+
   @override
   Future<BmDevicesList> getSystemDevices(BmSystemDevicesRequest request) async {
+    final override = overrideGetSystemDevices;
+    if (override != null) {
+      return await override(request);
+    }
     systemDeviceRequests.add(request);
     return BmDevicesList(devices: List.of(systemPeers));
   }
 
+  Future<bool> Function(BmTurnOnRequest request)? overrideTurnOn;
+
   @override
   Future<bool> turnOn(BmTurnOnRequest request) async {
+    final override = overrideTurnOn;
+    if (override != null) {
+      return await override(request);
+    }
     turnOnRequests++;
     turnOnResponses.add(BmTurnOnResponse(userAccepted: true));
     adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
     return true;
   }
 
+  Future<bool> Function(BmReadRssiRequest request)? overrideReadRssi;
+
   @override
   Future<bool> readRssi(BmReadRssiRequest request) async {
+    final override = overrideReadRssi;
+    if (override != null) {
+      return await override(request);
+    }
     rssiRequests.add(request);
     rssiValues.add(
       BmReadRssiResult(remoteId: request.remoteId, rssi: -47, success: true, errorCode: 0, errorString: ''),
@@ -82,16 +107,28 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<List<int>> Function(ReadL2CapChannelRequest request)? overrideReadL2CapChannel;
+
   @override
   Future<List<int>> readL2CapChannel(ReadL2CapChannelRequest request) async {
+    final override = overrideReadL2CapChannel;
+    if (override != null) {
+      return await override(request);
+    }
     readRequests.add(request);
     final bytes = bufferedBytes;
     bufferedBytes = [];
     return bytes;
   }
 
+  Future<bool> Function(BmReadDescriptorRequest request)? overrideReadDescriptor;
+
   @override
   Future<bool> readDescriptor(BmReadDescriptorRequest request) async {
+    final override = overrideReadDescriptor;
+    if (override != null) {
+      return await override(request);
+    }
     descriptorRead.add(
       BmDescriptorData(
         remoteId: request.remoteId,
@@ -109,8 +146,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<bool> Function(BmWriteDescriptorRequest request)? overrideWriteDescriptor;
+
   @override
   Future<bool> writeDescriptor(BmWriteDescriptorRequest request) async {
+    final override = overrideWriteDescriptor;
+    if (override != null) {
+      return await override(request);
+    }
     descriptorWrites.add(request);
     descriptorWritten.add(
       BmDescriptorData(
@@ -129,8 +172,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<bool> Function(BmSetNotifyValueRequest request)? overrideSetNotifyValue;
+
   @override
   Future<bool> setNotifyValue(BmSetNotifyValueRequest request) async {
+    final override = overrideSetNotifyValue;
+    if (override != null) {
+      return await override(request);
+    }
     notifyRequests.add(request);
     if (!emitNotifyDescriptorEvents) {
       return false;
@@ -171,20 +220,51 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Stream<L2CapChannelClosed> get onL2CapChannelClosed => closed.stream;
 
+  Future<BmBluetoothAdapterState> Function(BmBluetoothAdapterStateRequest request)? overrideGetAdapterState;
+
   @override
-  Future<BmBluetoothAdapterState> getAdapterState(BmBluetoothAdapterStateRequest request) async =>
-      BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on);
+  Future<BmBluetoothAdapterState> getAdapterState(BmBluetoothAdapterStateRequest request) async {
+    final override = overrideGetAdapterState;
+    if (override != null) {
+      return await override(request);
+    }
+    return BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on);
+  }
+
+  Future<bool> Function(BmSetLogLevelRequest request)? overrideSetLogLevel;
+
   @override
-  Future<bool> setLogLevel(BmSetLogLevelRequest request) async => true;
+  Future<bool> setLogLevel(BmSetLogLevelRequest request) async {
+    final override = overrideSetLogLevel;
+    if (override != null) {
+      return await override(request);
+    }
+    return true;
+  }
+
+  Future<bool> Function(BmScanSettings request)? overrideStartScan;
+
   @override
   Future<bool> startScan(BmScanSettings request) async {
+    final override = overrideStartScan;
+    if (override != null) {
+      return await override(request);
+    }
     scanStarts++;
     scanRequests.add(request);
     return true;
   }
 
+  Future<bool> Function(BmStopScanRequest request)? overrideStopScan;
+
   @override
-  Future<bool> stopScan(BmStopScanRequest request) async => true;
+  Future<bool> stopScan(BmStopScanRequest request) async {
+    final override = overrideStopScan;
+    if (override != null) {
+      return await override(request);
+    }
+    return true;
+  }
 
   void advertise({
     String id = 'AA:BB:CC:DD:EE:01',
@@ -216,8 +296,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     );
   }
 
+  Future<bool> Function(BmConnectRequest request)? overrideConnect;
+
   @override
   Future<bool> connect(BmConnectRequest request) async {
+    final override = overrideConnect;
+    if (override != null) {
+      return await override(request);
+    }
     connectRequests.add(request);
     if (holdConnections) {
       return true;
@@ -234,8 +320,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<bool> Function(BmDisconnectRequest request)? overrideDisconnect;
+
   @override
   Future<bool> disconnect(BmDisconnectRequest request) async {
+    final override = overrideDisconnect;
+    if (override != null) {
+      return await override(request);
+    }
     connected.remove(request.remoteId);
     connections.add(
       BmConnectionStateResponse(
@@ -248,8 +340,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<bool> Function(BmDiscoverServicesRequest request)? overrideDiscoverServices;
+
   @override
   Future<bool> discoverServices(BmDiscoverServicesRequest request) async {
+    final override = overrideDiscoverServices;
+    if (override != null) {
+      return await override(request);
+    }
     discoveries.add(
       BmDiscoverServicesResult(
         remoteId: request.remoteId,
@@ -301,8 +399,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<int> Function(ListenL2CapChannelRequest request)? overrideListenL2CapChannel;
+
   @override
   Future<int> listenL2CapChannel(ListenL2CapChannelRequest request) async {
+    final override = overrideListenL2CapChannel;
+    if (override != null) {
+      return await override(request);
+    }
     serverStarts++;
     final failure = l2capFailure;
     if (failure != null) {
@@ -311,8 +415,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return pendingServer?.future ?? 129;
   }
 
+  Future<bool> Function(BmReadCharacteristicRequest request)? overrideReadCharacteristic;
+
   @override
   Future<bool> readCharacteristic(BmReadCharacteristicRequest request) async {
+    final override = overrideReadCharacteristic;
+    if (override != null) {
+      return await override(request);
+    }
     characteristicReads.add(request);
     characteristicValues.add(
       BmCharacteristicData(
@@ -330,8 +440,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<bool> Function(BmWriteCharacteristicRequest request)? overrideWriteCharacteristic;
+
   @override
   Future<bool> writeCharacteristic(BmWriteCharacteristicRequest request) async {
+    final override = overrideWriteCharacteristic;
+    if (override != null) {
+      return await override(request);
+    }
     characteristicWrites.add(request);
     characteristicWritten.add(
       BmCharacteristicData(
@@ -349,13 +465,25 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  Future<void> Function(StopListenL2CapChannelRequest request)? overrideStopL2capServer;
+
   @override
   Future<void> stopL2capServer(StopListenL2CapChannelRequest request) async {
+    final override = overrideStopL2capServer;
+    if (override != null) {
+      return await override(request);
+    }
     stoppedServers.add(request.psm);
   }
 
+  Future<void> Function(OpenL2CapChannelRequest request)? overrideOpenL2CapChannel;
+
   @override
   Future<void> openL2CapChannel(OpenL2CapChannelRequest request) async {
+    final override = overrideOpenL2CapChannel;
+    if (override != null) {
+      return await override(request);
+    }
     openRequests.add(request);
     final failure = l2capFailure;
     if (failure != null) {
@@ -370,14 +498,26 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     }
   }
 
+  Future<void> Function(CloseL2CapChannelRequest request)? overrideCloseL2CapChannel;
+
   @override
   Future<void> closeL2CapChannel(CloseL2CapChannelRequest request) async {
+    final override = overrideCloseL2CapChannel;
+    if (override != null) {
+      return await override(request);
+    }
     closeRequests.add(request);
     closed.add(L2CapChannelClosed(remoteId: DeviceIdentifier(request.remoteId), psm: request.psm));
   }
 
+  Future<void> Function(WriteL2CapChannelRequest request)? overrideWriteL2CapChannel;
+
   @override
   Future<void> writeL2CapChannel(WriteL2CapChannelRequest request) async {
+    final override = overrideWriteL2CapChannel;
+    if (override != null) {
+      return await override(request);
+    }
     if (failNextWrite) {
       failNextWrite = false;
       throw StateError('Peer rejected the write');
