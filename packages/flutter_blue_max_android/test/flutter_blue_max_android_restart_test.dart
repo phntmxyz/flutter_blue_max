@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_android/flutter_blue_max_android.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -122,6 +124,48 @@ void main() {
       expect(supportedCalls, 1);
     });
   }
+  test('timeout releases concurrent callers and allows a retry', () async {
+    var draining = true;
+    var restartCalls = 0;
+    var pollCalls = 0;
+    var supportedCalls = 0;
+    final plugin = createPlugin((call) async {
+      switch (call.method) {
+        case 'flutterRestart':
+          restartCalls++;
+          return draining ? 1 : 0;
+        case 'connectedCount':
+          pollCalls++;
+          return 1;
+        case 'isSupported':
+          supportedCalls++;
+          return true;
+        default:
+          fail('Unexpected method ${call.method}');
+      }
+    });
+
+    // Await the shared handshake itself; do not race it with a shorter timer.
+    final outcomes = await Future.wait([
+      for (var i = 0; i < 2; i++)
+        plugin.isSupported(BmIsSupportedRequest()).then<Object>(
+              (value) => value,
+              onError: (Object error, StackTrace stack) => error,
+            ),
+    ]);
+    expect(outcomes, everyElement(isA<TimeoutException>()));
+    expect(identical(outcomes[0], outcomes[1]), isTrue);
+    expect((outcomes.first as TimeoutException).duration,
+        const Duration(seconds: 10));
+    expect(restartCalls, 1);
+    expect(pollCalls, greaterThan(0));
+    expect(supportedCalls, 0);
+
+    draining = false;
+    expect(await plugin.isSupported(BmIsSupportedRequest()), isTrue);
+    expect(restartCalls, 2);
+    expect(supportedCalls, 1);
+  }, timeout: const Timeout(Duration(seconds: 30)));
 }
 
 FlutterBlueMaxAndroid createPlugin(

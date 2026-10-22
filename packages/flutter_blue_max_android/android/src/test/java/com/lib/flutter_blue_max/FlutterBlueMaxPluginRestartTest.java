@@ -29,6 +29,8 @@ import org.robolectric.RobolectricTestRunner;
 import org.robolectric.RuntimeEnvironment;
 import org.robolectric.annotation.Config;
 import org.robolectric.annotation.LooperMode;
+import org.robolectric.annotation.Implementation;
+import org.robolectric.annotation.Implements;
 import org.robolectric.shadows.ShadowBluetoothGatt;
 import org.robolectric.util.ReflectionHelpers;
 
@@ -169,6 +171,104 @@ public class FlutterBlueMaxPluginRestartTest {
 
         assertTrue(shadowOf(gatt).isClosed());
         assertEquals(0, call("connectedCount"));
+    }
+
+    @Test
+    public void pendingOnlyGattWaitsForTerminalDisconnect() {
+        BluetoothGatt gatt = addPendingGatt();
+        assertTrue(connected.isEmpty());
+
+        assertEquals(1, call("flutterRestart"));
+        assertFalse(shadowOf(gatt).isClosed());
+        callback.onConnectionStateChange(gatt, 0, BluetoothProfile.STATE_DISCONNECTED);
+
+        assertTrue(shadowOf(gatt).isClosed());
+        assertEquals(0, call("connectedCount"));
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(messenger.events.isEmpty());
+    }
+
+    @Test
+    public void pendingGattThatConnectsLateStaysRetired() {
+        BluetoothGatt gatt = addPendingGatt();
+        assertEquals(1, call("flutterRestart"));
+
+        callback.onConnectionStateChange(gatt, 0, BluetoothProfile.STATE_CONNECTED);
+
+        assertTrue(connected.isEmpty());
+        assertEquals(1, call("connectedCount"));
+        assertFalse(shadowOf(gatt).isClosed());
+        callback.onConnectionStateChange(gatt, 0, BluetoothProfile.STATE_DISCONNECTED);
+        assertEquals(0, call("connectedCount"));
+        assertTrue(shadowOf(gatt).isClosed());
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(messenger.events.isEmpty());
+    }
+
+    @Test
+    public void oldConnectionCallbacksCannotRemoveNewPendingGatt() {
+        BluetoothGatt oldGatt = addPendingGatt();
+        assertEquals(1, call("flutterRestart"));
+        callback.onConnectionStateChange(oldGatt, 0, BluetoothProfile.STATE_DISCONNECTED);
+        assertEquals(0, call("connectedCount"));
+        BluetoothGatt newGatt = addPendingGatt();
+        Map<String, BluetoothGatt> pending = ReflectionHelpers.getField(plugin, "mCurrentlyConnectingDevices");
+        assertSame(newGatt, pending.get(REMOTE_ID));
+
+        callback.onConnectionStateChange(oldGatt, 0, BluetoothProfile.STATE_CONNECTED);
+        callback.onConnectionStateChange(oldGatt, 0, BluetoothProfile.STATE_DISCONNECTED);
+
+        assertSame(newGatt, pending.get(REMOTE_ID));
+        assertFalse(shadowOf(newGatt).isClosed());
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(messenger.events.isEmpty());
+        callback.onConnectionStateChange(newGatt, 0, BluetoothProfile.STATE_CONNECTED);
+        assertSame(newGatt, connected.get(REMOTE_ID));
+    }
+
+    @Test
+    public void pendingAutoConnectGattIsCountedOnceAndClosesOnDeadline() {
+        BluetoothGatt gatt = addPendingGatt();
+        Map<String, BluetoothGatt> autoConnect = ReflectionHelpers.getField(plugin, "mAutoConnected");
+        autoConnect.put(REMOTE_ID, gatt);
+        assertSame(gatt, autoConnect.get(REMOTE_ID));
+        assertEquals(1, call("flutterRestart"));
+        assertTrue(autoConnect.isEmpty());
+        long timeout = ReflectionHelpers.getStaticField(FlutterBlueMaxPlugin.class, "HOT_RESTART_DISCONNECT_TIMEOUT_MS");
+
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(timeout));
+
+        assertEquals(0, call("connectedCount"));
+        assertTrue(shadowOf(gatt).isClosed());
+        assertTrue(messenger.events.isEmpty());
+    }
+
+    @Test
+    @Config(shadows = ThrowingDisconnectGattShadow.class)
+    public void disconnectFailureClosesRetiredGattWithoutBlockingRestart() {
+        BluetoothGatt gatt = addPendingGatt();
+        assertFalse(shadowOf(gatt).isClosed());
+
+        assertEquals(0, call("flutterRestart"));
+
+        assertTrue(shadowOf(gatt).isClosed());
+        assertEquals(0, call("connectedCount"));
+    }
+
+    @Implements(BluetoothGatt.class)
+    public static class ThrowingDisconnectGattShadow extends ShadowBluetoothGatt {
+        @Implementation
+        public void disconnect() {
+            throw new IllegalStateException("simulated disconnect failure");
+        }
+    }
+
+    private BluetoothGatt addPendingGatt() {
+        BluetoothGatt gatt = ShadowBluetoothGatt.newInstance(adapter.getRemoteDevice(REMOTE_ID));
+        Map<String, BluetoothGatt> pending = ReflectionHelpers.getField(plugin, "mCurrentlyConnectingDevices");
+        pending.put(REMOTE_ID, gatt);
+        assertSame(gatt, pending.get(REMOTE_ID));
+        return gatt;
     }
 
     private BluetoothGatt addConnectedGatt() {

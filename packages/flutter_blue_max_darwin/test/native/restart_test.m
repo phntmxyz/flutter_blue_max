@@ -187,12 +187,91 @@ static void TestNewSessionEvents(void) {
     NSCAssert([methods isEqual:expected], @"New events missing: %@", methods);
 }
 
+static TestRegistrar *CreatePendingPlugin(TestPeripheral **peripheralOut) {
+    TestRegistrar *registrar = CreatePlugin(peripheralOut);
+    TestPeripheral *peripheral = *peripheralOut;
+    peripheral.state = CBPeripheralStateConnecting;
+    NSMutableDictionary *connected = [registrar.plugin valueForKey:@"connectedPeripherals"];
+    NSMutableDictionary *pending = [registrar.plugin valueForKey:@"currentlyConnectingPeripherals"];
+    [connected removeAllObjects];
+    pending[peripheral.identifier.UUIDString] = peripheral;
+    NSCAssert(connected.count == 0 && pending.count == 1, @"Pending-only setup failed");
+    return registrar;
+}
+
+static void TestPendingConnectionTeardown(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePendingPlugin(&peripheral);
+    TestCentralManager *central = [registrar.plugin valueForKey:@"centralManager"];
+    NSCAssert(central.cancellations == 0, @"Unexpected cancellation before restart");
+
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"Pending connection was not counted");
+    NSCAssert(central.cancellations == 1, @"Pending connection was not cancelled");
+    NSCAssert([Call(registrar.plugin, @"connectedCount") isEqual:@1], @"Pending connection drained too early");
+    peripheral.state = CBPeripheralStateDisconnected;
+    [registrar.plugin centralManager:(id)central didFailToConnectPeripheral:(id)peripheral error:nil];
+
+    NSCAssert([Call(registrar.plugin, @"connectedCount") isEqual:@0], @"Failed connection did not finish teardown");
+    NSCAssert(registrar.messenger.events.count == 0, @"Old failed-connect event reached Dart");
+    [[registrar.plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+static void TestPendingConnectionCompletesDuringRestart(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePendingPlugin(&peripheral);
+    TestCentralManager *central = [registrar.plugin valueForKey:@"centralManager"];
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"Restart did not begin");
+    NSCAssert(central.cancellations == 1, @"Initial cancellation missing");
+
+    peripheral.state = CBPeripheralStateConnected;
+    [registrar.plugin centralManager:(id)central didConnectPeripheral:(id)peripheral];
+
+    NSCAssert(central.cancellations == 2, @"Late connection was not cancelled again");
+    NSCAssert([Call(registrar.plugin, @"connectedCount") isEqual:@1], @"Late connection escaped teardown");
+    NSCAssert([[registrar.plugin valueForKey:@"currentlyConnectingPeripherals"] count] == 0, @"Pending entry was not moved");
+    NSCAssert([[registrar.plugin valueForKey:@"connectedPeripherals"] count] == 1, @"Connected entry was not retained");
+    NSCAssert(registrar.messenger.events.count == 0, @"Old connection event reached Dart");
+    FinishRestart(registrar, peripheral);
+    NSCAssert(registrar.messenger.events.count == 0, @"Old teardown event reached Dart");
+}
+
+static void TestRepeatedRestartRetainsPendingConnection(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePendingPlugin(&peripheral);
+    TestCentralManager *central = [registrar.plugin valueForKey:@"centralManager"];
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"First restart did not count pending connection");
+
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"Second restart lost pending connection");
+    NSCAssert(central.cancellations == 2, @"Second restart did not request cancellation");
+    FinishRestart(registrar, peripheral);
+    NSCAssert(registrar.messenger.events.count == 0, @"Repeated restart leaked teardown events");
+}
+
+static void TestPendingAndConnectedPeripheralIsCountedOnce(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    NSMutableDictionary *pending = [registrar.plugin valueForKey:@"currentlyConnectingPeripherals"];
+    pending[peripheral.identifier.UUIDString] = peripheral;
+    NSCAssert(pending.count == 1 && [[registrar.plugin valueForKey:@"connectedPeripherals"] count] == 1,
+              @"Overlapping connection-map setup failed");
+
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"Peripheral was counted twice");
+    TestCentralManager *central = [registrar.plugin valueForKey:@"centralManager"];
+    NSCAssert(central.cancellations == 1, @"Peripheral was cancelled twice");
+    FinishRestart(registrar, peripheral);
+    NSCAssert(pending.count == 0, @"Pending entry survived terminal disconnect");
+}
+
 int main(void) {
     @autoreleasepool {
         TestMtuTimerDuringRestart();
         TestPeripheralCallbacksDuringRestart();
         TestNewSessionEvents();
-        puts("3 Darwin restart regression tests passed");
+        TestPendingConnectionTeardown();
+        TestPendingConnectionCompletesDuringRestart();
+        TestRepeatedRestartRetainsPendingConnection();
+        TestPendingAndConnectedPeripheralIsCountedOnce();
+        puts("7 Darwin restart regression tests passed");
     }
     return 0;
 }
