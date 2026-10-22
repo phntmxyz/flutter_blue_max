@@ -17,6 +17,7 @@ on:
           - ios
           - macos
           - linux
+          - web
 
 permissions:
   contents: read
@@ -38,7 +39,7 @@ jobs:
       fail-fast: false
       matrix:
         platform: >-
-          ${{ fromJSON((inputs.platform || 'all') == 'all' && '["android","ios","macos","linux"]' ||
+          ${{ fromJSON((inputs.platform || 'all') == 'all' && '["android","ios","macos","linux","web"]' ||
           format('["{0}"]', inputs.platform)) }}
     steps:
       - name: Check out source
@@ -102,6 +103,12 @@ jobs:
         run: |
           puro2 -e "$FLUTTER_VERSION" flutter build linux --release --no-pub
           tar -czf dist/blue-max-linux-x64-release.tar.gz -C build/linux/x64/release bundle
+
+      - name: Build web app
+        if: matrix.platform == 'web'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" flutter build web --release --no-pub
+          tar -czf dist/blue-max-web-release.tar.gz -C build web
 
       - name: Upload download
         id: upload

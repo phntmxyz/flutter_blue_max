@@ -55,7 +55,7 @@ git push origin refs/tags/example-test/my-build
 ```
 
 Choose a unique tag name for each build.
-These tags build all four platforms from the tagged commit; ordinary branch pushes do not start builds.
+These tags build all five platforms from the tagged commit; ordinary branch pushes do not start builds.
 The [tag push trigger](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#push) works with workflows that have not been merged into the default branch.
 
 | Platform | Download | Usage |
@@ -64,12 +64,12 @@ The [tag push trigger](https://docs.github.com/en/actions/reference/workflows-an
 | iOS Simulator | `blue-max-ios-simulator-arm64-debug.tar.gz` | Extract `Runner.app` and install it in an Apple Silicon iOS Simulator. |
 | macOS | `blue-max-macos-arm64-debug.tar.gz` | Extract `Blue Max.app` and open it on an Apple Silicon Mac. |
 | Linux | `blue-max-linux-x64-release.tar.gz` | Extract the complete `bundle` directory and run `bundle/flutter_blue_max_example`. |
+| Web | `blue-max-web-release.tar.gz` | Extract and serve the `web` directory over localhost or HTTPS; see the command below. |
 
 The workflow pins Flutter 3.47.7 through `FLUTTER_VERSION`.
 It builds the local package implementations from the selected checkout and does not publish packages or releases.
 The existing `Publish Flutter Blue Plus…` workflows publish library packages to pub.dev when their version tags are pushed.
-The workflow currently builds the four native platforms above.
-Build the restored web runner locally with `flutter build web`; its output is in `build/web`.
+The workflow builds the four native platforms and web; `web` is also available as a manual platform selection.
 Windows has no example runner or Bluetooth backend.
 
 The macOS download uses debug mode because of the [release compiler limitation](#macos-release-compiler-limitation) below.
@@ -83,6 +83,14 @@ With an iOS Simulator booted, install the extracted app using:
 ```sh
 xcrun simctl install booted Runner.app
 ```
+
+To test the extracted web build locally, run this from the directory containing `web`, then open <http://localhost:8080> in a browser with Web Bluetooth support:
+
+```sh
+python3 -m http.server 8080 --bind 127.0.0.1 --directory web
+```
+
+Opening `index.html` directly from the filesystem does not provide the required web origin.
 
 ## Toolchain and minimum versions
 
