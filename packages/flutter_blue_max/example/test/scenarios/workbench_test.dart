@@ -68,6 +68,7 @@ void main() {
     await robot.scanForPeripheral();
     await robot.inspectPeripheral();
     await robot.returnToDeviceList();
+    await robot.reopenConnectedPeripheral();
   });
 
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {

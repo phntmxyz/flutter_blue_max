@@ -112,7 +112,7 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
   System-connected devices are queried on each scan, including peers connected through another app.
   As in the original example, Apple system-device lookup uses the Battery Service UUID (`180F`).
   Pending connections can be cancelled; broadcast-only advertisements cannot be connected.
-  RSSI is read after connecting, and the Android adapter banner can request that Bluetooth be enabled.
+  RSSI is read after connecting and when reopening a connected device, and the Android adapter banner can request that Bluetooth be enabled.
   Connected devices remain accessible above the result list when a new scan starts.
   Select a device, connect, then choose **GATT** or **L2CAP** in its inspector.
   GATT exposes service discovery, characteristic/descriptor reads and writes, and notifications.

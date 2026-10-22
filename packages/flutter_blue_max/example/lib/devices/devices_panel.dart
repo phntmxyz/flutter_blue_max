@@ -325,7 +325,7 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                     ),
                   ),
                   OutlinedButton.icon(
-                    onPressed: available && !c.busy('rssi') ? c.readRssi : null,
+                    onPressed: available && !c.busy('rssi:${device.remoteId}') ? c.readRssi : null,
                     icon: const Icon(Icons.signal_cellular_alt),
                     label: const Text('Read RSSI'),
                   ),

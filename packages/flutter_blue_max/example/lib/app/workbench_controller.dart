@@ -199,6 +199,9 @@ class WorkbenchController extends ChangeNotifier {
         }),
       );
     }
+    if (device.isConnected) {
+      unawaited(readRssi());
+    }
     _update();
   }
 
@@ -271,13 +274,15 @@ class WorkbenchController extends ChangeNotifier {
     }
   });
 
-  Future<void> readRssi() => run('rssi', () async {
+  Future<void> readRssi() async {
     final device = selected!;
-    final value = await device.readRssi();
-    if (selected == device) {
-      rssi = value;
-    }
-  });
+    await run('rssi:${device.remoteId}', () async {
+      final value = await device.readRssi();
+      if (selected == device) {
+        rssi = value;
+      }
+    });
+  }
 
   Future<void> requestMtu(int value) => run('mtu', () async {
     await selected!.requestMtu(value);

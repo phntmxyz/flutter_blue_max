@@ -187,6 +187,14 @@ class WorkbenchRobot {
     expect(controller.connected, isTrue);
   }
 
+  Future<void> reopenConnectedPeripheral() async {
+    await selectPeripheral();
+    logEvent('Verify that reopening a connected peer refreshes its signal strength');
+    spotText('-47 dBm', exact: true).existsOnce();
+    expect(controller.connected, isTrue);
+    expect(controller.error, isNull);
+  }
+
   void expectListening() {
     logEvent('Verify that server state survives navigation');
     expect(controller.serverPsm, 129);
