@@ -70,9 +70,12 @@ class _DevicesPanelState extends State<DevicesPanel> {
                   Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 6),
                   Text(
-                    kIsWeb
-                        ? 'Choose a device in the browser to explore GATT services.'
-                        : 'Explore advertisements and GATT services.',
+                    (() {
+                      if (kIsWeb) {
+                        return 'Choose a device in the browser to explore GATT services.';
+                      }
+                      return 'Explore advertisements and GATT services.';
+                    })(),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (c.localName?.isNotEmpty ?? false) ...[
@@ -90,11 +93,21 @@ class _DevicesPanelState extends State<DevicesPanel> {
                   const SizedBox(height: 14),
                   SizedBox(
                     width: double.infinity,
-                    child: FilledButton.icon(
-                      onPressed: c.ready && !c.busy('scan') ? c.scan : null,
-                      icon: Icon(c.scanning ? Icons.stop_rounded : Icons.radar_rounded),
-                      label: Text(c.scanning ? 'Stop scan' : 'Start scan'),
-                    ),
+                    child: () {
+                      final canScan = c.ready && !c.busy('scan');
+                      if (c.scanning) {
+                        return FilledButton.icon(
+                          onPressed: canScan ? c.scan : null,
+                          icon: const Icon(Icons.stop_rounded),
+                          label: const Text('Stop scan'),
+                        );
+                      }
+                      return FilledButton.icon(
+                        onPressed: canScan ? c.scan : null,
+                        icon: const Icon(Icons.radar_rounded),
+                        label: const Text('Start scan'),
+                      );
+                    }(),
                   ),
                   const SizedBox(height: 14),
                   if (c.systemDevices.isNotEmpty) ...[
@@ -140,11 +153,17 @@ class _DevicesPanelState extends State<DevicesPanel> {
                     children: [
                       Text('${results.length} devices', style: Theme.of(context).textTheme.labelMedium),
                       Text(
-                        c.scanning
-                            ? 'Scanning…'
-                            : kIsWeb
-                            ? 'Selected devices'
-                            : 'Strongest signal first',
+                        (() {
+                          if (c.scanning) {
+                            return 'Scanning…';
+                          }
+                          return (() {
+                            if (kIsWeb) {
+                              return 'Selected devices';
+                            }
+                            return 'Strongest signal first';
+                          })();
+                        })(),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -202,10 +221,13 @@ class _DevicesPanelState extends State<DevicesPanel> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            kIsWeb
-                                ? 'Selected in browser'
-                                : '${result.rssi} dBm · '
-                                      '${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
+                            (() {
+                              if (kIsWeb) {
+                                return 'Selected in browser';
+                              }
+                              return '${result.rssi} dBm · '
+                                  '${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}';
+                            })(),
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -303,10 +325,12 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                 spacing: 8,
                 runSpacing: 8,
                 children: [
-                  Chip(
-                    avatar: Icon(c.connected ? Icons.link : Icons.link_off, size: 16),
-                    label: Text(c.connected ? 'Connected' : 'Disconnected'),
-                  ),
+                  () {
+                    if (c.connected) {
+                      return const Chip(avatar: Icon(Icons.link, size: 16), label: Text('Connected'));
+                    }
+                    return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text('Disconnected'));
+                  }(),
                   if (!kIsWeb) ...[if (c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B'))],
                   if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
                 ],
@@ -316,25 +340,40 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                 spacing: 10,
                 runSpacing: 10,
                 children: [
-                  FilledButton.icon(
-                    onPressed: c.connectingDevice == device
-                        ? (c.busy('cancelConnection') ? null : c.cancelConnect)
-                        : c.ready &&
-                              !c.busy('connection') &&
-                              (c.connected || (advertisement?.advertisementData.connectable ?? true))
-                        ? (c.connected ? c.disconnect : c.connect)
-                        : null,
-                    icon: Icon(c.connected ? Icons.link_off : Icons.link),
-                    label: Text(
-                      c.connectingDevice == device
-                          ? 'Cancel connection'
-                          : c.busy('connection')
-                          ? 'Working…'
-                          : c.connected
-                          ? 'Disconnect'
-                          : 'Connect',
-                    ),
-                  ),
+                  () {
+                    final isConnectingThisPeer = c.connectingDevice == device;
+                    final connectionIdle = !c.busy('connection');
+                    final canConnect =
+                        c.ready &&
+                        connectionIdle &&
+                        (c.connected || (advertisement?.advertisementData.connectable ?? true));
+                    if (isConnectingThisPeer) {
+                      return FilledButton.icon(
+                        onPressed: c.busy('cancelConnection') ? null : c.cancelConnect,
+                        icon: Icon(c.connected ? Icons.link_off : Icons.link),
+                        label: const Text('Cancel connection'),
+                      );
+                    }
+                    if (!connectionIdle) {
+                      return FilledButton.icon(
+                        onPressed: null,
+                        icon: Icon(c.connected ? Icons.link_off : Icons.link),
+                        label: const Text('Working…'),
+                      );
+                    }
+                    if (c.connected) {
+                      return FilledButton.icon(
+                        onPressed: canConnect ? c.disconnect : null,
+                        icon: const Icon(Icons.link_off),
+                        label: const Text('Disconnect'),
+                      );
+                    }
+                    return FilledButton.icon(
+                      onPressed: canConnect ? c.connect : null,
+                      icon: const Icon(Icons.link),
+                      label: const Text('Connect'),
+                    );
+                  }(),
                   if (!kIsWeb)
                     OutlinedButton.icon(
                       onPressed: available && !c.busy('rssi:${device.remoteId}') ? c.readRssi : null,
@@ -409,52 +448,55 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           sliver: SliverToBoxAdapter(
-            child: _l2cap && c.supportsL2cap
-                ? DeviceL2capPanel(key: ValueKey(device.remoteId), device: device, controller: c)
-                : WorkbenchCard(
-                    title: const Text('GATT explorer'),
-                    icon: Icons.account_tree_outlined,
-                    subtitle: const Text(
-                      'Discover services after connecting. '
-                      'Only operations supported by each characteristic are shown.',
+            child: (() {
+              if (_l2cap && c.supportsL2cap) {
+                return DeviceL2capPanel(key: ValueKey(device.remoteId), device: device, controller: c);
+              }
+              return WorkbenchCard(
+                title: const Text('GATT explorer'),
+                icon: Icons.account_tree_outlined,
+                subtitle: const Text(
+                  'Discover services after connecting. '
+                  'Only operations supported by each characteristic are shown.',
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: available && !c.busy('discover') ? c.discover : null,
+                      icon: const Icon(Icons.refresh_rounded),
+                      label: Text(c.busy('discover') ? 'Discovering…' : 'Discover services'),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        OutlinedButton.icon(
-                          onPressed: available && !c.busy('discover') ? c.discover : null,
-                          icon: const Icon(Icons.refresh_rounded),
-                          label: Text(c.busy('discover') ? 'Discovering…' : 'Discover services'),
+                    if (c.services.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 20),
+                        child: Text('No services discovered in this connection.'),
+                      ),
+                    for (final service in c.services)
+                      ExpansionTile(
+                        key: ValueKey('${device.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
+                        tilePadding: EdgeInsets.zero,
+                        title: Text(
+                          service.uuid.str.toUpperCase(),
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
                         ),
-                        if (c.services.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 20),
-                            child: Text('No services discovered in this connection.'),
-                          ),
-                        for (final service in c.services)
-                          ExpansionTile(
-                            key: ValueKey('${device.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
-                            tilePadding: EdgeInsets.zero,
-                            title: Text(
-                              service.uuid.str.toUpperCase(),
-                              style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
+                        subtitle: Text(
+                          '${service.characteristics.length} characteristics · '
+                          '${service.isPrimary ? 'Primary' : 'Secondary'} service',
+                        ),
+                        children: [
+                          for (final characteristic in service.characteristics)
+                            GattCharacteristic(
+                              key: ObjectKey(characteristic),
+                              characteristic: characteristic,
+                              controller: c,
                             ),
-                            subtitle: Text(
-                              '${service.characteristics.length} characteristics · '
-                              '${service.isPrimary ? 'Primary' : 'Secondary'} service',
-                            ),
-                            children: [
-                              for (final characteristic in service.characteristics)
-                                GattCharacteristic(
-                                  key: ObjectKey(characteristic),
-                                  characteristic: characteristic,
-                                  controller: c,
-                                ),
-                            ],
-                          ),
-                      ],
-                    ),
-                  ),
+                        ],
+                      ),
+                  ],
+                ),
+              );
+            })(),
           ),
         ),
       ],

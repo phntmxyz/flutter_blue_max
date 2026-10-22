@@ -78,16 +78,22 @@ class L2capChannelCard extends StatelessWidget {
               runSpacing: 8,
               children: [
                 OutlinedButton.icon(
-                  onPressed: controller.busy('channel:${session.key}')
-                      ? null
-                      : () => controller.sendTestTraffic(session, size: 10 * 1024, count: 1),
+                  onPressed: (() {
+                    if (controller.busy('channel:${session.key}')) {
+                      return null;
+                    }
+                    return () => controller.sendTestTraffic(session, size: 10 * 1024, count: 1);
+                  })(),
                   icon: const Icon(Icons.data_usage),
                   label: const Text('Send 10 KB'),
                 ),
                 OutlinedButton.icon(
-                  onPressed: controller.busy('channel:${session.key}')
-                      ? null
-                      : () => controller.sendTestTraffic(session, size: 1024, count: 20),
+                  onPressed: (() {
+                    if (controller.busy('channel:${session.key}')) {
+                      return null;
+                    }
+                    return () => controller.sendTestTraffic(session, size: 1024, count: 20);
+                  })(),
                   icon: const Icon(Icons.bolt),
                   label: const Text('Burst 20×1 KB'),
                 ),

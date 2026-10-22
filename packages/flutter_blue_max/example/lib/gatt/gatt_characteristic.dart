@@ -110,13 +110,16 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                 children: [
                   if (p.read)
                     OutlinedButton.icon(
-                      onPressed: enabled
-                          ? () async {
-                              await widget.controller.run(key, () async {
-                                await c.read();
-                              });
-                            }
-                          : null,
+                      onPressed: (() {
+                        if (enabled) {
+                          return () async {
+                            await widget.controller.run(key, () async {
+                              await c.read();
+                            });
+                          };
+                        }
+                        return null;
+                      })(),
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text('Read'),
                     ),
@@ -127,28 +130,41 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                       label: const Text('Write'),
                     ),
                   if (p.notify || p.indicate)
-                    OutlinedButton.icon(
-                      onPressed: enabled
-                          ? () async {
-                              await widget.controller.run(key, () async {
-                                final notify = !_notifying;
-                                await c.setNotifyValue(notify);
-                                // Web Bluetooth does not publish a CCCD write event.
-                                if (kIsWeb) {
-                                  // Browser subscriptions have no native CCCD event.
-                                  if (mounted) {
-                                    setState(() => _notifying = notify);
-                                  }
-                                }
-                                if (p.read) {
-                                  await c.read();
-                                }
-                              });
+                    () {
+                      final VoidCallback? toggleNotifications;
+                      if (enabled) {
+                        toggleNotifications = () async {
+                          await widget.controller.run(key, () async {
+                            final notify = !_notifying;
+                            await c.setNotifyValue(notify);
+                            // Web Bluetooth does not publish a CCCD write event.
+                            if (kIsWeb) {
+                              // Browser subscriptions have no native CCCD event.
+                              if (mounted) {
+                                setState(() => _notifying = notify);
+                              }
                             }
-                          : null,
-                      icon: Icon(_notifying ? Icons.notifications_active_outlined : Icons.notifications_none, size: 16),
-                      label: Text(_notifying ? 'Unsubscribe' : 'Subscribe'),
-                    ),
+                            if (p.read) {
+                              await c.read();
+                            }
+                          });
+                        };
+                      } else {
+                        toggleNotifications = null;
+                      }
+                      if (_notifying) {
+                        return OutlinedButton.icon(
+                          onPressed: toggleNotifications,
+                          icon: const Icon(Icons.notifications_active_outlined, size: 16),
+                          label: const Text('Unsubscribe'),
+                        );
+                      }
+                      return OutlinedButton.icon(
+                        onPressed: toggleNotifications,
+                        icon: const Icon(Icons.notifications_none, size: 16),
+                        label: const Text('Subscribe'),
+                      );
+                    }(),
                 ],
               ),
               if (_writing) ...[
@@ -210,13 +226,16 @@ class _DescriptorState extends State<_Descriptor> {
         Align(
           alignment: Alignment.centerLeft,
           child: TextButton(
-            onPressed: enabled
-                ? () async {
-                    await widget.controller.run(key, () async {
-                      await d.read();
-                    });
-                  }
-                : null,
+            onPressed: (() {
+              if (enabled) {
+                return () async {
+                  await widget.controller.run(key, () async {
+                    await d.read();
+                  });
+                };
+              }
+              return null;
+            })(),
             child: const Text('Read descriptor'),
           ),
         ),

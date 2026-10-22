@@ -110,11 +110,12 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
               actions: [
                 if (wide)
                   Chip(
-                    avatar: Icon(
-                      c.ready ? Icons.circle : Icons.circle_outlined,
-                      size: 10,
-                      color: c.ready ? Theme.of(context).colorScheme.primary : null,
-                    ),
+                    avatar: () {
+                      if (c.ready) {
+                        return Icon(Icons.circle, size: 10, color: Theme.of(context).colorScheme.primary);
+                      }
+                      return const Icon(Icons.circle_outlined, size: 10);
+                    }(),
                     label: Text('Bluetooth ${c.adapter.name}'),
                   ),
                 IconButton(
@@ -194,18 +195,21 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
                 ],
               ),
             ),
-            bottomNavigationBar: wide
-                ? null
-                : NavigationBar(
-                    selectedIndex: _destination,
-                    onDestinationSelected: (index) => setState(() => _destination = index),
-                    destinations: [
-                      const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
-                      if (c.supportsL2cap)
-                        const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
-                      const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
-                    ],
-                  ),
+            bottomNavigationBar: (() {
+              if (wide) {
+                return null;
+              }
+              return NavigationBar(
+                selectedIndex: _destination,
+                onDestinationSelected: (index) => setState(() => _destination = index),
+                destinations: [
+                  const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
+                  if (c.supportsL2cap)
+                    const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
+                  const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
+                ],
+              );
+            })(),
           );
         },
       ),

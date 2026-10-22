@@ -21,6 +21,47 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
     final c = widget.controller;
     final incoming = c.channelSessions.where((session) => session.incoming).toList();
     final connectedCount = incoming.where((session) => !session.closed).length;
+    final listenerControls = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Require encryption'),
+          value: _secure,
+          onChanged: c.serverPsm == null && !c.busy('server') ? (value) => setState(() => _secure = value) : null,
+        ),
+        if (c.serverPsm != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: SelectableText('PSM ${c.serverPsm}', style: Theme.of(context).textTheme.headlineSmall)),
+              IconButton(
+                tooltip: 'Copy server PSM',
+                onPressed: () => Clipboard.setData(ClipboardData(text: '${c.serverPsm}')),
+                icon: const Icon(Icons.copy),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        () {
+          final canChangeServer = c.ready && !c.busy('server');
+          final label = c.busy('server') ? 'Working…' : null;
+          if (c.serverPsm == null) {
+            return FilledButton.icon(
+              onPressed: canChangeServer ? () => c.startServer(secure: _secure) : null,
+              icon: const Icon(Icons.play_arrow_rounded),
+              label: Text(label ?? 'Start server'),
+            );
+          }
+          return FilledButton.icon(
+            onPressed: canChangeServer ? c.stopServer : null,
+            icon: const Icon(Icons.stop_rounded),
+            label: Text(label ?? 'Stop server'),
+          );
+        }(),
+      ],
+    );
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -31,57 +72,28 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
           'To open a channel yourself, select a device in Devices and use its L2CAP tab.',
         ),
         const SizedBox(height: 24),
-        WorkbenchCard(
-          title: Text(c.serverPsm == null ? 'Prepare this device' : 'Listening on PSM ${c.serverPsm}'),
-          icon: Icons.dns_outlined,
-          subtitle: Text(
-            c.serverPsm == null
-                ? 'Start listening before the other device connects.'
-                : connectedCount == 0
-                ? 'Waiting for a peer — no channel connected yet.'
-                : '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.',
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              SwitchListTile.adaptive(
-                contentPadding: EdgeInsets.zero,
-                title: const Text('Require encryption'),
-                value: _secure,
-                onChanged: c.serverPsm == null && !c.busy('server') ? (value) => setState(() => _secure = value) : null,
-              ),
-              if (c.serverPsm != null) ...[
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Expanded(
-                      child: SelectableText('PSM ${c.serverPsm}', style: Theme.of(context).textTheme.headlineSmall),
-                    ),
-                    IconButton(
-                      tooltip: 'Copy server PSM',
-                      onPressed: () => Clipboard.setData(ClipboardData(text: '${c.serverPsm}')),
-                      icon: const Icon(Icons.copy),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-              ],
-              FilledButton.icon(
-                onPressed: c.ready && !c.busy('server')
-                    ? () => c.serverPsm == null ? c.startServer(secure: _secure) : c.stopServer()
-                    : null,
-                icon: Icon(c.serverPsm == null ? Icons.play_arrow_rounded : Icons.stop_rounded),
-                label: Text(
-                  c.busy('server')
-                      ? 'Working…'
-                      : c.serverPsm == null
-                      ? 'Start server'
-                      : 'Stop server',
-                ),
-              ),
-            ],
-          ),
-        ),
+        () {
+          if (c.serverPsm == null) {
+            return WorkbenchCard(
+              title: const Text('Prepare this device'),
+              icon: Icons.dns_outlined,
+              subtitle: const Text('Start listening before the other device connects.'),
+              child: listenerControls,
+            );
+          }
+          final String status;
+          if (connectedCount == 0) {
+            status = 'Waiting for a peer — no channel connected yet.';
+          } else {
+            status = '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.';
+          }
+          return WorkbenchCard(
+            title: Text('Listening on PSM ${c.serverPsm}'),
+            icon: Icons.dns_outlined,
+            subtitle: Text(status),
+            child: listenerControls,
+          );
+        }(),
         const WorkbenchCard(
           title: Text('Connect from the other device'),
           icon: Icons.info_outline,

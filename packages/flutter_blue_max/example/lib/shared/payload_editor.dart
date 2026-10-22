@@ -62,21 +62,24 @@ class _PayloadEditorState extends State<PayloadEditor> {
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: !widget.enabled || _sending
-                ? null
-                : () async {
-                    if (!_form.currentState!.validate()) {
-                      return;
-                    }
-                    setState(() => _sending = true);
-                    try {
-                      await widget.onSend(PayloadCodec.decode(_text.text, hex: _hex));
-                    } finally {
-                      if (mounted) {
-                        setState(() => _sending = false);
-                      }
-                    }
-                  },
+            onPressed: (() {
+              if (!widget.enabled || _sending) {
+                return null;
+              }
+              return () async {
+                if (!_form.currentState!.validate()) {
+                  return;
+                }
+                setState(() => _sending = true);
+                try {
+                  await widget.onSend(PayloadCodec.decode(_text.text, hex: _hex));
+                } finally {
+                  if (mounted) {
+                    setState(() => _sending = false);
+                  }
+                }
+              };
+            })(),
             icon: const Icon(Icons.send_rounded, size: 18),
             label: _sending ? const Text('Sending…') : widget.label,
           ),

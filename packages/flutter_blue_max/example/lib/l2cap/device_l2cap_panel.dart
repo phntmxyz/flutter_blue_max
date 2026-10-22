@@ -36,7 +36,10 @@ class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
     final sessions = c.channelSessions.where(
       (session) => !session.incoming && session.channel.deviceId == device.remoteId,
     );
-    final enabled = connected && c.ready && !c.busy('open') && !c.busy('connection');
+    final connectionReady = connected && c.ready;
+    final channelIdle = !c.busy('open');
+    final connectionIdle = !c.busy('connection');
+    final enabled = connectionReady && channelIdle && connectionIdle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -87,13 +90,16 @@ class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
                           child: Text('On Apple devices, encryption is determined by the remote server.'),
                         ),
                       FilledButton.icon(
-                        onPressed: enabled
-                            ? () {
-                                if (_form.currentState!.validate()) {
-                                  c.openChannel(PayloadCodec.psm(_psm.text), device: device, secure: _secure);
-                                }
+                        onPressed: (() {
+                          if (enabled) {
+                            return () {
+                              if (_form.currentState!.validate()) {
+                                c.openChannel(PayloadCodec.psm(_psm.text), device: device, secure: _secure);
                               }
-                            : null,
+                            };
+                          }
+                          return null;
+                        })(),
                         icon: const Icon(Icons.link_rounded),
                         label: Text(c.busy('open') ? 'Opening…' : 'Open channel'),
                       ),
