@@ -316,7 +316,7 @@ class WorkbenchController extends ChangeNotifier {
       return;
     }
     _startingServer = true;
-    late final int psm;
+    final int psm;
     try {
       psm = await FlutterBlueMax.listenL2capChannel(secure: secure);
     } finally {
@@ -357,20 +357,21 @@ class WorkbenchController extends ChangeNotifier {
     if (_channels[key]?.closed == false) {
       throw StateError('This peer already has a channel on PSM $psm.');
     }
-    late final BluetoothL2capChannel channel;
-    try {
-      channel = await device.openL2CapChannel(psm, secure: secure);
-    } catch (error, stackTrace) {
-      if (_disposed || !ready || _isUnsupported(error)) {
-        Error.throwWithStackTrace(error, stackTrace);
+    final channel = await () async {
+      try {
+        return await device.openL2CapChannel(psm, secure: secure);
+      } catch (error, stackTrace) {
+        if (_disposed || !ready || _isUnsupported(error)) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        log('L2CAP open failed; retrying once: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!device.isConnected) {
+          await device.connect(mtu: null);
+        }
+        return await device.openL2CapChannel(psm, secure: secure);
       }
-      log('L2CAP open failed; retrying once: $error');
-      debugPrintStack(stackTrace: stackTrace);
-      if (!device.isConnected) {
-        await device.connect(mtu: null);
-      }
-      channel = await device.openL2CapChannel(psm, secure: secure);
-    }
+    }();
     if (_disposed || !device.isConnected) {
       await channel.close();
       return;

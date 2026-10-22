@@ -21,7 +21,7 @@ class GattCharacteristic extends StatefulWidget {
 class _GattCharacteristicState extends State<GattCharacteristic> {
   bool _withoutResponse = false;
   bool _writing = false;
-  late bool _notifying = widget.characteristic.isNotifying;
+  bool _notifying = false;
   late final Stream<List<int>> _values = widget.characteristic.lastValueStream;
 
   StreamSubscription<List<int>>? _notificationChanges;
@@ -29,6 +29,7 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
   @override
   void initState() {
     super.initState();
+    _notifying = widget.characteristic.isNotifying;
     for (final descriptor in widget.characteristic.descriptors) {
       if (descriptor.uuid == Guid('2902')) {
         // CCCD events may arrive after the operation future and also after direct writes.
