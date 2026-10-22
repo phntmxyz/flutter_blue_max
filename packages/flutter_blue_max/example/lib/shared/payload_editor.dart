@@ -3,11 +3,13 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 /// Shared, validated byte input for GATT writes and L2CAP transmissions.
 class PayloadEditor extends StatefulWidget {
-  const PayloadEditor({super.key, required this.onSend, this.enabled = true, this.label = 'Send payload'});
+  const PayloadEditor({super.key, required this.onSend, this.enabled = true, this.label = const Text('Send payload')});
 
   final Future<void> Function(List<int>) onSend;
   final bool enabled;
-  final String label;
+
+  /// Uses the FilledButton text style unless the supplied widget overrides it.
+  final Widget label;
 
   @override
   State<PayloadEditor> createState() => _PayloadEditorState();
@@ -76,7 +78,7 @@ class _PayloadEditorState extends State<PayloadEditor> {
                     }
                   },
             icon: const Icon(Icons.send_rounded, size: 18),
-            label: Text(_sending ? 'Sending…' : widget.label),
+            label: _sending ? const Text('Sending…') : widget.label,
           ),
         ],
       ),

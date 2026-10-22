@@ -16,8 +16,8 @@ class L2capChannelCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkbenchCard(
       key: ValueKey(session.key),
-      title: '${session.incoming ? 'Incoming' : 'Outgoing'} · PSM ${session.channel.psm}',
-      subtitle: session.channel.deviceId.str,
+      title: Text('${session.incoming ? 'Incoming' : 'Outgoing'} · PSM ${session.channel.psm}'),
+      subtitle: Text(session.channel.deviceId.str),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

@@ -412,11 +412,12 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
             child: _l2cap && c.supportsL2cap
                 ? DeviceL2capPanel(key: ValueKey(device.remoteId), device: device, controller: c)
                 : WorkbenchCard(
-                    title: 'GATT explorer',
+                    title: const Text('GATT explorer'),
                     icon: Icons.account_tree_outlined,
-                    subtitle:
-                        'Discover services after connecting. '
-                        'Only operations supported by each characteristic are shown.',
+                    subtitle: const Text(
+                      'Discover services after connecting. '
+                      'Only operations supported by each characteristic are shown.',
+                    ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [

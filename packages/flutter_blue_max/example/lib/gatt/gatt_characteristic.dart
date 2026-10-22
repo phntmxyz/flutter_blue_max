@@ -162,7 +162,7 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                   ),
                 PayloadEditor(
                   enabled: enabled,
-                  label: 'Write characteristic',
+                  label: const Text('Write characteristic'),
                   onSend: (value) {
                     return widget.controller.run(key, () async {
                       await c.write(value, withoutResponse: !p.write || _withoutResponse);
@@ -222,7 +222,7 @@ class _DescriptorState extends State<_Descriptor> {
         ),
         PayloadEditor(
           enabled: enabled,
-          label: 'Write descriptor',
+          label: const Text('Write descriptor'),
           onSend: (value) {
             return widget.controller.run(key, () async {
               await d.write(value);

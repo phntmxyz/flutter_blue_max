@@ -32,13 +32,15 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
         ),
         const SizedBox(height: 24),
         WorkbenchCard(
-          title: c.serverPsm == null ? 'Prepare this device' : 'Listening on PSM ${c.serverPsm}',
+          title: Text(c.serverPsm == null ? 'Prepare this device' : 'Listening on PSM ${c.serverPsm}'),
           icon: Icons.dns_outlined,
-          subtitle: c.serverPsm == null
-              ? 'Start listening before the other device connects.'
-              : connectedCount == 0
-              ? 'Waiting for a peer — no channel connected yet.'
-              : '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.',
+          subtitle: Text(
+            c.serverPsm == null
+                ? 'Start listening before the other device connects.'
+                : connectedCount == 0
+                ? 'Waiting for a peer — no channel connected yet.'
+                : '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.',
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -81,7 +83,7 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
           ),
         ),
         const WorkbenchCard(
-          title: 'Connect from the other device',
+          title: Text('Connect from the other device'),
           icon: Icons.info_outline,
           child: Text(
             'The client needs to know this device and the assigned PSM. Starting this server does not advertise '

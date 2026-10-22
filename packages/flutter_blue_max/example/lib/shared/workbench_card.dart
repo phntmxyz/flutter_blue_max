@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 class WorkbenchCard extends StatelessWidget {
   const WorkbenchCard({super.key, required this.title, this.subtitle, required this.child, this.icon});
 
-  final String title;
-  final String? subtitle;
+  /// Inherits the section's titleMedium text style.
+  final Widget title;
+
+  /// Inherits the section's bodySmall text style.
+  final Widget? subtitle;
   final Widget child;
   final IconData? icon;
 
@@ -24,12 +27,14 @@ class WorkbenchCard extends StatelessWidget {
                   Icon(icon, size: 20, color: Theme.of(context).colorScheme.primary),
                   const SizedBox(width: 10),
                 ],
-                Expanded(child: Text(title, style: Theme.of(context).textTheme.titleMedium)),
+                Expanded(
+                  child: DefaultTextStyle(style: Theme.of(context).textTheme.titleMedium!, child: title),
+                ),
               ],
             ),
             if (subtitle != null) ...[
               const SizedBox(height: 6),
-              Text(subtitle!, style: Theme.of(context).textTheme.bodySmall),
+              DefaultTextStyle(style: Theme.of(context).textTheme.bodySmall!, child: subtitle!),
             ],
             const SizedBox(height: 18),
             child,

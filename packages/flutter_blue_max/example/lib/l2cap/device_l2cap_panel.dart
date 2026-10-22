@@ -41,9 +41,9 @@ class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         WorkbenchCard(
-          title: 'L2CAP to this device',
+          title: const Text('L2CAP to this device'),
           icon: Icons.cable_rounded,
-          subtitle: 'A separate byte stream to ${c.nameOf(device)} over the Bluetooth connection.',
+          subtitle: Text('A separate byte stream to ${c.nameOf(device)} over the Bluetooth connection.'),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
