@@ -8,7 +8,7 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 /// Owns the example's Bluetooth session across navigation and device selection.
 /// The package remains responsible for platform I/O and operation serialization.
-class WorkbenchController extends ChangeNotifier {
+class WorkbenchController() extends ChangeNotifier {
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _watched = <DeviceIdentifier>{};
   final _services = <DeviceIdentifier, List<BluetoothService>>{};

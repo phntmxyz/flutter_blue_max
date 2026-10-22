@@ -1,17 +1,17 @@
 import 'package:flutter/material.dart';
 
 /// Consistent section spacing for the phone and desktop workspaces.
-class WorkbenchCard extends StatelessWidget {
-  const WorkbenchCard({super.key, required this.title, this.subtitle, required this.child, this.icon});
+class const WorkbenchCard({
+  super.key,
 
   /// Inherits the section's titleMedium text style.
-  final Widget title;
+  required final Widget title,
 
   /// Inherits the section's bodySmall text style.
-  final Widget? subtitle;
-  final Widget child;
-  final IconData? icon;
-
+  final Widget? subtitle,
+  required final Widget child,
+  final IconData? icon,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(

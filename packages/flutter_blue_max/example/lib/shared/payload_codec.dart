@@ -1,6 +1,8 @@
 import 'dart:convert';
 
 /// Converts user-entered payloads without silently truncating malformed bytes.
+// Keep the shared codec API as a single namespace for forms and diagnostics.
+// ignore: avoid_classes_with_only_static_members, use_primary_constructors
 abstract final class PayloadCodec {
   /// Accepts hexadecimal byte pairs, optionally separated by whitespace.
   static List<int> decode(String input, {required bool hex}) {

@@ -6,12 +6,11 @@ import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// Exchanges data with the peer that owns this channel, regardless of selection.
-class L2capChannelCard extends StatelessWidget {
-  const L2capChannelCard({super.key, required this.session, required this.controller});
-
-  final ChannelSession session;
-  final WorkbenchController controller;
-
+class const L2capChannelCard({
+  super.key,
+  required final ChannelSession session,
+  required final WorkbenchController controller,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WorkbenchCard(

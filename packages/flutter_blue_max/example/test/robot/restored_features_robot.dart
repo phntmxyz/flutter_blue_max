@@ -11,7 +11,7 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
   Future<void> connectSystemPeer() async {
     logEvent('Find a system-connected peer that does not advertise');
     platform.systemPeers.add(
-      BmBluetoothDevice(remoteId: DeviceIdentifier('AA:BB:CC:DD:EE:61'), platformName: 'System peer'),
+      BmBluetoothDevice(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:61'), platformName: 'System peer'),
     );
     await tapLabel('Start scan');
     await tapLabel('Stop scan');
@@ -54,8 +54,8 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     expect(session.history, hasLength(2));
     spotText('RX 2 B', exact: true).existsOnce();
     await tapLabel('Receive history');
-    spotText('Stream', exact: false).existsAtLeastOnce();
-    spotText('Buffer read', exact: false).existsAtLeastOnce();
+    spotText('Stream').existsAtLeastOnce();
+    spotText('Buffer read').existsAtLeastOnce();
   }
 
   Future<void> exerciseNotificationsAndDescriptors() async {
@@ -125,8 +125,8 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     }
     spotText('Closed', exact: true).existsOnce();
     spotText('RX 2 B', exact: true).existsOnce();
-    spotText('Stream', exact: false).existsAtLeastOnce();
-    spotText('Buffer read', exact: false).existsAtLeastOnce();
+    spotText('Stream').existsAtLeastOnce();
+    spotText('Buffer read').existsAtLeastOnce();
     spotText('Read buffered data', exact: true).doesNotExist();
     spotText('Send payload', exact: true).doesNotExist();
     spotText('Send 10 KB', exact: true).doesNotExist();
@@ -157,7 +157,7 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     spotText('Request MTU', exact: true).doesNotExist();
     spotText('Create bond', exact: true).doesNotExist();
     spotText('Advertisement', exact: true).doesNotExist();
-    spotText('MTU ', exact: false).doesNotExist();
+    spotText('MTU ').doesNotExist();
   }
 
   Future<void> checkBroadcastAndAppearance() async {
@@ -170,7 +170,7 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     final connect = spot<FilledButton>().withChild(spotText('Connect', exact: true))..existsOnce();
     expect(connect.snapshotWidget().onPressed, isNull);
     await tapLabel('Advertisement');
-    spotText('Appearance: 0x340', exact: false).existsOnce();
+    spotText('Appearance: 0x340').existsOnce();
   }
 
   Future<void> enableBluetooth() async {

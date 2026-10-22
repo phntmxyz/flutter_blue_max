@@ -8,17 +8,16 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 
 /// Inspects the actual characteristic instance and its descriptors.
-class GattCharacteristic extends StatefulWidget {
-  const GattCharacteristic({super.key, required this.characteristic, required this.controller});
-
-  final BluetoothCharacteristic characteristic;
-  final WorkbenchController controller;
-
+class const GattCharacteristic({
+  super.key,
+  required final BluetoothCharacteristic characteristic,
+  required final WorkbenchController controller,
+}) extends StatefulWidget {
   @override
   State<GattCharacteristic> createState() => _GattCharacteristicState();
 }
 
-class _GattCharacteristicState extends State<GattCharacteristic> {
+class _GattCharacteristicState() extends State<GattCharacteristic> {
   bool _withoutResponse = false;
   bool _writing = false;
   bool _notifying = false;
@@ -199,16 +198,13 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
   }
 }
 
-class _Descriptor extends StatefulWidget {
-  const _Descriptor({required this.descriptor, required this.controller});
-  final BluetoothDescriptor descriptor;
-  final WorkbenchController controller;
-
+class const _Descriptor({required final BluetoothDescriptor descriptor, required final WorkbenchController controller})
+    extends StatefulWidget {
   @override
   State<_Descriptor> createState() => _DescriptorState();
 }
 
-class _DescriptorState extends State<_Descriptor> {
+class _DescriptorState() extends State<_Descriptor> {
   late final Stream<List<int>> _values = widget.descriptor.lastValueStream;
 
   @override

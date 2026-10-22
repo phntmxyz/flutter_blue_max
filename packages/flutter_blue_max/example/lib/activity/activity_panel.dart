@@ -3,15 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 
 /// Searchable session output includes native diagnostics and payload previews.
-class ActivityPanel extends StatefulWidget {
-  const ActivityPanel({super.key, required this.controller});
-  final WorkbenchController controller;
-
+class const ActivityPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
   @override
   State<ActivityPanel> createState() => _ActivityPanelState();
 }
 
-class _ActivityPanelState extends State<ActivityPanel> {
+class _ActivityPanelState() extends State<ActivityPanel> {
   String _query = '';
 
   @override

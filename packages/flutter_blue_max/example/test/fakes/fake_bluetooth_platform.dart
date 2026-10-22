@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 
 /// Replaces only native I/O; the example and the public plugin run unchanged.
-final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
+final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final adapters = StreamController<BmBluetoothAdapterState>.broadcast(sync: true);
   final connections = StreamController<BmConnectionStateResponse>.broadcast(sync: true);
   final advertisements = StreamController<BmScanResponse>.broadcast(sync: true);
@@ -246,7 +246,7 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
         descriptorUuid: Guid('2902'),
         primaryServiceUuid: request.primaryServiceUuid,
         instanceId: request.instanceId,
-        value: [request.enable ? 1 : 0, 0],
+        value: [if (request.enable) 1 else 0, 0],
         success: true,
         errorCode: 0,
         errorString: '',
@@ -466,7 +466,11 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
     if (failure != null) {
       throw failure;
     }
-    return pendingServer?.future ?? 129;
+    final pending = pendingServer;
+    if (pending != null) {
+      return await pending.future;
+    }
+    return 129;
   }
 
   Future<bool> Function(BmReadCharacteristicRequest request)? overrideReadCharacteristic;

@@ -18,8 +18,8 @@ void main() {
   test('channels with the same PSM remain isolated by peer', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    final first = DeviceIdentifier('AA:BB:CC:DD:EE:01');
-    final second = DeviceIdentifier('AA:BB:CC:DD:EE:02');
+    const first = DeviceIdentifier('AA:BB:CC:DD:EE:01');
+    const second = DeviceIdentifier('AA:BB:CC:DD:EE:02');
     platform.accepted.add(L2CapChannelConnected(remoteId: first, psm: 129));
     platform.accepted.add(L2CapChannelConnected(remoteId: second, psm: 129));
     expect(controller.channels, hasLength(2));
@@ -47,7 +47,7 @@ void main() {
     expect(controller.services, hasLength(1));
     await controller.openChannel(131, device: controller.selected!, secure: true);
     await controller.startServer(secure: true);
-    platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('server'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
     expect(controller.channels, hasLength(2));
     await controller.disconnect();
     await Future<void>.delayed(Duration.zero);
@@ -76,7 +76,7 @@ void main() {
   test('failed write exposes an error, releases busy state and does not count bytes', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: false);
-    platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('server'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
     final session = controller.channels.single;
     platform.failNextWrite = true;
     await controller.send(session, [1]);
@@ -91,7 +91,7 @@ void main() {
   test('adapter shutdown clears native resources and activity is bounded', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('server'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
     platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.off));
     await Future<void>.delayed(Duration.zero);
     expect(controller.channels, isEmpty);
@@ -199,7 +199,7 @@ void main() {
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('traffic'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('traffic'), psm: 129));
       final session = c.channels.single;
       await c.sendTestTraffic(session, size: 10 * 1024, count: 1);
       final large = platform.writes.last;
@@ -233,7 +233,7 @@ void main() {
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('burst-failure'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('burst-failure'), psm: 129));
       final session = c.channels.single;
       platform.failNextWrite = true;
       await c.sendTestTraffic(session, size: 1024, count: 20);
@@ -248,9 +248,9 @@ void main() {
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      final peer = DeviceIdentifier('buffer');
+      const peer = DeviceIdentifier('buffer');
       platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
-      platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('other'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('other'), psm: 129));
       final session = c.channels.first;
       platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [65, 66]));
       platform.bufferedBytes = [65, 66];
@@ -272,7 +272,7 @@ void main() {
       final c = fixture.controller;
       final platform = fixture.platform;
       platform.systemPeers.add(
-        BmBluetoothDevice(remoteId: DeviceIdentifier('AA:BB:CC:DD:EE:53'), platformName: 'System peer'),
+        BmBluetoothDevice(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:53'), platformName: 'System peer'),
       );
       await c.scan();
       await c.scan();
@@ -292,7 +292,7 @@ void main() {
         final c = fixture.controller;
         final platform = fixture.platform;
         await c.startServer(secure: false);
-        final peer = DeviceIdentifier('history');
+        const peer = DeviceIdentifier('history');
         platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
         final session = c.channels.single;
         platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [65, 66]));

@@ -8,10 +8,7 @@ import 'package:spot/spot.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 
-class WorkbenchRobot {
-  WorkbenchRobot(this.tester, this.platform);
-  final WidgetTester tester;
-  final FakeBluetoothPlatform platform;
+class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform platform) {
   final controller = WorkbenchController();
 
   Future<void> launch({required Size size}) async {
@@ -206,7 +203,7 @@ class WorkbenchRobot {
 
   Future<void> acceptIncomingChannel() async {
     logEvent('Receive an incoming channel and distinguish it from a waiting server');
-    platform.accepted.add(L2CapChannelConnected(remoteId: DeviceIdentifier('AA:BB:CC:DD:EE:03'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:03'), psm: 129));
     await idle();
     expect(controller.channels.single.incoming, isTrue);
     spotText('Waiting for a peer — no channel connected yet.', exact: true).doesNotExist();

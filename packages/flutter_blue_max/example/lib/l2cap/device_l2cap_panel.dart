@@ -7,17 +7,16 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// Opens outgoing channels only for the device shown in the inspector.
-class DeviceL2capPanel extends StatefulWidget {
-  const DeviceL2capPanel({super.key, required this.device, required this.controller});
-
-  final BluetoothDevice device;
-  final WorkbenchController controller;
-
+class const DeviceL2capPanel({
+  super.key,
+  required final BluetoothDevice device,
+  required final WorkbenchController controller,
+}) extends StatefulWidget {
   @override
   State<DeviceL2capPanel> createState() => _DeviceL2capPanelState();
 }
 
-class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
+class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
   final _psm = TextEditingController();
   final _form = GlobalKey<FormState>();
   bool _secure = true;

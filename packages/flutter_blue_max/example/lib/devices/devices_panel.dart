@@ -8,16 +8,13 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// Adapts discovery and inspection from a two-pane desktop layout to a phone.
-class DevicesPanel extends StatefulWidget {
-  const DevicesPanel({super.key, required this.controller, this.active = true});
-  final WorkbenchController controller;
-  final bool active;
-
+class const DevicesPanel({super.key, required final WorkbenchController controller, final bool active = true})
+    extends StatefulWidget {
   @override
   State<DevicesPanel> createState() => _DevicesPanelState();
 }
 
-class _DevicesPanelState extends State<DevicesPanel> {
+class _DevicesPanelState() extends State<DevicesPanel> {
   bool _showDetails = false;
 
   @override
@@ -248,16 +245,13 @@ class _DevicesPanelState extends State<DevicesPanel> {
   }
 }
 
-class _DeviceDetails extends StatefulWidget {
-  const _DeviceDetails({super.key, required this.controller, this.onBack});
-  final WorkbenchController controller;
-  final VoidCallback? onBack;
-
+class const _DeviceDetails({super.key, required final WorkbenchController controller, final VoidCallback? onBack})
+    extends StatefulWidget {
   @override
   State<_DeviceDetails> createState() => _DeviceDetailsState();
 }
 
-class _DeviceDetailsState extends State<_DeviceDetails> {
+class _DeviceDetailsState() extends State<_DeviceDetails> {
   bool _l2cap = false;
   WorkbenchController get controller => widget.controller;
   VoidCallback? get onBack => widget.onBack;

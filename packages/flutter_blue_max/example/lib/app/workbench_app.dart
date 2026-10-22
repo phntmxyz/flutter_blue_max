@@ -9,15 +9,12 @@ import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 
 /// A responsive diagnostic app for the plugin's native and web backends.
-class WorkbenchApp extends StatefulWidget {
-  const WorkbenchApp({super.key, this.controller});
-  final WorkbenchController? controller;
-
+class const WorkbenchApp({super.key, final WorkbenchController? controller}) extends StatefulWidget {
   @override
   State<WorkbenchApp> createState() => _WorkbenchAppState();
 }
 
-class _WorkbenchAppState extends State<WorkbenchApp> {
+class _WorkbenchAppState() extends State<WorkbenchApp> {
   late final _controller = widget.controller ?? WorkbenchController();
   int _destination = 0;
   ThemeMode _themeMode = ThemeMode.dark;
@@ -217,10 +214,7 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
   }
 }
 
-class _AdapterBanner extends StatelessWidget {
-  const _AdapterBanner({required this.controller});
-  final WorkbenchController controller;
-
+class const _AdapterBanner({required final WorkbenchController controller}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = switch (controller.adapter) {

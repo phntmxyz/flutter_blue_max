@@ -1,4 +1,4 @@
-include: package:flutter_lints/flutter.yaml
+include: package:lint/strict.yaml
 
 formatter:
   page_width: 120
@@ -14,3 +14,4 @@ analyzer:
     - ios/**
     - macos/**
     - linux/**
+    - web/**

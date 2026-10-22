@@ -1,11 +1,7 @@
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 /// A channel is identified by both its remote peer and PSM.
-class ChannelSession {
-  ChannelSession(this.channel, {required this.incoming});
-
-  BluetoothL2capChannel channel;
-  bool incoming;
+class ChannelSession(var BluetoothL2capChannel channel, {required var bool incoming}) {
   bool closed = false;
   int transmitted = 0;
   int received = 0;

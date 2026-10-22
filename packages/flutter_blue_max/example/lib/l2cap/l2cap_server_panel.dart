@@ -5,15 +5,12 @@ import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// The receiving role waits for peers; it does not open a channel to a selected device.
-class L2capServerPanel extends StatefulWidget {
-  const L2capServerPanel({super.key, required this.controller});
-  final WorkbenchController controller;
-
+class const L2capServerPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
   @override
   State<L2capServerPanel> createState() => _L2capServerPanelState();
 }
 
-class _L2capServerPanelState extends State<L2capServerPanel> {
+class _L2capServerPanelState() extends State<L2capServerPanel> {
   bool _secure = true;
 
   @override
