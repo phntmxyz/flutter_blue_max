@@ -67,12 +67,14 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     expect(platform.notifyRequests.last.enable, isTrue);
     expect(platform.characteristicReads.length, before + 1);
     final characteristic = controller.services.single.characteristics.single;
-    expect(
-      characteristic.isNotifying,
-      isTrue,
-      reason:
-          '${characteristic.instanceId}: ${characteristic.descriptors.map((d) => '${d.uuid}/${d.instanceId}: ${d.lastValue}')}',
-    );
+    if (!kIsWeb) {
+      expect(
+        characteristic.isNotifying,
+        isTrue,
+        reason:
+            '${characteristic.instanceId}: ${characteristic.descriptors.map((d) => '${d.uuid}/${d.instanceId}: ${d.lastValue}')}',
+      );
+    }
     await tapLabel('Unsubscribe');
     expect(platform.notifyRequests.last.enable, isFalse);
     expect(platform.characteristicReads.length, before + 2);
@@ -129,6 +131,33 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     spotText('Send payload', exact: true).doesNotExist();
     spotText('Send 10 KB', exact: true).doesNotExist();
     spotText('Burst 20×1 KB', exact: true).doesNotExist();
+  }
+
+  void expectGattOnlyPlatform() {
+    logEvent('Verify that unsupported L2CAP controls are absent');
+    spotText('Local server', exact: true).doesNotExist();
+    spotText('L2CAP', exact: true).doesNotExist();
+    spotText('GATT explorer', exact: true).existsOnce();
+    expect(controller.error, isNull);
+  }
+
+  void expectWebCapabilities() {
+    expectGattOnlyPlatform();
+    logEvent('Verify browser service permissions and absence of unsupported native operations');
+    expect(platform.scanRequests.last.webOptionalServices, [
+      Guid('180f'),
+      Guid('180a'),
+      Guid('1800'),
+      Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e'),
+    ]);
+    expect(platform.rssiRequests, isEmpty);
+    expect(platform.systemDeviceRequests, isEmpty);
+    expect(controller.rssi, isNull);
+    spotText('Read RSSI', exact: true).doesNotExist();
+    spotText('Request MTU', exact: true).doesNotExist();
+    spotText('Create bond', exact: true).doesNotExist();
+    spotText('Advertisement', exact: true).doesNotExist();
+    spotText('MTU ', exact: false).doesNotExist();
   }
 
   Future<void> checkBroadcastAndAppearance() async {

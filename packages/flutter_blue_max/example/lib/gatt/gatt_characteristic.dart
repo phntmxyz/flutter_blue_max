@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
@@ -126,7 +127,12 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                     OutlinedButton.icon(
                       onPressed: enabled
                           ? () => widget.controller.run(key, () async {
-                              await c.setNotifyValue(!_notifying);
+                              final notify = !_notifying;
+                              await c.setNotifyValue(notify);
+                              // Web Bluetooth does not publish a CCCD write event.
+                              if (kIsWeb && mounted) {
+                                setState(() => _notifying = notify);
+                              }
                               if (p.read) {
                                 await c.read();
                               }

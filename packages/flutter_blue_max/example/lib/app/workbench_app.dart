@@ -8,7 +8,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 
-/// A responsive diagnostic app for the real plugin on Android, iOS and macOS.
+/// A responsive diagnostic app for the plugin's native and web backends.
 class WorkbenchApp extends StatefulWidget {
   const WorkbenchApp({super.key, this.controller});
   final WorkbenchController? controller;
@@ -162,10 +162,17 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
                             selectedIndex: _destination,
                             onDestinationSelected: (index) => setState(() => _destination = index),
                             labelType: NavigationRailLabelType.all,
-                            destinations: const [
-                              NavigationRailDestination(icon: Icon(Icons.radar_rounded), label: Text('Devices')),
-                              NavigationRailDestination(icon: Icon(Icons.dns_outlined), label: Text('Local server')),
-                              NavigationRailDestination(icon: Icon(Icons.terminal_rounded), label: Text('Activity')),
+                            destinations: [
+                              const NavigationRailDestination(icon: Icon(Icons.radar_rounded), label: Text('Devices')),
+                              if (c.supportsL2cap)
+                                const NavigationRailDestination(
+                                  icon: Icon(Icons.dns_outlined),
+                                  label: Text('Local server'),
+                                ),
+                              const NavigationRailDestination(
+                                icon: Icon(Icons.terminal_rounded),
+                                label: Text('Activity'),
+                              ),
                             ],
                           ),
                           const VerticalDivider(width: 1),
@@ -175,7 +182,7 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
                             index: _destination,
                             children: [
                               DevicesPanel(controller: c, active: _destination == 0),
-                              L2capServerPanel(controller: c),
+                              if (c.supportsL2cap) L2capServerPanel(controller: c),
                               ActivityPanel(controller: c),
                             ],
                           ),
@@ -191,10 +198,11 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
                 : NavigationBar(
                     selectedIndex: _destination,
                     onDestinationSelected: (index) => setState(() => _destination = index),
-                    destinations: const [
-                      NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
-                      NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
-                      NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
+                    destinations: [
+                      const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
+                      if (c.supportsL2cap)
+                        const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
+                      const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
                     ],
                   ),
           );
@@ -211,6 +219,8 @@ class _AdapterBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final message = switch (controller.adapter) {
+      BluetoothAdapterState.unknown when kIsWeb =>
+        'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
       BluetoothAdapterState.unauthorized =>
         'Bluetooth permission is denied. Allow access in system settings, then reopen the app.',
       BluetoothAdapterState.unavailable => 'Bluetooth is not available on this device.',
@@ -226,7 +236,9 @@ class _AdapterBanner extends StatelessWidget {
           const Icon(Icons.info_outline, size: 18),
           const SizedBox(width: 12),
           Expanded(child: Text(message)),
-          if (defaultTargetPlatform == TargetPlatform.android && controller.adapter == BluetoothAdapterState.off)
+          if (!kIsWeb &&
+              defaultTargetPlatform == TargetPlatform.android &&
+              controller.adapter == BluetoothAdapterState.off)
             TextButton(
               onPressed: controller.busy('adapter') ? null : controller.turnOn,
               child: const Text('Turn on Bluetooth'),

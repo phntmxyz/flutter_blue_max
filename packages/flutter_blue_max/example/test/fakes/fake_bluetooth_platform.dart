@@ -23,11 +23,14 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   int serverStarts = 0;
   bool holdConnections = false;
   bool includeGattExtras = false;
+  bool emitNotifyDescriptorEvents = true;
   bool failNextOpen = false;
   bool disconnectOnOpenFailure = false;
   Object? l2capFailure;
   final connectRequests = <BmConnectRequest>[];
   final systemDeviceRequests = <BmSystemDevicesRequest>[];
+  final scanRequests = <BmScanSettings>[];
+  final rssiRequests = <BmReadRssiRequest>[];
   final openRequests = <OpenL2CapChannelRequest>[];
   final readRequests = <ReadL2CapChannelRequest>[];
   final characteristicReads = <BmReadCharacteristicRequest>[];
@@ -72,6 +75,7 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
 
   @override
   Future<bool> readRssi(BmReadRssiRequest request) async {
+    rssiRequests.add(request);
     rssiValues.add(
       BmReadRssiResult(remoteId: request.remoteId, rssi: -47, success: true, errorCode: 0, errorString: ''),
     );
@@ -128,6 +132,9 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Future<bool> setNotifyValue(BmSetNotifyValueRequest request) async {
     notifyRequests.add(request);
+    if (!emitNotifyDescriptorEvents) {
+      return false;
+    }
     descriptorWritten.add(
       BmDescriptorData(
         remoteId: request.remoteId,
@@ -172,6 +179,7 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   @override
   Future<bool> startScan(BmScanSettings request) async {
     scanStarts++;
+    scanRequests.add(request);
     return true;
   }
 

@@ -69,7 +69,12 @@ class _DevicesPanelState extends State<DevicesPanel> {
                 children: [
                   Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 6),
-                  Text('Explore advertisements and GATT services.', style: Theme.of(context).textTheme.bodySmall),
+                  Text(
+                    kIsWeb
+                        ? 'Choose a device in the browser to explore GATT services.'
+                        : 'Explore advertisements and GATT services.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
                   if (c.localName?.isNotEmpty ?? false) ...[
                     const SizedBox(height: 6),
                     Text('This device: ${c.localName}', style: Theme.of(context).textTheme.bodySmall),
@@ -135,7 +140,11 @@ class _DevicesPanelState extends State<DevicesPanel> {
                     children: [
                       Text('${results.length} devices', style: Theme.of(context).textTheme.labelMedium),
                       Text(
-                        c.scanning ? 'Scanning…' : 'Strongest signal first',
+                        c.scanning
+                            ? 'Scanning…'
+                            : kIsWeb
+                            ? 'Selected devices'
+                            : 'Strongest signal first',
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                     ],
@@ -193,8 +202,10 @@ class _DevicesPanelState extends State<DevicesPanel> {
                           ),
                           const SizedBox(height: 5),
                           Text(
-                            '${result.rssi} dBm · '
-                            '${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
+                            kIsWeb
+                                ? 'Selected in browser'
+                                : '${result.rssi} dBm · '
+                                      '${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
                             style: Theme.of(context).textTheme.bodySmall,
                           ),
                         ],
@@ -296,7 +307,7 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                     avatar: Icon(c.connected ? Icons.link : Icons.link_off, size: 16),
                     label: Text(c.connected ? 'Connected' : 'Disconnected'),
                   ),
-                  if (c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B')),
+                  if (c.connected && !kIsWeb) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B')),
                   if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
                 ],
               ),
@@ -324,12 +335,13 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                           : 'Connect',
                     ),
                   ),
-                  OutlinedButton.icon(
-                    onPressed: available && !c.busy('rssi:${device.remoteId}') ? c.readRssi : null,
-                    icon: const Icon(Icons.signal_cellular_alt),
-                    label: const Text('Read RSSI'),
-                  ),
-                  if (defaultTargetPlatform == TargetPlatform.android) ...[
+                  if (!kIsWeb)
+                    OutlinedButton.icon(
+                      onPressed: available && !c.busy('rssi:${device.remoteId}') ? c.readRssi : null,
+                      icon: const Icon(Icons.signal_cellular_alt),
+                      label: const Text('Read RSSI'),
+                    ),
+                  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
                     OutlinedButton(
                       onPressed: available ? () => _mtuDialog(context) : null,
                       child: const Text('Request MTU'),
@@ -342,7 +354,7 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                 ],
               ),
               const SizedBox(height: 28),
-              if (advertisement != null)
+              if (!kIsWeb && advertisement != null)
                 Card(
                   margin: const EdgeInsets.only(bottom: 16),
                   child: ExpansionTile(
@@ -375,26 +387,27 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
             ],
           ),
         ),
-        PinnedHeaderSliver(
-          child: ColoredBox(
-            color: Theme.of(context).colorScheme.surface,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
-              child: SegmentedButton<bool>(
-                segments: const [
-                  ButtonSegment(value: false, icon: Icon(Icons.account_tree_outlined), label: Text('GATT')),
-                  ButtonSegment(value: true, icon: Icon(Icons.cable_rounded), label: Text('L2CAP')),
-                ],
-                selected: {_l2cap},
-                onSelectionChanged: (value) => setState(() => _l2cap = value.single),
+        if (c.supportsL2cap)
+          PinnedHeaderSliver(
+            child: ColoredBox(
+              color: Theme.of(context).colorScheme.surface,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+                child: SegmentedButton<bool>(
+                  segments: const [
+                    ButtonSegment(value: false, icon: Icon(Icons.account_tree_outlined), label: Text('GATT')),
+                    ButtonSegment(value: true, icon: Icon(Icons.cable_rounded), label: Text('L2CAP')),
+                  ],
+                  selected: {_l2cap},
+                  onSelectionChanged: (value) => setState(() => _l2cap = value.single),
+                ),
               ),
             ),
           ),
-        ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           sliver: SliverToBoxAdapter(
-            child: _l2cap
+            child: _l2cap && c.supportsL2cap
                 ? DeviceL2capPanel(key: ValueKey(device.remoteId), device: device, controller: c)
                 : WorkbenchCard(
                     title: 'GATT explorer',

@@ -30,6 +30,7 @@ class WorkbenchRobot {
     logEvent('Close the workbench');
     platform.holdConnections = false;
     platform.includeGattExtras = false;
+    platform.emitNotifyDescriptorEvents = true;
     platform.systemPeers.clear();
     await tester.pumpWidget(const SizedBox.shrink());
     controller.dispose();

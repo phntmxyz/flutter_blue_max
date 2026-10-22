@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -78,4 +79,38 @@ void main() {
     await robot.launch(size: const Size(390, 844));
     await robot.pullToRefreshDevices();
   });
+
+  testWidgets('Linux exposes GATT and activity without unsupported L2CAP controls', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.scanForPeripheral();
+    await robot.inspectPeripheral();
+    robot.expectGattOnlyPlatform();
+    await robot.readAndWriteCharacteristic();
+    await robot.openActivity();
+    await robot.tapLabel('Devices');
+    robot.expectGattOnlyPlatform();
+    debugDefaultTargetPlatformOverride = null;
+  });
+
+  for (final size in [const Size(1200, 850), const Size(390, 844)]) {
+    testWidgets('web: scan, GATT and navigation at $size', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      platform.includeGattExtras = true;
+      platform.emitNotifyDescriptorEvents = false;
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: size);
+      await robot.scanForPeripheral();
+      await robot.inspectPeripheral();
+      robot.expectWebCapabilities();
+      await robot.exerciseNotificationsAndDescriptors();
+      await robot.openActivity();
+      await robot.tapLabel('Devices');
+      robot.expectWebCapabilities();
+      debugDefaultTargetPlatformOverride = null;
+    }, skip: !kIsWeb);
+  }
 }

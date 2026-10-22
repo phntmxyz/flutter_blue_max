@@ -1,6 +1,6 @@
 # Blue Max Bluetooth workbench
 
-A Material 3 example for exploring real Bluetooth peripherals on Android, iOS, macOS and Linux.
+A Material 3 example for exploring real Bluetooth peripherals on Android, iOS, macOS, Linux and the web.
 It uses the local packages in this repository through `pubspec_overrides.yaml`.
 
 ## Run
@@ -25,15 +25,19 @@ Replace `<device-id>` below with the ID from `flutter devices`.
 | macOS 12+ | `flutter run -d macos --debug` | Scan, GATT and L2CAP client/server; use debug mode with the tested Flutter version. |
 | Linux | `flutter run -d linux` | Scan and GATT backend; no L2CAP client/server. |
 | Windows | Not available | No example runner or Windows Bluetooth backend. |
-| Web | Not available | No example runner; a separate web backend exists, without L2CAP. |
+| Web | `flutter run -d chrome` | Browser device chooser and GATT for the services listed below; no L2CAP, RSSI, MTU requests or bonding. |
 
 - Android: install the Android SDK/JDK, enable USB debugging and grant Bluetooth permissions; Android 7–11 also needs location permission/services for scanning.
 - iOS: build on macOS with Xcode and select a development team in `ios/Runner.xcodeproj` for a physical device; start Simulator with `open -a Simulator`.
 - macOS: install Xcode and allow Bluetooth access when prompted.
 - Linux: build on Linux with Clang, CMake, Ninja, pkg-config and GTK 3 development libraries; Bluetooth requires BlueZ and a usable adapter.
+- Web: use a browser with [Web Bluetooth support](https://developer.chrome.com/docs/capabilities/bluetooth) over HTTPS or localhost; **Start scan** opens the browser's device chooser.
+  As in the original example, the chooser requests access to Battery (`180F`), Device Information (`180A`), Generic Access (`1800`) and Nordic UART (`6E400001-B5A3-F393-E0A9-E50E24DCCA9E`).
+  Browser permissions restrict GATT access to these services; custom services must be included in the scan's `webOptionalServices` before selecting the device.
 
 The table describes implementation support, not completed hardware validation on every platform.
-Known UI limitation: L2CAP controls are still visible on Linux and older Android devices; unsupported calls show a dismissible error.
+L2CAP controls are hidden on Linux and web.
+On Android below version 10, the backend reports unsupported calls through a dismissible error; the library has no per-feature capability query yet.
 
 ## Download builds from GitHub Actions
 
@@ -64,7 +68,9 @@ The [tag push trigger](https://docs.github.com/en/actions/reference/workflows-an
 The workflow pins Flutter 3.47.7 through `FLUTTER_VERSION`.
 It builds the local package implementations from the selected checkout and does not publish packages or releases.
 The existing `Publish Flutter Blue Plus…` workflows publish library packages to pub.dev when their version tags are pushed.
-Windows and web are omitted because this sample has no runner for either platform.
+The workflow currently builds the four native platforms above.
+Build the restored web runner locally with `flutter build web`; its output is in `build/web`.
+Windows has no example runner or Bluetooth backend.
 
 The macOS download uses debug mode because of the [release compiler limitation](#macos-release-compiler-limitation) below.
 It is ad-hoc signed rather than notarized; macOS may require approval in **System Settings → Privacy & Security** when opening a downloaded build.
@@ -112,7 +118,7 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
   System-connected devices are queried on each scan, including peers connected through another app.
   As in the original example, Apple system-device lookup uses the Battery Service UUID (`180F`).
   Pending connections can be cancelled; broadcast-only advertisements cannot be connected.
-  RSSI is read after connecting and when reopening a connected device, and the Android adapter banner can request that Bluetooth be enabled.
+  On native platforms, RSSI is read after connecting and when reopening a connected device, and the Android adapter banner can request that Bluetooth be enabled.
   Connected devices remain accessible above the result list when a new scan starts.
   Select a device, connect, then choose **GATT** or **L2CAP** in its inspector.
   GATT exposes service discovery, characteristic/descriptor reads and writes, and notifications.
@@ -181,6 +187,7 @@ They do not validate radio behavior or operating-system permission dialogs.
 | Large payload and burst | Channel → Send 10 KB / Burst 20×1 KB | Payload content/size, queued completion and partial failure |
 | Receive history and RX count | Channel → Receive history | 200 entries, stream/read distinction and retention after channel closure/reopening |
 | Logs and Clear | Activity | Bounded logging; search/copy/clear available in UI |
+| Web device chooser and GATT | Web runner → Devices | Chrome widget tests for service permissions, reads/writes, subscriptions and navigation |
 
 ## Hardware checks
 
@@ -220,6 +227,8 @@ Received values are stream chunks, not application message boundaries.
 ```sh
 flutter analyze
 flutter test
+flutter test --platform chrome test/scenarios/restored_features_test.dart --plain-name 'web:'
+flutter build web
 flutter build apk --debug
 flutter build ios --simulator --debug
 flutter build macos --debug

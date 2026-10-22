@@ -59,6 +59,14 @@ class WorkbenchController extends ChangeNotifier {
   bool get ready => adapter == BluetoothAdapterState.on;
   bool busy(String operation) => _busy.contains(operation);
 
+  /// The current web and Linux backends do not implement L2CAP.
+  bool get supportsL2cap =>
+      !kIsWeb &&
+      switch (defaultTargetPlatform) {
+        TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+        _ => false,
+      };
+
   List<ScanResult> get visibleDevices {
     final search = query.trim().toLowerCase();
     return scanResults.where((result) {
@@ -212,8 +220,14 @@ class WorkbenchController extends ChangeNotifier {
     if (scanning) {
       await FlutterBlueMax.stopScan();
     } else {
-      await refreshSystemDevices();
-      await FlutterBlueMax.startScan(timeout: const Duration(seconds: 15));
+      if (!kIsWeb) {
+        await refreshSystemDevices();
+      }
+      await FlutterBlueMax.startScan(
+        timeout: const Duration(seconds: 15),
+        // Preserve the original example's browser service permissions.
+        webOptionalServices: [Guid('180f'), Guid('180a'), Guid('1800'), Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e')],
+      );
     }
   });
 
@@ -278,6 +292,9 @@ class WorkbenchController extends ChangeNotifier {
   });
 
   Future<void> readRssi() async {
+    if (kIsWeb) {
+      return;
+    }
     final device = selected!;
     await run('rssi:${device.remoteId}', () async {
       final value = await device.readRssi();
@@ -292,6 +309,9 @@ class WorkbenchController extends ChangeNotifier {
   });
 
   Future<void> startServer({required bool secure}) => run('server', () async {
+    if (!supportsL2cap) {
+      throw UnsupportedError('L2CAP is not available on this platform.');
+    }
     if (serverPsm != null) {
       return;
     }
@@ -330,6 +350,9 @@ class WorkbenchController extends ChangeNotifier {
 
   /// Binds an outgoing channel to the inspected peer, never to later device selection.
   Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) => run('open', () async {
+    if (!supportsL2cap) {
+      throw UnsupportedError('L2CAP is not available on this platform.');
+    }
     final key = (device.remoteId, psm);
     if (_channels[key]?.closed == false) {
       throw StateError('This peer already has a channel on PSM $psm.');
