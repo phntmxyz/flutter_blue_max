@@ -13,6 +13,21 @@ final _platform = FakeBluetoothPlatform();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('polling stops when its deadline expires', () async {
+    var polls = 0;
+    await expectLater(
+      _until(() {
+        polls++;
+        return false;
+      }, timeout: const Duration(milliseconds: 10)),
+      throwsA(isA<TimeoutException>()),
+    );
+    expect(polls, greaterThan(0));
+    final pollsAtTimeout = polls;
+    await Future<void>.delayed(const Duration(milliseconds: 20));
+    expect(polls, pollsAtTimeout, reason: 'A timed-out poll must not keep running');
+  });
+
   test('cancellation interrupts a pending real plugin connection without waiting for its timeout', () async {
     final c = await _setup();
     final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:51');
@@ -224,10 +239,12 @@ Future<WorkbenchController> _setup() async {
   return c;
 }
 
-Future<void> _until(bool Function() complete) async {
-  await Future<void>(() async {
-    while (!complete()) {
-      await Future<void>.delayed(Duration.zero);
+Future<void> _until(bool Function() complete, {Duration timeout = const Duration(seconds: 2)}) async {
+  final stopwatch = Stopwatch()..start();
+  while (!complete()) {
+    if (stopwatch.elapsed >= timeout) {
+      throw TimeoutException('Condition was not met before the polling deadline', timeout);
     }
-  }).timeout(const Duration(seconds: 2));
+    await Future<void>.delayed(Duration.zero);
+  }
 }
