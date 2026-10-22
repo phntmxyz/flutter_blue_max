@@ -61,9 +61,10 @@ The layout adapts to phones and desktops, supports light/dark themes and keeps B
 ## Download builds from GitHub Actions
 
 The [Build example downloads](../../../.github/workflows/example_build.yml) workflow builds all five supported targets with Flutter 3.47.7 and retains downloads for 14 days.
+Pull requests that change the packages or this workflow run all five builds, formatting checks, package:lint analysis, the native test suite and the two Chrome scenarios.
 It produces Actions artifacts rather than GitHub Releases or pub.dev packages.
 
-Before the workflow is on the default branch, check out the branch to test and deliberately push a new `example-test/` tag:
+To build a branch without an open pull request before the workflow is on the default branch, check out that branch and deliberately push a new `example-test/` tag:
 
 ```sh
 git tag example-test/my-build HEAD
@@ -71,7 +72,7 @@ git push origin refs/tags/example-test/my-build
 ```
 
 Use a unique tag for each build; the tag builds its exact commit on all five platforms.
-Ordinary branch pushes do not trigger this workflow.
+For branches without an open pull request, ordinary pushes do not trigger this workflow.
 Once the workflow exists on the default branch, **Actions → Build example downloads → Run workflow** also lets you choose a branch and either `all` or one platform ([GitHub instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)).
 After the run, download files from **Artifacts** or the links in the job summaries.
 
@@ -109,7 +110,7 @@ From the example directory:
 ```sh
 flutter analyze
 flutter test
-flutter test --platform chrome test/scenarios/restored_features_test.dart --plain-name 'web:'
+flutter test --platform chrome test/scenarios/workbench_test.dart --plain-name 'web:'
 ```
 
 Tests execute the production example in `lib/` and the public `flutter_blue_max` API, replacing only platform I/O with an in-memory fake.

@@ -1,6 +1,10 @@
 name: Build example downloads
 
 on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/example_build.yml'
   push:
     tags:
       - 'example-test/**'
@@ -74,8 +78,17 @@ jobs:
       - name: Install the example's Flutter version
         run: |
           puro2 create "$FLUTTER_VERSION" "$FLUTTER_VERSION"
-          puro2 -e "$FLUTTER_VERSION" flutter pub get
+          puro2 -e "$FLUTTER_VERSION" flutter pub get --enforce-lockfile
           mkdir -p dist
+
+      - name: Check example formatting, analysis and tests
+        if: matrix.platform == 'linux'
+        run: |
+          puro2 -e "$FLUTTER_VERSION" dart format --output=none --set-exit-if-changed lib test
+          puro2 -e "$FLUTTER_VERSION" flutter analyze --no-pub lib test
+          puro2 -e "$FLUTTER_VERSION" flutter test --no-pub
+          puro2 -e "$FLUTTER_VERSION" flutter test --no-pub --platform chrome \
+            test/scenarios/workbench_test.dart --plain-name 'web:'
 
       - name: Build Android APK
         if: matrix.platform == 'android'
