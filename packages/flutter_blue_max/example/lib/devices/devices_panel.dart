@@ -307,7 +307,7 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                     avatar: Icon(c.connected ? Icons.link : Icons.link_off, size: 16),
                     label: Text(c.connected ? 'Connected' : 'Disconnected'),
                   ),
-                  if (c.connected && !kIsWeb) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B')),
+                  if (!kIsWeb) ...[if (c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B'))],
                   if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
                 ],
               ),
@@ -354,36 +354,38 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
                 ],
               ),
               const SizedBox(height: 28),
-              if (!kIsWeb && advertisement != null)
-                Card(
-                  margin: const EdgeInsets.only(bottom: 16),
-                  child: ExpansionTile(
-                    title: const Text('Advertisement'),
-                    subtitle: Text(
-                      '${advertisement.rssi} dBm · '
-                      '${advertisement.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
-                    ),
-                    expandedAlignment: Alignment.centerLeft,
-                    childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                    children: [
-                      SelectableText(
-                        [
-                          'Name: ${advertisement.advertisementData.advName}',
-                          if (advertisement.advertisementData.txPowerLevel != null)
-                            'TX power: ${advertisement.advertisementData.txPowerLevel} dBm',
-                          if (advertisement.advertisementData.appearance != null)
-                            'Appearance: 0x${advertisement.advertisementData.appearance!.toRadixString(16)}',
-                          for (final uuid in advertisement.advertisementData.serviceUuids) 'Service: $uuid',
-                          for (final entry in advertisement.advertisementData.manufacturerData.entries)
-                            'Manufacturer 0x${entry.key.toRadixString(16)}: ${PayloadCodec.hex(entry.value)}',
-                          for (final entry in advertisement.advertisementData.serviceData.entries)
-                            'Service data ${entry.key}: ${PayloadCodec.hex(entry.value)}',
-                        ].join('\n'),
-                        style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+              if (!kIsWeb) ...[
+                if (advertisement != null)
+                  Card(
+                    margin: const EdgeInsets.only(bottom: 16),
+                    child: ExpansionTile(
+                      title: const Text('Advertisement'),
+                      subtitle: Text(
+                        '${advertisement.rssi} dBm · '
+                        '${advertisement.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
                       ),
-                    ],
+                      expandedAlignment: Alignment.centerLeft,
+                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      children: [
+                        SelectableText(
+                          [
+                            'Name: ${advertisement.advertisementData.advName}',
+                            if (advertisement.advertisementData.txPowerLevel != null)
+                              'TX power: ${advertisement.advertisementData.txPowerLevel} dBm',
+                            if (advertisement.advertisementData.appearance != null)
+                              'Appearance: 0x${advertisement.advertisementData.appearance!.toRadixString(16)}',
+                            for (final uuid in advertisement.advertisementData.serviceUuids) 'Service: $uuid',
+                            for (final entry in advertisement.advertisementData.manufacturerData.entries)
+                              'Manufacturer 0x${entry.key.toRadixString(16)}: ${PayloadCodec.hex(entry.value)}',
+                            for (final entry in advertisement.advertisementData.serviceData.entries)
+                              'Service data ${entry.key}: ${PayloadCodec.hex(entry.value)}',
+                          ].join('\n'),
+                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+              ],
             ],
           ),
         ),

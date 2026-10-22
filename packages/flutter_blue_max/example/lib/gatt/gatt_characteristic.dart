@@ -134,8 +134,11 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                                 final notify = !_notifying;
                                 await c.setNotifyValue(notify);
                                 // Web Bluetooth does not publish a CCCD write event.
-                                if (kIsWeb && mounted) {
-                                  setState(() => _notifying = notify);
+                                if (kIsWeb) {
+                                  // Browser subscriptions have no native CCCD event.
+                                  if (mounted) {
+                                    setState(() => _notifying = notify);
+                                  }
                                 }
                                 if (p.read) {
                                   await c.read();

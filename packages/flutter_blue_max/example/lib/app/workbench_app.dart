@@ -237,13 +237,14 @@ class _AdapterBanner extends StatelessWidget {
           const Icon(Icons.info_outline, size: 18),
           const SizedBox(width: 12),
           Expanded(child: Text(message)),
-          if (!kIsWeb &&
-              defaultTargetPlatform == TargetPlatform.android &&
-              controller.adapter == BluetoothAdapterState.off)
-            TextButton(
-              onPressed: controller.busy('adapter') ? null : controller.turnOn,
-              child: const Text('Turn on Bluetooth'),
-            ),
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+            // Only an off adapter needs the Android enable request.
+            if (controller.adapter == BluetoothAdapterState.off)
+              TextButton(
+                onPressed: controller.busy('adapter') ? null : controller.turnOn,
+                child: const Text('Turn on Bluetooth'),
+              ),
+          ],
         ],
       ),
     );
