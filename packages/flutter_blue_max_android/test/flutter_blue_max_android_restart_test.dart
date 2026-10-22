@@ -84,6 +84,44 @@ void main() {
       'isSupported',
     ]);
   });
+  for (final missingMethod in ['flutterRestart', 'connectedCount']) {
+    test('rejects missing $missingMethod count and retries', () async {
+      var missingResponse = true;
+      var restartCalls = 0;
+      var supportedCalls = 0;
+      final plugin = createPlugin((call) async {
+        switch (call.method) {
+          case 'flutterRestart':
+            restartCalls++;
+            if (missingResponse && missingMethod == 'flutterRestart') {
+              return null;
+            }
+            return missingResponse ? 1 : 0;
+          case 'connectedCount':
+            return null;
+          case 'isSupported':
+            supportedCalls++;
+            return true;
+          default:
+            fail('Unexpected method ${call.method}');
+        }
+      });
+
+      await expectLater(
+        plugin.isSupported(BmIsSupportedRequest()),
+        throwsA(isA<PlatformException>().having(
+          (e) => e.code,
+          'code',
+          'invalidRestartCount',
+        )),
+      );
+      expect(supportedCalls, 0);
+      missingResponse = false;
+      expect(await plugin.isSupported(BmIsSupportedRequest()), isTrue);
+      expect(restartCalls, 2);
+      expect(supportedCalls, 1);
+    });
+  }
 }
 
 FlutterBlueMaxAndroid createPlugin(

@@ -536,7 +536,7 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     const timeout = Duration(seconds: 10);
     final stopwatch = Stopwatch()..start();
 
-    var remaining = await methodChannel.invokeMethod<int>('flutterRestart') ?? 0;
+    var remaining = await _readRestartConnectionCount('flutterRestart');
     while (remaining != 0) {
       if (stopwatch.elapsed >= timeout) {
         throw TimeoutException(
@@ -546,8 +546,19 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
         );
       }
       await Future<void>.delayed(pollInterval);
-      remaining = await methodChannel.invokeMethod<int>('connectedCount') ?? 0;
+      remaining = await _readRestartConnectionCount('connectedCount');
     }
+  }
+
+  Future<int> _readRestartConnectionCount(String method) async {
+    final count = await methodChannel.invokeMethod<int>(method);
+    if (count == null) {
+      throw PlatformException(
+        code: 'invalidRestartCount',
+        message: 'Native $method returned no BLE restart connection count',
+      );
+    }
+    return count;
   }
 
   Future<void> _methodCallHandler(
