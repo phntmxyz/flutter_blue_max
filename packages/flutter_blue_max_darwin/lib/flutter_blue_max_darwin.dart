@@ -351,22 +351,22 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     String method, [
     dynamic arguments,
   ]) async {
-    // make sure we can receive platform callbacks
+    // Make sure callbacks from the native plugin are routed to this Dart
+    // isolate before the restart handshake starts.
     methodChannel.setMethodCallHandler(_methodCallHandler);
 
-    // Complete the hot-restart handshake before the first real call.
-    // 'setOptions' and 'setLogLevel' are deliberately allowed through
-    // beforehand: the handshake causes the native side to create the
-    // CBCentralManager, and options like showPowerAlert must already
-    // be delivered by then to have any effect.
+    // A hot restart creates a new Dart wrapper while the native plugin stays
+    // attached to the Flutter engine. Share one handshake between concurrent
+    // first calls so no operation can race the old native session teardown.
+    // Options and logging must be delivered before the handshake creates a
+    // CBCentralManager, otherwise options such as restoreState are too late.
     if (method != 'setOptions' && method != 'setLogLevel') {
-      Future<void> handshake = _restartHandshake ??= _drainOldConnections();
+      final handshake = _restartHandshake ??= _drainOldSession();
       try {
         await handshake;
       } catch (_) {
-        // don't cache a failed handshake - the next call retries it. The
-        // identical() check keeps a late failure from wiping out a newer,
-        // still-running retry started by another caller
+        // A failed handshake must be retryable. The identity check avoids an
+        // older failure clearing a newer retry.
         if (identical(_restartHandshake, handshake)) {
           _restartHandshake = null;
         }
@@ -398,15 +398,34 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     return out;
   }
 
-  /// after a hot restart the native side may still hold connections
-  /// from the previous dart vm - tell it to drop them and wait until done
-  Future<void> _drainOldConnections() async {
-    if ((await methodChannel.invokeMethod('flutterRestart')) != 0) {
-      await Future.delayed(Duration(milliseconds: 50));
-      while ((await methodChannel.invokeMethod('connectedCount')) != 0) {
-        await Future.delayed(Duration(milliseconds: 50));
+  Future<void> _drainOldSession() async {
+    const pollInterval = Duration(milliseconds: 50);
+    const timeout = Duration(seconds: 10);
+    final stopwatch = Stopwatch()..start();
+
+    var remaining = await _readRestartConnectionCount('flutterRestart');
+    while (remaining != 0) {
+      if (stopwatch.elapsed >= timeout) {
+        throw TimeoutException(
+          'Timed out waiting for $remaining native BLE connection(s) '
+          'to close after hot restart',
+          timeout,
+        );
       }
+      await Future<void>.delayed(pollInterval);
+      remaining = await _readRestartConnectionCount('connectedCount');
     }
+  }
+
+  Future<int> _readRestartConnectionCount(String method) async {
+    final count = await methodChannel.invokeMethod<int>(method);
+    if (count == null) {
+      throw PlatformException(
+        code: 'invalidRestartCount',
+        message: 'Native $method returned no BLE restart connection count',
+      );
+    }
+    return count;
   }
 
   Future<void> _methodCallHandler(

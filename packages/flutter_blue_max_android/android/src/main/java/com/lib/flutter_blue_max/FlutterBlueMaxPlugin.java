@@ -120,6 +120,12 @@ public class FlutterBlueMaxPlugin implements
     private final Semaphore mMethodCallMutex = new Semaphore(1);
     private final Map<String, BluetoothGatt> mConnectedDevices = new ConcurrentHashMap<>();
     private final Map<String, BluetoothGatt> mCurrentlyConnectingDevices = new ConcurrentHashMap<>();
+    // GATT handles owned by the previous Dart isolate. They stay here until
+    // Android confirms disconnection, so a hot-restarted isolate cannot race a
+    // new connection against callbacks from the old handle.
+    private final Set<BluetoothGatt> mHotRestartGatt = Collections.newSetFromMap(new ConcurrentHashMap<>());
+    private static final long HOT_RESTART_DISCONNECT_TIMEOUT_MS = 5000;
+    private volatile long mBleSessionGeneration = 0;
     private final Map<String, BluetoothDevice> mBondingDevices = new ConcurrentHashMap<>();
     private final Map<String, byte[]> mBondingPins = new ConcurrentHashMap<>();
     private final Map<String, Integer> mMtu = new ConcurrentHashMap<>();
@@ -399,13 +405,14 @@ public class FlutterBlueMaxPlugin implements
                         mIsScanning = false;
                     }
 
-                    // all dart state is reset after flutter restart
-                    // (i.e. Hot Restart) so also reset native state
-                    disconnectAllDevices("flutterRestart");
+                    // All Dart state is reset after hot restart. Retire every
+                    // native GATT handle and wait for its asynchronous teardown
+                    // before accepting work from the new isolate.
+                    disconnectForHotRestart();
 
-                    log(LogLevel.DEBUG, "connectedPeripherals: " + mConnectedDevices.size());
+                    log(LogLevel.DEBUG, "hotRestartConnections: " + mHotRestartGatt.size());
 
-                    result.success(mConnectedDevices.size());
+                    result.success(mHotRestartGatt.size());
                     break;
                 }
 
@@ -418,11 +425,11 @@ public class FlutterBlueMaxPlugin implements
 
                 case "connectedCount":
                 {
-                    log(LogLevel.DEBUG, "connectedPeripherals: " + mConnectedDevices.size());
-                    if (mConnectedDevices.size() == 0) {
+                    log(LogLevel.DEBUG, "hotRestartConnections: " + mHotRestartGatt.size());
+                    if (mHotRestartGatt.isEmpty()) {
                         log(LogLevel.DEBUG, "Hot Restart: complete");
                     }
-                    result.success(mConnectedDevices.size());
+                    result.success(mHotRestartGatt.size());
                     break;
                 }
 
@@ -1952,6 +1959,7 @@ public class FlutterBlueMaxPlugin implements
         // merge connected & autoconnected
         Map<String, BluetoothGatt> allDevices = new HashMap<>();
         allDevices.putAll(mConnectedDevices);
+        allDevices.putAll(mCurrentlyConnectingDevices);
         allDevices.putAll(mAutoConnected);
 
         // request disconnections
@@ -1990,6 +1998,83 @@ public class FlutterBlueMaxPlugin implements
         mWriteChr.clear();
         mWriteDesc.clear();
         mAutoConnected.clear();
+
+        if (l2CapChannelManager != null) {
+            l2CapChannelManager.closeAllChannels();
+        }
+    }
+
+    private void disconnectForHotRestart()
+    {
+        mBleSessionGeneration++;
+        // A second first-call handshake can arrive while the previous teardown
+        // is still running. Existing retired handles remain authoritative.
+        Set<BluetoothGatt> allDevices = Collections.newSetFromMap(new ConcurrentHashMap<>());
+        allDevices.addAll(mConnectedDevices.values());
+        allDevices.addAll(mCurrentlyConnectingDevices.values());
+        allDevices.addAll(mAutoConnected.values());
+        mHotRestartGatt.addAll(allDevices);
+
+        // Remove the handles from active lookup maps immediately. Their later
+        // callbacks are recognized by identity through mHotRestartGatt and are
+        // never allowed to mutate a newer connection for the same remote id.
+        mConnectedDevices.clear();
+        mCurrentlyConnectingDevices.clear();
+        mAutoConnected.clear();
+        mBondingDevices.clear();
+        mBondingPins.clear();
+        mMtu.clear();
+        mWriteChr.clear();
+        mWriteDesc.clear();
+
+        if (l2CapChannelManager != null) {
+            l2CapChannelManager.closeAllChannels();
+        }
+
+        for (BluetoothGatt gatt : allDevices) {
+            String remoteId = gatt.getDevice().getAddress();
+            log(LogLevel.DEBUG, "Hot Restart: disconnecting old GATT " + remoteId);
+            try {
+                gatt.disconnect();
+            } catch (Exception e) {
+                log(LogLevel.WARNING, "Hot Restart: disconnect failed for " + remoteId + ": " + e);
+                closeHotRestartGatt(gatt);
+            }
+        }
+
+        if (allDevices.isEmpty()) {
+            return;
+        }
+
+        // Some Android stacks never deliver a terminal callback for a GATT
+        // that was still connecting. Bound the handshake and force-close those
+        // handles rather than hanging the new Dart isolate forever.
+        new Handler(Looper.getMainLooper()).postDelayed(() -> {
+            acquireMutex(mMethodCallMutex);
+            try {
+                // A previous restart's timer must never close handles retired
+                // by a later restart, even when their remote ids match.
+                for (BluetoothGatt gatt : allDevices) {
+                    if (mHotRestartGatt.contains(gatt)) {
+                        log(LogLevel.WARNING, "Hot Restart: force-closing old GATT after timeout");
+                        closeHotRestartGatt(gatt);
+                    }
+                }
+            } finally {
+                mMethodCallMutex.release();
+            }
+        }, HOT_RESTART_DISCONNECT_TIMEOUT_MS);
+    }
+
+    private void closeHotRestartGatt(BluetoothGatt gatt)
+    {
+        try {
+            gatt.close();
+        } catch (Exception e) {
+            log(LogLevel.WARNING, "Hot Restart: close failed: " + e);
+        } finally {
+            mHotRestartGatt.remove(gatt);
+        }
     }
 
     int getAppearanceFromScanRecord(ScanRecord adv) {
@@ -2344,6 +2429,20 @@ public class FlutterBlueMaxPlugin implements
     // ██       ██   ██  ██       ██       ██   ██  ██   ██  ██       ██  ██
     //  ██████  ██   ██  ███████  ███████  ██████   ██   ██   ██████  ██   ██
 
+    private void runIfCurrentGatt(BluetoothGatt gatt, Runnable callback)
+    {
+        // Serialize native cache updates with restart teardown. Checking only
+        // the retired set would admit late callbacks after a handle is closed.
+        acquireMutex(mMethodCallMutex);
+        try {
+            if (mConnectedDevices.get(gatt.getDevice().getAddress()) == gatt) {
+                callback.run();
+            }
+        } finally {
+            mMethodCallMutex.release();
+        }
+    }
+
     private final BluetoothGattCallback mGattCallback = new BluetoothGattCallback()
     {
         @Override
@@ -2367,6 +2466,25 @@ public class FlutterBlueMaxPlugin implements
 
                 String remoteId = gatt.getDevice().getAddress();
 
+                // This handle belonged to the Dart isolate that was replaced
+                // by hot restart. Never let its late callbacks remove or
+                // replace a newer GATT stored under the same remote id.
+                if (mHotRestartGatt.contains(gatt)) {
+                    if (newState == BluetoothProfile.STATE_CONNECTED) {
+                        log(LogLevel.DEBUG, "Hot Restart: old GATT connected late; disconnecting " + remoteId);
+                        try {
+                            gatt.disconnect();
+                        } catch (Exception e) {
+                            log(LogLevel.WARNING, "Hot Restart: late disconnect failed for " + remoteId + ": " + e);
+                            closeHotRestartGatt(gatt);
+                        }
+                    } else {
+                        log(LogLevel.DEBUG, "Hot Restart: old GATT disconnected " + remoteId);
+                        closeHotRestartGatt(gatt);
+                    }
+                    return;
+                }
+
                 // edge case. see function for details
                 if (handleUnexpectedConnectionEvents(gatt, newState, remoteId)) {
                     return;
@@ -2378,7 +2496,9 @@ public class FlutterBlueMaxPlugin implements
                     mConnectedDevices.put(remoteId, gatt);
 
                     // remove from currently connecting devices
-                    mCurrentlyConnectingDevices.remove(remoteId);
+                    if (mCurrentlyConnectingDevices.get(remoteId) == gatt) {
+                        mCurrentlyConnectingDevices.remove(remoteId);
+                    }
 
                     // default minimum mtu
                     mMtu.put(remoteId, 23);
@@ -2388,10 +2508,14 @@ public class FlutterBlueMaxPlugin implements
                 if(newState == BluetoothProfile.STATE_DISCONNECTED) {
 
                     // remove from connected devices
-                    mConnectedDevices.remove(remoteId);
+                    if (mConnectedDevices.get(remoteId) == gatt) {
+                        mConnectedDevices.remove(remoteId);
+                    }
 
                     // remove from currently connecting devices
-                    mCurrentlyConnectingDevices.remove(remoteId);
+                    if (mCurrentlyConnectingDevices.get(remoteId) == gatt) {
+                        mCurrentlyConnectingDevices.remove(remoteId);
+                    }
 
                     // remove from currently bonding devices
                     mBondingDevices.remove(remoteId);
@@ -2431,14 +2555,16 @@ public class FlutterBlueMaxPlugin implements
         {
             boolean unexpectedEvent = false;
             if (newState == BluetoothProfile.STATE_CONNECTED) {
-                if (mCurrentlyConnectingDevices.get(remoteId) == null && mAutoConnected.get(remoteId) == null) {
+                if (mCurrentlyConnectingDevices.get(remoteId) != gatt && mAutoConnected.get(remoteId) != gatt) {
                     log(LogLevel.DEBUG, "[unexpected connection] disconnecting now");
 
                     // this is an unexpected connection
                     unexpectedEvent = true;
 
                     // remove from connected devices
-                    mConnectedDevices.remove(remoteId);
+                    if (mConnectedDevices.get(remoteId) == gatt) {
+                        mConnectedDevices.remove(remoteId);
+                    }
 
                     // remove from currently bonding devices
                     mBondingDevices.remove(remoteId);
@@ -2453,9 +2579,9 @@ public class FlutterBlueMaxPlugin implements
 
             } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
 
-                if (mCurrentlyConnectingDevices.get(remoteId) == null &&
-                    mConnectedDevices.get(remoteId) == null &&
-                    mAutoConnected.get(remoteId) == null) {
+                if (mCurrentlyConnectingDevices.get(remoteId) != gatt &&
+                    mConnectedDevices.get(remoteId) != gatt &&
+                    mAutoConnected.get(remoteId) != gatt) {
 
                     log(LogLevel.DEBUG, "[unexpected connection] disconnect complete");
 
@@ -2478,63 +2604,67 @@ public class FlutterBlueMaxPlugin implements
         @Override
         public void onServicesDiscovered(BluetoothGatt gatt, int status)
         {
-            LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onServicesDiscovered:");
-            log(level, "  count: " + gatt.getServices().size());
-            log(level, "  status: " + status + gattErrorString(status));
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onServicesDiscovered:");
+                log(level, "  count: " + gatt.getServices().size());
+                log(level, "  status: " + status + gattErrorString(status));
 
-            List<Object> services = new ArrayList<Object>();
-            for(BluetoothGattService s : gatt.getServices()) {
-                services.add(bmBluetoothService(gatt.getDevice(), s, null, gatt));
-                for(BluetoothGattService s2 : s.getIncludedServices()) {
-                    services.add(bmBluetoothService(gatt.getDevice(), s2, s, gatt));
+                List<Object> services = new ArrayList<Object>();
+                for(BluetoothGattService s : gatt.getServices()) {
+                    services.add(bmBluetoothService(gatt.getDevice(), s, null, gatt));
+                    for(BluetoothGattService s2 : s.getIncludedServices()) {
+                        services.add(bmBluetoothService(gatt.getDevice(), s2, s, gatt));
+                    }
                 }
-            }
 
-            // see: BmDiscoverServicesResult
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", gatt.getDevice().getAddress());
-            response.put("services", services);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
+                // see: BmDiscoverServicesResult
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", gatt.getDevice().getAddress());
+                response.put("services", services);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
 
-            invokeMethodUIThread("OnDiscoveredServices", response);
+                invokeMethodUIThread("OnDiscoveredServices", response, gatt);
+            });
         }
 
         // called for both notifications & reads
         public void onCharacteristicReceived(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value, int status)
         {
-            // https://www.bluetooth.com/wp-content/uploads/Files/Specification/Assigned_Numbers.html
+            runIfCurrentGatt(gatt, () -> {
+                // https://www.bluetooth.com/wp-content/uploads/Files/Specification/Assigned_Numbers.html
 
-            // Generic Attribute service 0x1801
-            if (uuidStr(characteristic.getService().getUuid()).equals("1801")) {
+                // Generic Attribute service 0x1801
+                if (uuidStr(characteristic.getService().getUuid()).equals("1801")) {
 
-                // Service Changed 0x2A05
-                if (uuidStr(characteristic.getUuid()).toUpperCase().equals("2A05")) {
-                    HashMap<String, Object> response = bmBluetoothDevice(gatt.getDevice());
-                    invokeMethodUIThread("OnServicesReset", response);
+                    // Service Changed 0x2A05
+                    if (uuidStr(characteristic.getUuid()).toUpperCase().equals("2A05")) {
+                        HashMap<String, Object> response = bmBluetoothDevice(gatt.getDevice());
+                        invokeMethodUIThread("OnServicesReset", response, gatt);
+                    }
                 }
-            }
 
-            // has associated primary service?
-            BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
+                // has associated primary service?
+                BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
 
-            // see: BmCharacteristicData
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", gatt.getDevice().getAddress());
-            response.put("service_uuid", uuidStr(characteristic.getService().getUuid()));
-            response.put("characteristic_uuid", uuidStr(characteristic.getUuid()));
-            response.put("instance_id", characteristic.getInstanceId());
-            response.put("value", value);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
-            if (primaryService != null) {
-                response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
-            }
+                // see: BmCharacteristicData
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", gatt.getDevice().getAddress());
+                response.put("service_uuid", uuidStr(characteristic.getService().getUuid()));
+                response.put("characteristic_uuid", uuidStr(characteristic.getUuid()));
+                response.put("instance_id", characteristic.getInstanceId());
+                response.put("value", value);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
+                if (primaryService != null) {
+                    response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
+                }
 
-            invokeMethodUIThread("OnCharacteristicReceived", response);
+                invokeMethodUIThread("OnCharacteristicReceived", response, gatt);
+            });
         }
 
         @Override
@@ -2564,122 +2694,128 @@ public class FlutterBlueMaxPlugin implements
         @Override
         public void onCharacteristicWrite(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status)
         {
-            LogLevel level = status == BluetoothGatt.GATT_SUCCESS ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onCharacteristicWrite:");
-            log(level, "  chr: " + uuidStr(characteristic.getUuid()));
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == BluetoothGatt.GATT_SUCCESS ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onCharacteristicWrite:");
+                log(level, "  chr: " + uuidStr(characteristic.getUuid()));
+                log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
 
-            // For "writeWithResponse", onCharacteristicWrite is called after the remote sends back a write response.
-            // For "writeWithoutResponse", onCharacteristicWrite is called as long as there is still space left
-            // in android's internal buffer. When the buffer is full, it delays calling onCharacteristicWrite
-            // until there is at least ~50% free space again.
+                // For "writeWithResponse", onCharacteristicWrite is called after the remote sends back a write response.
+                // For "writeWithoutResponse", onCharacteristicWrite is called as long as there is still space left
+                // in android's internal buffer. When the buffer is full, it delays calling onCharacteristicWrite
+                // until there is at least ~50% free space again.
 
-            // has associated primary service?
-            BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
+                // has associated primary service?
+                BluetoothGattService primaryService = getPrimaryService(gatt, characteristic);
 
-            // for convenience
-            String remoteId = gatt.getDevice().getAddress();
-            String serviceUuid = uuidStr(characteristic.getService().getUuid());
-            String characteristicUuid = uuidStr(characteristic.getUuid());
-            String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
-            Integer instanceId = characteristic.getInstanceId();
+                // for convenience
+                String remoteId = gatt.getDevice().getAddress();
+                String serviceUuid = uuidStr(characteristic.getService().getUuid());
+                String characteristicUuid = uuidStr(characteristic.getUuid());
+                String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
+                Integer instanceId = characteristic.getInstanceId();
 
-            // what data did we write?
-            String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + primaryServiceUuid;
-            byte[] value = mWriteChr.remove(key + ":" + instanceId);
-            if (value == null) value = mWriteChr.remove(key + ":noinst"); //fallback
-            if (value == null) value = new byte[0];
+                // what data did we write?
+                String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + primaryServiceUuid;
+                byte[] value = mWriteChr.remove(key + ":" + instanceId);
+                if (value == null) value = mWriteChr.remove(key + ":noinst"); //fallback
+                if (value == null) value = new byte[0];
 
-            // see: BmCharacteristicData
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", remoteId);
-            response.put("service_uuid", serviceUuid);
-            response.put("characteristic_uuid", characteristicUuid);
-            response.put("instance_id", instanceId);
-            response.put("value", value);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
-            if (primaryService != null) {
-                response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
-            }
+                // see: BmCharacteristicData
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", remoteId);
+                response.put("service_uuid", serviceUuid);
+                response.put("characteristic_uuid", characteristicUuid);
+                response.put("instance_id", instanceId);
+                response.put("value", value);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
+                if (primaryService != null) {
+                    response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
+                }
 
-            invokeMethodUIThread("OnCharacteristicWritten", response);
+                invokeMethodUIThread("OnCharacteristicWritten", response, gatt);
+            });
         }
 
         @Override
         @TargetApi(33) // newer function, passes byte[] value
         public void onDescriptorRead(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status, byte[] value)
         {
-            LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onDescriptorRead:");
-            log(level, "  chr: " + uuidStr(descriptor.getCharacteristic().getUuid()));
-            log(level, "  desc: " + uuidStr(descriptor.getUuid()));
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onDescriptorRead:");
+                log(level, "  chr: " + uuidStr(descriptor.getCharacteristic().getUuid()));
+                log(level, "  desc: " + uuidStr(descriptor.getUuid()));
+                log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
 
-            // has associated primary service?
-            BluetoothGattService primaryService = getPrimaryService(gatt, descriptor.getCharacteristic());
+                // has associated primary service?
+                BluetoothGattService primaryService = getPrimaryService(gatt, descriptor.getCharacteristic());
 
-            // see: BmDescriptorData
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", gatt.getDevice().getAddress());
-            response.put("service_uuid", uuidStr(descriptor.getCharacteristic().getService().getUuid()));
-            response.put("characteristic_uuid", uuidStr(descriptor.getCharacteristic().getUuid()));
-            response.put("descriptor_uuid", uuidStr(descriptor.getUuid()));
-            response.put("instance_id", descriptor.getCharacteristic().getInstanceId());
-            response.put("value", value);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
-            if (primaryService != null) {
-                response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
-            }
+                // see: BmDescriptorData
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", gatt.getDevice().getAddress());
+                response.put("service_uuid", uuidStr(descriptor.getCharacteristic().getService().getUuid()));
+                response.put("characteristic_uuid", uuidStr(descriptor.getCharacteristic().getUuid()));
+                response.put("descriptor_uuid", uuidStr(descriptor.getUuid()));
+                response.put("instance_id", descriptor.getCharacteristic().getInstanceId());
+                response.put("value", value);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
+                if (primaryService != null) {
+                    response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
+                }
 
-            invokeMethodUIThread("OnDescriptorRead", response);
+                invokeMethodUIThread("OnDescriptorRead", response, gatt);
+            });
         }
 
         @Override
         public void onDescriptorWrite(BluetoothGatt gatt, BluetoothGattDescriptor descriptor, int status)
         {
-            LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onDescriptorWrite:");
-            log(level, "  chr: " + uuidStr(descriptor.getCharacteristic().getUuid()));
-            log(level, "  desc: " + uuidStr(descriptor.getUuid()));
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onDescriptorWrite:");
+                log(level, "  chr: " + uuidStr(descriptor.getCharacteristic().getUuid()));
+                log(level, "  desc: " + uuidStr(descriptor.getUuid()));
+                log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
 
-            // has associated primary service?
-            BluetoothGattService primaryService = getPrimaryService(gatt, descriptor.getCharacteristic());
+                // has associated primary service?
+                BluetoothGattService primaryService = getPrimaryService(gatt, descriptor.getCharacteristic());
 
-            // for convenience
-            String remoteId = gatt.getDevice().getAddress();
-            String serviceUuid = uuidStr(descriptor.getCharacteristic().getService().getUuid());
-            String characteristicUuid = uuidStr(descriptor.getCharacteristic().getUuid());
-            String descriptorUuid = uuidStr(descriptor.getUuid());
-            String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
-            Integer instanceId = descriptor.getCharacteristic().getInstanceId();
+                // for convenience
+                String remoteId = gatt.getDevice().getAddress();
+                String serviceUuid = uuidStr(descriptor.getCharacteristic().getService().getUuid());
+                String characteristicUuid = uuidStr(descriptor.getCharacteristic().getUuid());
+                String descriptorUuid = uuidStr(descriptor.getUuid());
+                String primaryServiceUuid = primaryService != null ? uuidStr(primaryService.getUuid()) : "";
+                Integer instanceId = descriptor.getCharacteristic().getInstanceId();
 
-            // what data did we write?
-            String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + descriptorUuid + ":" + primaryServiceUuid;
-            byte[] value = mWriteDesc.remove(key + ":" + instanceId);
-            if (value == null) value = mWriteDesc.remove(key + ":noinst"); // fallback
-            if (value == null) value = new byte[0];
+                // what data did we write?
+                String key = remoteId + ":" + serviceUuid + ":" + characteristicUuid + ":" + descriptorUuid + ":" + primaryServiceUuid;
+                byte[] value = mWriteDesc.remove(key + ":" + instanceId);
+                if (value == null) value = mWriteDesc.remove(key + ":noinst"); // fallback
+                if (value == null) value = new byte[0];
 
-            // see: BmDescriptorData
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", remoteId);
-            response.put("service_uuid", serviceUuid);
-            response.put("characteristic_uuid", characteristicUuid);
-            response.put("descriptor_uuid", descriptorUuid);
-            response.put("instance_id", descriptor.getCharacteristic().getInstanceId());
-            response.put("value", value);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
-            if (primaryService != null) {
-                response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
-            }
+                // see: BmDescriptorData
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", remoteId);
+                response.put("service_uuid", serviceUuid);
+                response.put("characteristic_uuid", characteristicUuid);
+                response.put("descriptor_uuid", descriptorUuid);
+                response.put("instance_id", descriptor.getCharacteristic().getInstanceId());
+                response.put("value", value);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
+                if (primaryService != null) {
+                    response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
+                }
 
-            invokeMethodUIThread("OnDescriptorWritten", response);
+                invokeMethodUIThread("OnDescriptorWritten", response, gatt);
+            });
         }
 
         @Override
@@ -2693,44 +2829,48 @@ public class FlutterBlueMaxPlugin implements
         @Override
         public void onReadRemoteRssi(BluetoothGatt gatt, int rssi, int status)
         {
-            LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onReadRemoteRssi:");
-            log(level, "  rssi: " + rssi);
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onReadRemoteRssi:");
+                log(level, "  rssi: " + rssi);
+                log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
 
-            // see: BmReadRssiResult
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", gatt.getDevice().getAddress());
-            response.put("rssi", rssi);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
+                // see: BmReadRssiResult
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", gatt.getDevice().getAddress());
+                response.put("rssi", rssi);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
 
-            invokeMethodUIThread("OnReadRssi", response);
+                invokeMethodUIThread("OnReadRssi", response, gatt);
+            });
         }
 
         @Override
         public void onMtuChanged(BluetoothGatt gatt, int mtu, int status)
         {
-            LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
-            log(level, "onMtuChanged:");
-            log(level, "  mtu: " + mtu );
-            log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
+            runIfCurrentGatt(gatt, () -> {
+                LogLevel level = status == 0 ? LogLevel.DEBUG : LogLevel.ERROR;
+                log(level, "onMtuChanged:");
+                log(level, "  mtu: " + mtu );
+                log(level, "  status: " + gattErrorString(status) + " (" + status + ")");
 
-            String remoteId = gatt.getDevice().getAddress();
+                String remoteId = gatt.getDevice().getAddress();
 
-            // remember mtu
-            mMtu.put(remoteId, mtu);
+                // remember mtu
+                mMtu.put(remoteId, mtu);
 
-            // see: BmMtuChangedResponse
-            HashMap<String, Object> response = new HashMap<>();
-            response.put("remote_id", remoteId);
-            response.put("mtu", mtu);
-            response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
-            response.put("error_code", status);
-            response.put("error_string", gattErrorString(status));
+                // see: BmMtuChangedResponse
+                HashMap<String, Object> response = new HashMap<>();
+                response.put("remote_id", remoteId);
+                response.put("mtu", mtu);
+                response.put("success", status == BluetoothGatt.GATT_SUCCESS ? 1 : 0);
+                response.put("error_code", status);
+                response.put("error_string", gattErrorString(status));
 
-            invokeMethodUIThread("OnMtuChanged", response);
+                invokeMethodUIThread("OnMtuChanged", response, gatt);
+            });
         }
 
         @Override
@@ -3030,7 +3170,19 @@ public class FlutterBlueMaxPlugin implements
 
     private void invokeMethodUIThread(final String method, HashMap<String, Object> data)
     {
+        invokeMethodUIThread(method, data, null);
+    }
+
+    private void invokeMethodUIThread(final String method, HashMap<String, Object> data, BluetoothGatt owner)
+    {
+        final long generation = mBleSessionGeneration;
         new Handler(Looper.getMainLooper()).post(() -> {
+            // The event may have been queued before the restart or before this
+            // device acquired a replacement GATT handle.
+            if (generation != mBleSessionGeneration ||
+                (owner != null && mConnectedDevices.get(owner.getDevice().getAddress()) != owner)) {
+                return;
+            }
             //Could already be teared down at this moment
             if (methodChannel != null) {
                 methodChannel.invokeMethod(method, data);
@@ -3406,6 +3558,20 @@ class L2CapChannelManager {
             plugin.log(FlutterBlueMaxPlugin.LogLevel.WARNING, "[FBP] No server socket found with psm " + psm);
         }
         resultCallback.success(null);
+    }
+
+    public synchronized void closeAllChannels() {
+        // Dart loses every L2CAP channel/server handle during hot restart, so
+        // retaining native sockets would leave resources that the new isolate
+        // cannot address or close.
+        for (L2CapInfo channelInfo : new ArrayList<>(openL2CapChannelInfos)) {
+            if (channelInfo instanceof ClientSocketInfo) {
+                ((ClientSocketInfo) channelInfo).l2capChannel.close();
+            } else if (channelInfo instanceof ServerSocketInfo) {
+                ((ServerSocketInfo) channelInfo).closeSocket();
+            }
+        }
+        openL2CapChannelInfos.clear();
     }
 
     private void firePlatformNotSupportedError(Result resultCallback) {
@@ -4326,7 +4492,4 @@ class MarshallingUtil {
         return 0;
     }
 }
-
-
-
 
