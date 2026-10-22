@@ -1177,6 +1177,12 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 // the connection process, but there is no platform callback for it.
 - (void)checkForMtuChangesCallback
 {
+    // The old peripherals remain in the connection map until CoreBluetooth
+    // confirms teardown, but their MTU must not repopulate the new Dart cache.
+    if (self.flutterRestarting) {
+        return;
+    }
+
     for (NSString *key in self.connectedPeripherals) {
 
         CBPeripheral *peripheral = [self.connectedPeripherals objectForKey:key];
@@ -1517,6 +1523,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)peripheral:(CBPeripheral *)peripheral
     didDiscoverServices:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didDiscoverServices:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
@@ -1536,6 +1546,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didDiscoverCharacteristicsForService:(CBService *)service
                                    error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didDiscoverCharacteristicsForService:");
         Log(LERROR, @"  svc: %@", [service.UUID uuidStr]);
@@ -1563,6 +1577,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
                                       error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didDiscoverDescriptorsForCharacteristic:");
         Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
@@ -1609,6 +1627,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didDiscoverIncludedServicesForService:(CBService *)service
                                     error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didDiscoverIncludedServicesForService:");
         Log(LERROR, @"  svc: %@", [service.UUID uuidStr]);
@@ -1626,6 +1648,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic
                               error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     // this function is called on notifications as well as manual reads
     if (error) {
         Log(LERROR, @"didUpdateValueForCharacteristic:");
@@ -1662,6 +1688,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didWriteValueForCharacteristic:(CBCharacteristic *)characteristic
                              error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     // Note: this callback is only called for writeWithResponse
     if (error) {
         Log(LERROR, @"didWriteValueForCharacteristic:");
@@ -1709,6 +1739,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic
                                           error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didUpdateNotificationStateForCharacteristic:");
         Log(LERROR, @"  chr: %@", [characteristic.UUID uuidStr]);
@@ -1758,6 +1792,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didUpdateValueForDescriptor:(CBDescriptor *)descriptor
                           error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didUpdateValueForDescriptor:");
         Log(LERROR, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
@@ -1798,6 +1836,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     didWriteValueForDescriptor:(CBDescriptor *)descriptor
                          error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didWriteValueForDescriptor:");
         Log(LERROR, @"  chr: %@", [descriptor.characteristic.UUID uuidStr]);
@@ -1846,6 +1888,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 
 - (void)peripheralDidUpdateName:(CBPeripheral *)peripheral
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     Log(LDEBUG, @"didUpdateName: %@", [peripheral name]);
 
     // See BmNameChanged
@@ -1860,6 +1906,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)peripheral:(CBPeripheral *)peripheral 
     didModifyServices:(NSArray<CBService *> *)invalidatedServices
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     Log(LDEBUG, @"didModifyServices");
 
     NSDictionary* result = [self bmBluetoothDevice:peripheral];
@@ -1870,6 +1920,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)peripheral:(CBPeripheral *)peripheral
     didReadRSSI:(NSNumber *)rssi error:(NSError *)error
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didReadRSSI:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
@@ -1891,6 +1945,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 
 - (void)peripheralIsReadyToSendWriteWithoutResponse:(CBPeripheral *)peripheral
 {
+    if (self.flutterRestarting) {
+        return;
+    }
+
     Log(LVERBOSE, @"peripheralIsReadyToSendWriteWithoutResponse");
 
     // peripheralIsReadyToSendWriteWithoutResponse is used to signal
