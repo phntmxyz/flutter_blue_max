@@ -463,33 +463,35 @@ class _DeviceDetailsState extends State<_DeviceDetails> {
     final form = GlobalKey<FormState>();
     final value = await showDialog<int>(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Request MTU'),
-        content: Form(
-          key: form,
-          child: TextFormField(
-            initialValue: input,
-            onChanged: (value) => input = value,
-            keyboardType: TextInputType.number,
-            decoration: const InputDecoration(labelText: 'Bytes (23–517)'),
-            validator: (value) {
-              final mtu = int.tryParse(value ?? '');
-              return mtu == null || mtu < 23 || mtu > 517 ? 'Enter a value from 23 to 517.' : null;
-            },
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Request MTU'),
+          content: Form(
+            key: form,
+            child: TextFormField(
+              initialValue: input,
+              onChanged: (value) => input = value,
+              keyboardType: TextInputType.number,
+              decoration: const InputDecoration(labelText: 'Bytes (23–517)'),
+              validator: (value) {
+                final mtu = int.tryParse(value ?? '');
+                return mtu == null || mtu < 23 || mtu > 517 ? 'Enter a value from 23 to 517.' : null;
+              },
+            ),
           ),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-          FilledButton(
-            onPressed: () {
-              if (form.currentState!.validate()) {
-                Navigator.pop(context, int.parse(input));
-              }
-            },
-            child: const Text('Request'),
-          ),
-        ],
-      ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            FilledButton(
+              onPressed: () {
+                if (form.currentState!.validate()) {
+                  Navigator.pop(context, int.parse(input));
+                }
+              },
+              child: const Text('Request'),
+            ),
+          ],
+        );
+      },
     );
     if (value != null) {
       await controller.requestMtu(value);

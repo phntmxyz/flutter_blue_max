@@ -74,15 +74,17 @@ class _ActivityPanelState extends State<ActivityPanel> {
             sliver: SliverList.separated(
               itemCount: lines.length,
               separatorBuilder: (_, _) => const Divider(height: 16),
-              itemBuilder: (context, index) => SelectableText(
-                lines[index],
-                style: TextStyle(
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                  height: 1.6,
-                  color: lines[index].contains('ERROR') ? Theme.of(context).colorScheme.error : null,
-                ),
-              ),
+              itemBuilder: (context, index) {
+                return SelectableText(
+                  lines[index],
+                  style: TextStyle(
+                    fontFamily: 'monospace',
+                    fontSize: 12,
+                    height: 1.6,
+                    color: lines[index].contains('ERROR') ? Theme.of(context).colorScheme.error : null,
+                  ),
+                );
+              },
             ),
           ),
       ],

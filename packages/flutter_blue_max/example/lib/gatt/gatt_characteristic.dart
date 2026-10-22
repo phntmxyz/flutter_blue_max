@@ -111,9 +111,11 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                   if (p.read)
                     OutlinedButton.icon(
                       onPressed: enabled
-                          ? () => widget.controller.run(key, () async {
-                              await c.read();
-                            })
+                          ? () async {
+                              await widget.controller.run(key, () async {
+                                await c.read();
+                              });
+                            }
                           : null,
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text('Read'),
@@ -127,17 +129,19 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                   if (p.notify || p.indicate)
                     OutlinedButton.icon(
                       onPressed: enabled
-                          ? () => widget.controller.run(key, () async {
-                              final notify = !_notifying;
-                              await c.setNotifyValue(notify);
-                              // Web Bluetooth does not publish a CCCD write event.
-                              if (kIsWeb && mounted) {
-                                setState(() => _notifying = notify);
-                              }
-                              if (p.read) {
-                                await c.read();
-                              }
-                            })
+                          ? () async {
+                              await widget.controller.run(key, () async {
+                                final notify = !_notifying;
+                                await c.setNotifyValue(notify);
+                                // Web Bluetooth does not publish a CCCD write event.
+                                if (kIsWeb && mounted) {
+                                  setState(() => _notifying = notify);
+                                }
+                                if (p.read) {
+                                  await c.read();
+                                }
+                              });
+                            }
                           : null,
                       icon: Icon(_notifying ? Icons.notifications_active_outlined : Icons.notifications_none, size: 16),
                       label: Text(_notifying ? 'Unsubscribe' : 'Subscribe'),
@@ -156,12 +160,14 @@ class _GattCharacteristicState extends State<GattCharacteristic> {
                 PayloadEditor(
                   enabled: enabled,
                   label: 'Write characteristic',
-                  onSend: (value) => widget.controller.run(key, () async {
-                    await c.write(value, withoutResponse: !p.write || _withoutResponse);
-                    if (p.read) {
-                      await c.read();
-                    }
-                  }),
+                  onSend: (value) {
+                    return widget.controller.run(key, () async {
+                      await c.write(value, withoutResponse: !p.write || _withoutResponse);
+                      if (p.read) {
+                        await c.read();
+                      }
+                    });
+                  },
                 ),
               ],
               for (final descriptor in c.descriptors)
@@ -202,9 +208,11 @@ class _DescriptorState extends State<_Descriptor> {
           alignment: Alignment.centerLeft,
           child: TextButton(
             onPressed: enabled
-                ? () => widget.controller.run(key, () async {
-                    await d.read();
-                  })
+                ? () async {
+                    await widget.controller.run(key, () async {
+                      await d.read();
+                    });
+                  }
                 : null,
             child: const Text('Read descriptor'),
           ),
@@ -212,9 +220,11 @@ class _DescriptorState extends State<_Descriptor> {
         PayloadEditor(
           enabled: enabled,
           label: 'Write descriptor',
-          onSend: (value) => widget.controller.run(key, () async {
-            await d.write(value);
-          }),
+          onSend: (value) {
+            return widget.controller.run(key, () async {
+              await d.write(value);
+            });
+          },
         ),
         if (d.uuid == Guid('2902'))
           const Padding(

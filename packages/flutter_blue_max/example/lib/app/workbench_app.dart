@@ -119,8 +119,9 @@ class _WorkbenchAppState extends State<WorkbenchApp> {
                   ),
                 IconButton(
                   tooltip: 'Toggle light / dark theme',
-                  onPressed: () =>
-                      setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark),
+                  onPressed: () {
+                    setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+                  },
                   icon: Icon(_themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
                 ),
                 const SizedBox(width: 12),
