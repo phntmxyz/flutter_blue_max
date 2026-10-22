@@ -143,6 +143,7 @@ void main() {
 }
 
 Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setup({bool dispose = true}) async {
+  _platform.reset();
   FlutterBlueMaxPlatform.instance = _platform;
   final controller = WorkbenchController();
   await controller.start();

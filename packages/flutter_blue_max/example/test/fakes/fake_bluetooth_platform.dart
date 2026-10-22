@@ -46,6 +46,60 @@ final class FakeBluetoothPlatform extends FlutterBlueMaxPlatform {
   int turnOnRequests = 0;
   int scanStarts = 0;
 
+  /// Clear per-test behavior while preserving the plugin's subscribed streams.
+  void reset() {
+    characteristicWrites.clear();
+    writes.clear();
+    closeRequests.clear();
+    stoppedServers.clear();
+    connected.clear();
+    connectRequests.clear();
+    systemDeviceRequests.clear();
+    scanRequests.clear();
+    rssiRequests.clear();
+    openRequests.clear();
+    readRequests.clear();
+    characteristicReads.clear();
+    descriptorWrites.clear();
+    notifyRequests.clear();
+    systemPeers.clear();
+    pendingServer = null;
+    failNextWrite = false;
+    serverStarts = 0;
+    holdConnections = false;
+    includeGattExtras = false;
+    emitNotifyDescriptorEvents = true;
+    failNextOpen = false;
+    disconnectOnOpenFailure = false;
+    l2capFailure = null;
+    bufferedBytes = [];
+    pendingWrites = null;
+    turnOnRequests = 0;
+    scanStarts = 0;
+    overrideGetAdapterName = null;
+    overrideGetSystemDevices = null;
+    overrideTurnOn = null;
+    overrideReadRssi = null;
+    overrideReadL2CapChannel = null;
+    overrideReadDescriptor = null;
+    overrideWriteDescriptor = null;
+    overrideSetNotifyValue = null;
+    overrideGetAdapterState = null;
+    overrideSetLogLevel = null;
+    overrideStartScan = null;
+    overrideStopScan = null;
+    overrideConnect = null;
+    overrideDisconnect = null;
+    overrideDiscoverServices = null;
+    overrideListenL2CapChannel = null;
+    overrideReadCharacteristic = null;
+    overrideWriteCharacteristic = null;
+    overrideStopL2capServer = null;
+    overrideOpenL2CapChannel = null;
+    overrideCloseL2CapChannel = null;
+    overrideWriteL2CapChannel = null;
+  }
+
   Future<BmBluetoothAdapterName> Function(BmBluetoothAdapterNameRequest request)? overrideGetAdapterName;
 
   @override

@@ -15,6 +15,7 @@ class WorkbenchRobot {
   final controller = WorkbenchController();
 
   Future<void> launch({required Size size}) async {
+    platform.reset();
     logEvent('Launch the real workbench at $size');
     addTearDown(dispose);
     FlutterBlueMaxPlatform.instance = platform;

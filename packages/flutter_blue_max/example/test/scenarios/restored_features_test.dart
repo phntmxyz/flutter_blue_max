@@ -54,10 +54,10 @@ void main() {
   });
 
   testWidgets('GATT subscriptions and descriptor operations remain reachable', (tester) async {
-    platform.includeGattExtras = true;
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.scanForPeripheral();
+    platform.includeGattExtras = true;
     await robot.inspectPeripheral();
     await robot.exerciseNotificationsAndDescriptors();
   });
@@ -99,10 +99,10 @@ void main() {
     testWidgets('web: scan, GATT and navigation at $size', (tester) async {
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      platform.includeGattExtras = true;
-      platform.emitNotifyDescriptorEvents = false;
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: size);
+      platform.includeGattExtras = true;
+      platform.emitNotifyDescriptorEvents = false;
       await robot.scanForPeripheral();
       await robot.inspectPeripheral();
       robot.expectWebCapabilities();

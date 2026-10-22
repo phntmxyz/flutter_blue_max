@@ -220,6 +220,7 @@ void main() {
 }
 
 Future<WorkbenchController> _setup() async {
+  _platform.reset();
   FlutterBlueMaxPlatform.instance = _platform;
   _platform.holdConnections = false;
   _platform.pendingWrites = null;
