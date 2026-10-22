@@ -33,7 +33,9 @@ class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
     final c = widget.controller;
     final device = widget.device;
     final connected = device.isConnected;
-    final sessions = c.channels.where((session) => !session.incoming && session.channel.deviceId == device.remoteId);
+    final sessions = c.channelSessions.where(
+      (session) => !session.incoming && session.channel.deviceId == device.remoteId,
+    );
     final enabled = connected && c.ready && !c.busy('open') && !c.busy('connection');
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -106,7 +108,7 @@ class _DeviceL2capPanelState extends State<DeviceL2capPanel> {
             ],
           ),
         ),
-        if (sessions.isEmpty && connected)
+        if (!sessions.any((session) => !session.closed) && connected)
           const Padding(padding: EdgeInsets.only(bottom: 16), child: Text('No L2CAP channel open to this device yet.')),
         for (final session in sessions) L2capChannelCard(key: ValueKey(session.key), session: session, controller: c),
       ],

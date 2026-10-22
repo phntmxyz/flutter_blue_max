@@ -19,7 +19,8 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
   @override
   Widget build(BuildContext context) {
     final c = widget.controller;
-    final incoming = c.channels.where((session) => session.incoming).toList();
+    final incoming = c.channelSessions.where((session) => session.incoming).toList();
+    final connectedCount = incoming.where((session) => !session.closed).length;
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -35,9 +36,9 @@ class _L2capServerPanelState extends State<L2capServerPanel> {
           icon: Icons.dns_outlined,
           subtitle: c.serverPsm == null
               ? 'Start listening before the other device connects.'
-              : incoming.isEmpty
+              : connectedCount == 0
               ? 'Waiting for a peer — no channel connected yet.'
-              : '${incoming.length} incoming ${incoming.length == 1 ? 'channel' : 'channels'} connected.',
+              : '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

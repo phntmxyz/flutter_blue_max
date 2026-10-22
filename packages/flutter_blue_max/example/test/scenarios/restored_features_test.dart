@@ -39,6 +39,17 @@ void main() {
     await robot.openL2cap();
     await robot.openRemoteChannel();
     await robot.exerciseL2capTraffic();
+    await robot.inspectHistoryAfterClosing(fromPeer: false);
+  });
+
+  testWidgets('incoming channel history remains visible after the peer closes it', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.openLocalServer();
+    await robot.startServer();
+    await robot.acceptIncomingChannel();
+    await robot.exerciseL2capTraffic();
+    await robot.inspectHistoryAfterClosing(fromPeer: true);
   });
 
   testWidgets('GATT subscriptions and descriptor operations remain reachable', (tester) async {

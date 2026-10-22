@@ -40,7 +40,10 @@ class WorkbenchController extends ChangeNotifier {
   static const maxLogEntries = 500;
 
   List<String> get logs => List.unmodifiable(_logs);
-  List<ChannelSession> get channels => List.unmodifiable(_channels.values);
+  List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((session) => !session.closed));
+
+  /// Closed channels keep their diagnostics available until the device session resets.
+  List<ChannelSession> get channelSessions => List.unmodifiable(_channels.values);
   List<BluetoothService> get services => _services[selected?.remoteId] ?? [];
   List<BluetoothDevice> get connectedDevices => FlutterBlueMax.connectedDevices;
   ScanResult? get selectedAdvertisement {
@@ -102,7 +105,7 @@ class WorkbenchController extends ChangeNotifier {
       FlutterBlueMax.onL2capConnected.listen((event) {
         if (event.psm == serverPsm || _startingServer) {
           final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
-          _channels.putIfAbsent((event.remoteId, event.psm), () => ChannelSession(channel, incoming: true));
+          _trackChannel(channel, incoming: true);
           log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
         }
       }),
@@ -110,7 +113,7 @@ class WorkbenchController extends ChangeNotifier {
     _subscriptions.add(
       FlutterBlueMax.onL2capReceived.listen((event) {
         final session = _channels[(event.remoteId, event.psm)];
-        if (session == null) {
+        if (session == null || session.closed) {
           return;
         }
         session.received += event.value.length;
@@ -123,7 +126,7 @@ class WorkbenchController extends ChangeNotifier {
     );
     _subscriptions.add(
       FlutterBlueMax.onL2capClosed.listen((event) {
-        _channels.remove((event.remoteId, event.psm));
+        _channels[(event.remoteId, event.psm)]?.closed = true;
         log('L2CAP closed ${event.remoteId} / PSM ${event.psm}');
       }),
     );
@@ -320,7 +323,7 @@ class WorkbenchController extends ChangeNotifier {
     await Future.wait(
       accepted.map((session) async {
         await session.channel.close();
-        _channels.remove(session.key);
+        session.closed = true;
       }),
     );
   });
@@ -328,7 +331,7 @@ class WorkbenchController extends ChangeNotifier {
   /// Binds an outgoing channel to the inspected peer, never to later device selection.
   Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) => run('open', () async {
     final key = (device.remoteId, psm);
-    if (_channels.containsKey(key)) {
+    if (_channels[key]?.closed == false) {
       throw StateError('This peer already has a channel on PSM $psm.');
     }
     late final BluetoothL2capChannel channel;
@@ -349,7 +352,7 @@ class WorkbenchController extends ChangeNotifier {
       await channel.close();
       return;
     }
-    _channels[key] = ChannelSession(channel, incoming: false);
+    _trackChannel(channel, incoming: false);
     log('L2CAP opened ${device.remoteId} / PSM $psm');
   });
 
@@ -393,8 +396,18 @@ class WorkbenchController extends ChangeNotifier {
 
   Future<void> closeChannel(ChannelSession session) => run('channel:${session.key}', () async {
     await session.channel.close();
-    _channels.remove(session.key);
+    session.closed = true;
   });
+
+  void _trackChannel(BluetoothL2capChannel channel, {required bool incoming}) {
+    final session = _channels.putIfAbsent((
+      channel.deviceId,
+      channel.psm,
+    ), () => ChannelSession(channel, incoming: incoming));
+    session.channel = channel;
+    session.incoming = incoming;
+    session.closed = false;
+  }
 
   /// Reports errors once and prevents duplicate submissions of the same action.
   Future<void> run(String operation, Future<void> Function() action) async {
@@ -468,7 +481,7 @@ class WorkbenchController extends ChangeNotifier {
     final psm = serverPsm;
     final cleanup = <Future<void> Function()>[
       if (scanning) FlutterBlueMax.stopScan,
-      for (final session in _channels.values.toList()) session.channel.close,
+      for (final session in channels) session.channel.close,
       if (psm != null) () => FlutterBlueMax.stopL2capServer(psm),
       for (final id in _watched) () => BluetoothDevice(remoteId: id).disconnect(),
     ];

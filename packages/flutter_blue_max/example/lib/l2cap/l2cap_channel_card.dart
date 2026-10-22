@@ -27,16 +27,19 @@ class L2capChannelCard extends StatelessWidget {
             children: [
               Chip(label: Text('TX ${session.transmitted} B')),
               Chip(label: Text('RX ${session.received} B')),
-              OutlinedButton.icon(
-                onPressed: !controller.busy('channel:${session.key}') ? () => controller.readChannel(session) : null,
-                icon: const Icon(Icons.download_outlined),
-                label: const Text('Read buffered data'),
-              ),
-              TextButton.icon(
-                onPressed: !controller.busy('channel:${session.key}') ? () => controller.closeChannel(session) : null,
-                icon: const Icon(Icons.close),
-                label: const Text('Close channel'),
-              ),
+              if (session.closed) const Chip(label: Text('Closed')),
+              if (!session.closed)
+                OutlinedButton.icon(
+                  onPressed: !controller.busy('channel:${session.key}') ? () => controller.readChannel(session) : null,
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('Read buffered data'),
+                ),
+              if (!session.closed)
+                TextButton.icon(
+                  onPressed: !controller.busy('channel:${session.key}') ? () => controller.closeChannel(session) : null,
+                  icon: const Icon(Icons.close),
+                  label: const Text('Close channel'),
+                ),
             ],
           ),
           if (session.lastReceived.isNotEmpty) ...[
@@ -63,32 +66,34 @@ class L2capChannelCard extends StatelessWidget {
                 ),
             ],
           ),
-          const SizedBox(height: 16),
-          PayloadEditor(
-            enabled: !controller.busy('channel:${session.key}'),
-            onSend: (bytes) => controller.send(session, bytes),
-          ),
-          const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: [
-              OutlinedButton.icon(
-                onPressed: controller.busy('channel:${session.key}')
-                    ? null
-                    : () => controller.sendTestTraffic(session, size: 10 * 1024, count: 1),
-                icon: const Icon(Icons.data_usage),
-                label: const Text('Send 10 KB'),
-              ),
-              OutlinedButton.icon(
-                onPressed: controller.busy('channel:${session.key}')
-                    ? null
-                    : () => controller.sendTestTraffic(session, size: 1024, count: 20),
-                icon: const Icon(Icons.bolt),
-                label: const Text('Burst 20×1 KB'),
-              ),
-            ],
-          ),
+          if (!session.closed) ...[
+            const SizedBox(height: 16),
+            PayloadEditor(
+              enabled: !controller.busy('channel:${session.key}'),
+              onSend: (bytes) => controller.send(session, bytes),
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: controller.busy('channel:${session.key}')
+                      ? null
+                      : () => controller.sendTestTraffic(session, size: 10 * 1024, count: 1),
+                  icon: const Icon(Icons.data_usage),
+                  label: const Text('Send 10 KB'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: controller.busy('channel:${session.key}')
+                      ? null
+                      : () => controller.sendTestTraffic(session, size: 1024, count: 20),
+                  icon: const Icon(Icons.bolt),
+                  label: const Text('Burst 20×1 KB'),
+                ),
+              ],
+            ),
+          ],
         ],
       ),
     );

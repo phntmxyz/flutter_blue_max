@@ -130,6 +130,67 @@ void main() {
     expect(c.connectedDevices, contains(c.selected));
   });
 
+  for (final remoteClose in [true, false]) {
+    test('receive history survives ${remoteClose ? 'remote' : 'local'} channel closure and reopening', () async {
+      final c = await _setup();
+      await c.startServer(secure: false);
+      final peer = DeviceIdentifier('history');
+      _platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
+      final session = c.channels.single;
+      _platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [65, 66]));
+      _platform.bufferedBytes = [67, 68];
+      await c.readChannel(session);
+
+      if (remoteClose) {
+        _platform.closed.add(L2CapChannelClosed(remoteId: peer, psm: 129));
+      } else {
+        await c.closeChannel(session);
+      }
+
+      expect(c.channels, isEmpty);
+      expect(c.channelSessions.single.closed, isTrue);
+      expect(c.channelSessions.single.received, 2);
+      expect(c.channelSessions.single.history.map((entry) => entry.bytes), [
+        [67, 68],
+        [65, 66],
+      ]);
+      _platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [99]));
+      expect(session.received, 2);
+
+      _platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
+      expect(c.channels.single.closed, isFalse);
+      _platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [69]));
+      expect(c.channelSessions.single.history.map((entry) => entry.bytes), [
+        [69],
+        [67, 68],
+        [65, 66],
+      ]);
+      expect(session.received, 3);
+      await c.stopServer();
+      expect(c.channels, isEmpty);
+      expect(c.channelSessions.single.history, hasLength(3));
+    });
+  }
+
+  test('outgoing channels reopen after closing and retain the original 200-entry history', () async {
+    final c = await _setup();
+    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:54');
+    c.select(peer);
+    await c.connect();
+    await c.openChannel(131, device: peer, secure: false);
+    for (var i = 0; i < 201; i++) {
+      _platform.received.add(L2CapChannelData(remoteId: peer.remoteId, psm: 131, value: [i]));
+    }
+    await c.closeChannel(c.channels.single);
+    await c.openChannel(131, device: peer, secure: false);
+
+    expect(c.error, isNull);
+    expect(c.channels.single.history, hasLength(200));
+    expect(c.channels.single.history.first.bytes, [200]);
+    expect(c.channels.single.history.last.bytes, [1]);
+    expect(c.channels.single.received, 201);
+  });
+
   test('adapter turn-on uses the real library request and adapter state stream', () async {
     final c = await _setup();
     _platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.off));

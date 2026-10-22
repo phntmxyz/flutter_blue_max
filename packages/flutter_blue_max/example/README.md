@@ -124,7 +124,8 @@ The example's OS minimums follow Flutter 3.47; the plugin packages retain their 
 - **Local server:** prepare this device to accept incoming L2CAP channels, independently of the selected peripheral.
   Starting the server only begins listening; it does not mean another device is connected.
   The screen distinguishes waiting for a peer from accepted channels and explains the separate discovery/PSM exchange requirement.
-  Each channel has its own payload editor, TX/RX byte counters, latest received chunk and bounded receive history.
+  Each channel has its own payload editor, TX/RX byte counters, latest received chunk and a history of the latest 200 receive entries.
+  Closing a channel keeps its history and counters visible, with transfer controls hidden; reopening the same peer/PSM continues that history.
   Both incoming and outgoing channels expose buffered reads, a patterned 10 KB test write and a 20 × 1 KB burst.
   Buffered reads may repeat data already delivered by the stream, so they are labelled separately and do not increment the stream RX counter.
   The burst submits concurrent public-API calls; the library controls their native serialization.
@@ -178,7 +179,7 @@ They do not validate radio behavior or operating-system permission dialogs.
 | L2CAP send and live receive | Channel card | Writes, per-peer RX/TX counts and error handling |
 | Buffered L2CAP read | Channel → Read buffered data | Peer routing and no double-counting |
 | Large payload and burst | Channel → Send 10 KB / Burst 20×1 KB | Payload content/size, queued completion and partial failure |
-| Receive history and RX count | Channel → Receive history | Bounded history and stream/read distinction |
+| Receive history and RX count | Channel → Receive history | 200 entries, stream/read distinction and retention after channel closure/reopening |
 | Logs and Clear | Activity | Bounded logging; search/copy/clear available in UI |
 
 ## Hardware checks
@@ -207,7 +208,7 @@ Use a peer with a known L2CAP server/client implementation for this test.
    The example does not advertise a GATT service or publish the PSM through GATT; peer discovery and PSM exchange must be provided separately.
 3. Send a known payload from the peer and check the incoming channel, RX counter and bytes.
 4. Send a reply from the channel's editor and verify the exact bytes on the peer.
-5. Close the channel from the peer and verify that it disappears.
+5. Close the channel from the peer and verify that its card says Closed, retains received data and hides transfer controls.
 6. Stop and restart the server, using the newly assigned PSM.
 
 To test the outgoing path, connect to a discoverable GATT peripheral that also exposes an L2CAP server, then select **L2CAP** in that device's inspector and enter the remote PSM.

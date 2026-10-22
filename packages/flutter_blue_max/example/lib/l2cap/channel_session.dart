@@ -4,13 +4,14 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 class ChannelSession {
   ChannelSession(this.channel, {required this.incoming});
 
-  final BluetoothL2capChannel channel;
-  final bool incoming;
+  BluetoothL2capChannel channel;
+  bool incoming;
+  bool closed = false;
   int transmitted = 0;
   int received = 0;
   List<int> lastReceived = [];
   final List<({DateTime time, String source, List<int> bytes})> history = [];
-  static const maxHistoryEntries = 100;
+  static const maxHistoryEntries = 200;
 
   /// Keep bounded per-channel history; buffer reads may repeat streamed data.
   void recordReceived(List<int> bytes, {required String source}) {

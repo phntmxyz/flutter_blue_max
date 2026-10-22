@@ -110,6 +110,27 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     spotText('Write descriptor', exact: true).existsOnce();
   }
 
+  Future<void> inspectHistoryAfterClosing({required bool fromPeer}) async {
+    logEvent('Close the channel and inspect its retained receive history');
+    spotText('RX 2 B', exact: true).existsOnce();
+    if (fromPeer) {
+      final channel = controller.channels.single.channel;
+      platform.closed.add(L2CapChannelClosed(remoteId: channel.deviceId, psm: channel.psm));
+      await idle();
+      spotText('Waiting for a peer — no channel connected yet.', exact: true).existsOnce();
+    } else {
+      await tapLabel('Close channel');
+    }
+    spotText('Closed', exact: true).existsOnce();
+    spotText('RX 2 B', exact: true).existsOnce();
+    spotText('Stream', exact: false).existsAtLeastOnce();
+    spotText('Buffer read', exact: false).existsAtLeastOnce();
+    spotText('Read buffered data', exact: true).doesNotExist();
+    spotText('Send payload', exact: true).doesNotExist();
+    spotText('Send 10 KB', exact: true).doesNotExist();
+    spotText('Burst 20×1 KB', exact: true).doesNotExist();
+  }
+
   Future<void> checkBroadcastAndAppearance() async {
     await tapLabel('Start scan');
     logEvent('Receive a non-connectable advertisement with an appearance value');
