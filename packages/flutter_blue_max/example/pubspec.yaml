@@ -1,41 +1,27 @@
 name: flutter_blue_max_example
-description: Demonstrates how to use the flutter_blue_max plugin.
-
-# The following line prevents the package from being accidentally published to
-# pub.dev using `flutter pub publish`. This is preferred for private packages.
+description: A Bluetooth workbench for GATT and L2CAP on Android, iOS and macOS.
 publish_to: 'none'
+version: 1.0.0+1
 
 environment:
-  sdk: ^3.0.0
+  sdk: ^3.13.0
+  flutter: '>=3.47.0'
 
 dependencies:
   flutter:
     sdk: flutter
-
   flutter_blue_max:
-    # Note: We use a path dependency because the example app & plugin are bundled together.
-    # In *your* app you should use ^1.17.3 or similar
     path: ../
 
 dev_dependencies:
-  flutter_lints: ^5.0.0
-
-dependency_overrides:
-  # Note: We use these dependency overrides to test the example app with the latest changes.
-  # In *your* app you should not add these overrides
-  flutter_blue_max_android:
-    path: ../../flutter_blue_max_android
-  flutter_blue_max_darwin:
-    path: ../../flutter_blue_max_darwin
-  flutter_blue_max_linux:
-    path: ../../flutter_blue_max_linux
+  lint: ^2.14.0
+  flutter_test:
+    sdk: flutter
   flutter_blue_max_platform_interface:
     path: ../../flutter_blue_max_platform_interface
-  flutter_blue_max_web:
-    path: ../../flutter_blue_max_web
+  spot: ^0.18.0
 
 flutter:
   uses-material-design: true
-
-  # see https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers
-  # disable-swift-package-manager: true
+  config:
+    enable-swift-package-manager: true
