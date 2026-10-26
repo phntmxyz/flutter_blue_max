@@ -4113,21 +4113,43 @@ class ServerSocketInfo implements L2CapInfo {
 
     // Terminal owner state. A stopped listener can never start accepting again.
     private boolean retired;
+    private boolean acceptLoopStopped;
     private final long session;
 
     public synchronized void acceptConnections() {
-        if (retired || isAcceptingConnections) return;
+        if (retired || acceptLoopStopped || isAcceptingConnections) return;
         isAcceptingConnections = true;
         new Thread(() -> {
             while (isAcceptingConnections) {
+                final BluetoothSocket socket;
                 try {
-                    adoptAcceptedSocket(serverSocket.accept());
+                    socket = serverSocket.accept();
                 } catch (IOException e) {
-                    if (isAcceptingConnections) {
-                        Log.e(TAG, "Accepting incoming connection failed. Stop accepting.", e);
+                    synchronized (this) {
+                        if (isAcceptingConnections) {
+                            Log.e(TAG, "Listening socket failed. Stop accepting.", e);
+                        }
+                        acceptLoopStopped = true;
+                        isAcceptingConnections = false;
                     }
-                    closeSocket();
+                    // Accepted sockets have independent lifetimes. Keep them
+                    // owned and open until their peers or an explicit close
+                    // end them; a failed listener must not silently kill them.
+                    try {
+                        serverSocket.close();
+                    } catch (IOException closeError) {
+                        Log.e(TAG, "Closing failed listener failed.", closeError);
+                    }
                     break;
+                }
+                try {
+                    adoptAcceptedSocket(socket);
+                } catch (IOException e) {
+                    // Adoption closes only the failed socket. Other channels
+                    // and the listening socket remain usable.
+                    if (isAcceptingConnections) {
+                        Log.e(TAG, "Opening accepted socket streams failed.", e);
+                    }
                 }
             }
         }).start();

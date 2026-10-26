@@ -11,6 +11,8 @@ import java.io.InputStream;
 import java.io.OutputStream;
 import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.BlockingQueue;
+import java.util.concurrent.LinkedBlockingQueue;
 import org.robolectric.shadow.api.Shadow;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -398,12 +400,82 @@ public class FlutterBlueMaxPluginRestartTest {
         current.closeSocket();
     }
 
+    @Test
+    @Config(sdk = 34, shadows = {AcceptedSocketShadow.class, ListenerSocketShadow.class})
+    public void failedAcceptedSocketDoesNotCloseHealthyChannelsOrStopListener() throws Exception {
+        List<String> events = new ArrayList<>();
+        ServerSocketInfo server = newServer(events);
+        BluetoothSocket existing = Shadow.newInstanceOf(BluetoothSocket.class);
+        AcceptedSocketShadow existingShadow = Shadow.extract(existing);
+        server.adoptAcceptedSocket(existing);
+        shadowOf(Looper.getMainLooper()).idle();
+        events.clear();
+        ListenerSocketShadow listener = Shadow.extract(server.serverSocket);
+        BluetoothSocket broken = Shadow.newInstanceOf(BluetoothSocket.class);
+        AcceptedSocketShadow brokenShadow = Shadow.extract(broken);
+        brokenShadow.failStreamSetup = true;
+        BluetoothSocket following = Shadow.newInstanceOf(BluetoothSocket.class);
+        listener.incoming.add(broken);
+        listener.incoming.add(following);
+        listener.acceptCalls = new CountDownLatch(3);
+        try {
+            server.acceptConnections();
+            assertTrue("Listener did not accept the next socket", listener.acceptCalls.await(5, TimeUnit.SECONDS));
+            shadowOf(Looper.getMainLooper()).idle();
+            assertTrue(brokenShadow.closed);
+            assertFalse(existingShadow.closed);
+            assertEquals(2, ((List<?>) ReflectionHelpers.getField(server, "openChannels")).size());
+            assertEquals(List.of("connected"), events);
+        } finally {
+            server.closeSocket();
+        }
+    }
+
+    @Test
+    @Config(sdk = 34, shadows = {AcceptedSocketShadow.class, ListenerSocketShadow.class})
+    public void failedListenerAcceptKeepsExistingChannelsOwnedAndOpen() throws Exception {
+        List<String> events = new ArrayList<>();
+        ServerSocketInfo server = newServer(events);
+        BluetoothSocket existing = Shadow.newInstanceOf(BluetoothSocket.class);
+        AcceptedSocketShadow existingShadow = Shadow.extract(existing);
+        server.adoptAcceptedSocket(existing);
+        shadowOf(Looper.getMainLooper()).idle();
+        events.clear();
+        ListenerSocketShadow listener = Shadow.extract(server.serverSocket);
+        listener.incoming.add(new IOException("Listening socket failed"));
+        try {
+            server.acceptConnections();
+            assertTrue(listener.closed.await(5, TimeUnit.SECONDS));
+            shadowOf(Looper.getMainLooper()).idle();
+            assertFalse(existingShadow.closed);
+            assertTrue(server.getAnyL2CapChannel() != null);
+            assertTrue(events.isEmpty());
+        } finally {
+            server.closeSocket();
+        }
+        assertTrue(existingShadow.closed);
+    }
+
     @Implements(BluetoothServerSocket.class)
     public static class ListenerSocketShadow {
+        final BlockingQueue<Object> incoming = new LinkedBlockingQueue<>();
+        final CountDownLatch closed = new CountDownLatch(1);
+        CountDownLatch acceptCalls;
         @Implementation public int getPsm() { return 0x81; }
-        @Implementation public void close() {}
+        @Implementation public void close() {
+            closed.countDown();
+            incoming.offer(new IOException("Listener closed"));
+        }
         @Implementation public BluetoothSocket accept() throws IOException {
-            throw new IOException("No socket queued");
+            if (acceptCalls != null) acceptCalls.countDown();
+            try {
+                Object next = incoming.take();
+                if (next instanceof IOException) throw (IOException) next;
+                return (BluetoothSocket) next;
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IOException(e);
+            }
         }
     }
 
@@ -411,10 +483,12 @@ public class FlutterBlueMaxPluginRestartTest {
     public static class AcceptedSocketShadow {
         volatile boolean closed;
         int streamRequests;
+        boolean failStreamSetup;
         CountDownLatch entered;
         CountDownLatch release;
         @Implementation public InputStream getInputStream() throws IOException {
             streamRequests++;
+            if (failStreamSetup) throw new IOException("Accepted socket stream unavailable");
             if (entered != null) {
                 entered.countDown();
                 try {
