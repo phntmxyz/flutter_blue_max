@@ -76,14 +76,31 @@
 
 @interface TestCentralManager : NSObject
 @property(nonatomic) NSUInteger cancellations;
+@property(nonatomic) CBManagerState state;
+@property(nonatomic) TestPeripheral *retrievedPeripheral;
+@property(nonatomic) NSUInteger connectRequests;
+@property(nonatomic) NSUInteger scanRequests;
 @property(nonatomic, weak) id delegate;
 @end
 
 @implementation TestCentralManager
-- (CBManagerState)state {
-    return CBManagerStatePoweredOn;
+- (instancetype)init {
+    self = [super init];
+    if (self) _state = CBManagerStatePoweredOn;
+    return self;
+}
+- (NSArray *)retrievePeripheralsWithIdentifiers:(NSArray *)identifiers {
+    return self.retrievedPeripheral ? @[self.retrievedPeripheral] : @[];
+}
+- (void)connectPeripheral:(CBPeripheral *)peripheral options:(NSDictionary *)options {
+    self.connectRequests++;
+    self.retrievedPeripheral.state = CBPeripheralStateConnecting;
 }
 - (void)stopScan {}
+- (void)scanForPeripheralsWithServices:(NSArray *)services options:(NSDictionary *)options {
+    NSCAssert(self.state == CBManagerStatePoweredOn, @"Scan called before manager ready");
+    self.scanRequests++;
+}
 - (void)cancelPeripheralConnection:(CBPeripheral *)peripheral {
     self.cancellations++;
 }
@@ -502,8 +519,55 @@ static void TestQueuedStreamSetupCannotOutliveCleanup(void) {
     FinishRestart(registrar, peripheral);
 }
 
+static id CallWithArguments(FlutterBlueMaxPlugin *plugin, NSString *method, id arguments) {
+    __block id response = nil;
+    [plugin handleMethodCall:[FlutterMethodCall methodCallWithMethodName:method arguments:arguments]
+                      result:^(id value) { response = value; }];
+    NSCAssert(![response isKindOfClass:[FlutterError class]], @"Unexpected error: %@", response);
+    return response;
+}
+
+static void TestCancelPendingConnect(BOOL failsToConnect, BOOL connectsWhileCancelling) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    TestCentralManager *central = [plugin valueForKey:@"centralManager"];
+    central.retrievedPeripheral = peripheral;
+    [[plugin valueForKey:@"connectedPeripherals"] removeAllObjects];
+    NSCAssert([CallWithArguments(plugin, @"connect", @{@"remote_id": peripheral.identifier.UUIDString,
+                                                      @"auto_connect": @NO}) isEqual:@YES], @"Connect did not start");
+    NSCAssert(central.connectRequests == 1 && peripheral.state == CBPeripheralStateConnecting, @"No native connect pending");
+    NSCAssert([CallWithArguments(plugin, @"disconnect", peripheral.identifier.UUIDString) isEqual:@YES], @"Disconnect did not cancel");
+    NSCAssert(central.cancellations == 1, @"Native cancellation missing");
+    if (connectsWhileCancelling) {
+        peripheral.state = CBPeripheralStateConnected;
+        [plugin centralManager:(id)central didConnectPeripheral:(id)peripheral];
+        NSCAssert(registrar.messenger.events.count == 0, @"Cancelled attempt emitted connected");
+        NSCAssert(central.cancellations == 2, @"Late connection was not cancelled again");
+    }
+    peripheral.state = CBPeripheralStateDisconnected;
+    if (failsToConnect) {
+        NSError *cancelled = [NSError errorWithDomain:CBErrorDomain code:CBErrorOperationCancelled userInfo:nil];
+        [plugin centralManager:(id)central didFailToConnectPeripheral:(id)peripheral error:cancelled];
+    } else {
+        [plugin centralManager:(id)central didDisconnectPeripheral:(id)peripheral error:nil];
+    }
+    NSCAssert(registrar.messenger.events.count == 1, @"Dart never received cancellation");
+    FlutterMethodCall *event = registrar.messenger.events.lastObject;
+    NSCAssert([event.method isEqual:@"OnConnectionStateChanged"], @"Wrong event");
+    NSCAssert([event.arguments[@"connection_state"] isEqual:@0], @"Cancellation not disconnected");
+    NSCAssert([event.arguments[@"disconnect_reason_code"] isEqual:@23789258], @"Missing connectionCanceled reason");
+    NSCAssert([[plugin valueForKey:@"currentlyConnectingPeripherals"] count] == 0, @"Pending attempt retained after terminal event");
+    NSCAssert([CallWithArguments(plugin, @"disconnect", peripheral.identifier.UUIDString) isEqual:@NO], @"Completed cancel still pending");
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+
 int main(void) {
     @autoreleasepool {
+        TestCancelPendingConnect(NO, NO);
+        TestCancelPendingConnect(YES, NO);
+        TestCancelPendingConnect(NO, YES);
         TestMtuTimerDuringRestart();
         TestPeripheralCallbacksDuringRestart();
         TestNewSessionEvents();
@@ -519,7 +583,7 @@ int main(void) {
         TestLateClientOpenCannotReviveChannel();
         TestQueuedStreamSetupCannotOutliveCleanup();
         TestEmptyRestartStillRetiresItsProducer();
-        puts("15 Darwin restart regression tests passed");
+        puts("18 Darwin restart regression tests passed");
     }
     return 0;
 }

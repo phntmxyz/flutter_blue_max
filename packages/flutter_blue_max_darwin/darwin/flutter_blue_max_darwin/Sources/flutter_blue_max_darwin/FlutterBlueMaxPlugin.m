@@ -155,6 +155,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 @property(nonatomic) NSMutableDictionary *knownPeripherals;
 @property(nonatomic) NSMutableDictionary *connectedPeripherals;
 @property(nonatomic) NSMutableDictionary *currentlyConnectingPeripherals;
+// Cancellation intent does not release ownership. The terminal central callback
+// still completes Dart's connect/disconnect futures for this attempt.
+@property(nonatomic) NSMutableDictionary *disconnectingPeripherals;
 @property(nonatomic) NSMutableArray *servicesToDiscover;
 @property(nonatomic) NSMutableArray *characteristicsToDiscover;
 @property(nonatomic) NSMutableDictionary *didWriteWithoutResponse;
@@ -188,6 +191,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     instance.knownPeripherals = [NSMutableDictionary new];
     instance.connectedPeripherals = [NSMutableDictionary new];
     instance.currentlyConnectingPeripherals = [NSMutableDictionary new];
+    instance.disconnectingPeripherals = [NSMutableDictionary new];
     instance.servicesToDiscover = [NSMutableArray new];
     instance.characteristicsToDiscover = [NSMutableArray new];
     instance.didWriteWithoutResponse = [NSMutableDictionary new];
@@ -533,7 +537,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
                 peripheral = [self.currentlyConnectingPeripherals objectForKey:remoteId];
                 if (peripheral != nil) {
                     Log(LDEBUG, @"disconnect: cancelling connection in progress");
-                    [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
+                    // Keep the attempt owned until CoreBluetooth acknowledges
+                    // cancellation; its terminal callback must still reach Dart.
                 }   
             }
             if (peripheral == nil) {
@@ -545,7 +550,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
                 return;
             }
 
-            // disconnect
+            // Mark intent before calling CoreBluetooth: connection completion
+            // can race cancellation and must not emit a connected event.
+            self.disconnectingPeripherals[remoteId] = peripheral;
             [self.centralManager cancelPeripheralConnection:peripheral];
             
             result(@YES);
@@ -1150,6 +1157,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     if ([func isEqualToString:@"adapterTurnOff"]) {
         [self.connectedPeripherals removeAllObjects];
         [self.currentlyConnectingPeripherals removeAllObjects];
+        [self.disconnectingPeripherals removeAllObjects];
     }
 
     // Tear down all L2CAP channels (including zombies). didDisconnectPeripheral
@@ -1233,6 +1241,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         self.flutterRestarting = NO;
         self.flutterRestartDeadline = nil;
         [self.knownPeripherals removeAllObjects];
+        [self.disconnectingPeripherals removeAllObjects];
     }
     return remaining;
 }
@@ -1498,6 +1507,11 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         return;
     }
 
+    if (self.disconnectingPeripherals[remoteId] == peripheral) {
+        [central cancelPeripheralConnection:peripheral];
+        return;
+    }
+
     // remember the connected peripherals of *this app*
     [self.connectedPeripherals setObject:peripheral forKey:remoteId];
 
@@ -1552,6 +1566,11 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         return;
     }
 
+    BOOL userCancelled = self.disconnectingPeripherals[remoteId] == peripheral;
+    if (userCancelled) {
+        [self.disconnectingPeripherals removeObjectForKey:remoteId];
+    }
+
     // remember the connected peripherals of *this app*
     [self.connectedPeripherals removeObjectForKey:remoteId];
 
@@ -1574,8 +1593,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     NSDictionary *result = @{
         @"remote_id":                remoteId,
         @"connection_state":         @([self bmConnectionStateEnum:peripheral.state]),
-        @"disconnect_reason_code":   error ? @(error.code) : @(bmUserCanceledErrorCode),
-        @"disconnect_reason_string": error ? [error localizedDescription] : @("connection canceled"),
+        @"disconnect_reason_code":   userCancelled || !error ? @(bmUserCanceledErrorCode) : @(error.code),
+        @"disconnect_reason_string": userCancelled || !error ? @"connection canceled" : [error localizedDescription],
     };
 
     if (!self.flutterRestarting) {
@@ -1604,6 +1623,11 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         return;
     }
 
+    BOOL userCancelled = self.disconnectingPeripherals[remoteId] == peripheral;
+    if (userCancelled) {
+        [self.disconnectingPeripherals removeObjectForKey:remoteId];
+    }
+
     // remove from currently connecting peripherals
     [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
 
@@ -1611,8 +1635,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     NSDictionary *result = @{
         @"remote_id":                [[peripheral identifier] UUIDString],
         @"connection_state":         @([self bmConnectionStateEnum:peripheral.state]),
-        @"disconnect_reason_code":   error ? @(error.code) : [NSNull null], 
-        @"disconnect_reason_string": error ? [error localizedDescription] : [NSNull null],
+        @"disconnect_reason_code":   userCancelled ? @(23789258) : (error ? @(error.code) : [NSNull null]),
+        @"disconnect_reason_string": userCancelled ? @"connection canceled" : (error ? [error localizedDescription] : [NSNull null]),
     };
 
     if (!self.flutterRestarting) {
