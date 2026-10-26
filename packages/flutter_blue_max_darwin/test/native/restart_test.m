@@ -132,10 +132,13 @@
 // Keep manager construction at its native boundary; the production plugin and
 // all delegate/retirement paths run unchanged.
 @interface TestPlugin : FlutterBlueMaxPlugin
+@property(nonatomic) BOOL delayManagerReadiness;
 @end
 @implementation TestPlugin
 - (CBCentralManager *)createCentralManager {
-    return (id)[TestCentralManager new];
+    TestCentralManager *manager = [TestCentralManager new];
+    if (self.delayManagerReadiness) manager.state = CBManagerStateUnknown;
+    return (id)manager;
 }
 @end
 
@@ -562,12 +565,39 @@ static void TestCancelPendingConnect(BOOL failsToConnect, BOOL connectsWhileCanc
     [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
 }
 
+static void TestRestartWaitsForManagerReadiness(CBManagerState finalState) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    TestPlugin *plugin = (id)registrar.plugin;
+    plugin.delayManagerReadiness = YES;
+    id oldCentral = [plugin valueForKey:@"centralManager"];
+    Call(plugin, @"flutterRestart");
+    [plugin setValue:[NSDate distantPast] forKey:@"flutterRestartDeadline"];
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@1], @"Restart completed with an unknown manager");
+    TestCentralManager *current = [plugin valueForKey:@"centralManager"];
+    NSCAssert(current != oldCentral && current.state == CBManagerStateUnknown, @"Replacement manager missing");
+    current.state = CBManagerStateResetting;
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@1], @"Restart completed while manager resetting");
+    NSCAssert([Call(plugin, @"flutterRestart") isEqual:@1], @"Retry bypassed readiness");
+    NSCAssert([plugin valueForKey:@"centralManager"] == current, @"Retry replaced initializing manager");
+    current.state = finalState;
+    [plugin centralManagerDidUpdateState:(id)current];
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@0], @"Known adapter state blocked restart");
+    NSCAssert([plugin valueForKey:@"centralManager"] == current, @"Ready manager replaced again");
+    if (finalState == CBManagerStatePoweredOn) {
+        NSCAssert([CallWithArguments(plugin, @"startScan", @{@"with_services": @[]}) isEqual:@YES], @"Immediate scan failed");
+        NSCAssert(current.scanRequests == 1, @"Scan never reached ready manager");
+    }
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
 
 int main(void) {
     @autoreleasepool {
         TestCancelPendingConnect(NO, NO);
         TestCancelPendingConnect(YES, NO);
         TestCancelPendingConnect(NO, YES);
+        TestRestartWaitsForManagerReadiness(CBManagerStatePoweredOn);
+        TestRestartWaitsForManagerReadiness(CBManagerStatePoweredOff);
         TestMtuTimerDuringRestart();
         TestPeripheralCallbacksDuringRestart();
         TestNewSessionEvents();
@@ -583,7 +613,7 @@ int main(void) {
         TestLateClientOpenCannotReviveChannel();
         TestQueuedStreamSetupCannotOutliveCleanup();
         TestEmptyRestartStillRetiresItsProducer();
-        puts("18 Darwin restart regression tests passed");
+        puts("20 Darwin restart regression tests passed");
     }
     return 0;
 }

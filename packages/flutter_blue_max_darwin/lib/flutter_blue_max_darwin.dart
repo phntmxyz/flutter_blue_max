@@ -407,8 +407,8 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     while (remaining != 0) {
       if (stopwatch.elapsed >= timeout) {
         throw TimeoutException(
-          'Timed out waiting for $remaining native BLE connection(s) '
-          'to close after hot restart',
+          'Timed out waiting for native BLE restart cleanup '
+          'or adapter initialization',
           timeout,
         );
       }

@@ -172,6 +172,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 @property(nonatomic) NSNumber *restoreState;
 @property(nonatomic, retain) L2CapChannelManager *l2CapChannelManager;
 @property(nonatomic) BOOL flutterRestarting;
+@property(nonatomic) BOOL flutterRestartAwaitingManagerState;
 // Set when a restart starts waiting for old connections. A retried restart
 // keeps it, so retries cannot extend the wait.
 @property(nonatomic) NSDate *flutterRestartDeadline;
@@ -291,6 +292,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
         if ([@"flutterRestart" isEqualToString:call.method])
         {
+            if (self.flutterRestartAwaitingManagerState) {
+                result(@([self remainingRestartConnections]));
+                return;
+            }
             // no adapter?
             if (self.centralManager == nil) {
                 result(@(0)); // no work to do
@@ -1219,6 +1224,16 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // wait is bounded instead of blocking the new isolate until the app is killed.
 - (NSUInteger)remainingRestartConnections
 {
+    if (self.flutterRestartAwaitingManagerState) {
+        CBManagerState state = self.centralManager.state;
+        if (state == CBManagerStateUnknown || state == CBManagerStateResetting) {
+            return 1;
+        }
+        // Powered off/unauthorized/unsupported are known outcomes too: callers
+        // get the usual adapter error rather than a restart timeout.
+        self.flutterRestartAwaitingManagerState = NO;
+        return 0;
+    }
     NSUInteger remaining = [self restartConnectionCount];
     if (remaining > 0 && self.flutterRestarting && [self.flutterRestartDeadline timeIntervalSinceNow] <= 0) {
         Log(LWARNING, @"Hot Restart: dropping %lu old connection(s) after timeout", remaining);
@@ -1237,11 +1252,15 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         // delegates alone cannot isolate late CBCentralManager callbacks.
         self.centralManager.delegate = nil;
         self.centralManager = nil;
-        self.centralManager = [self createCentralManager];
         self.flutterRestarting = NO;
         self.flutterRestartDeadline = nil;
         [self.knownPeripherals removeAllObjects];
         [self.disconnectingPeripherals removeAllObjects];
+        self.flutterRestartAwaitingManagerState = YES;
+        self.centralManager = [self createCentralManager];
+        // Manager construction is asynchronous. Keep the Dart handshake pending
+        // until its initial unknown/resetting state resolves before startScan.
+        return [self remainingRestartConnections];
     }
     return remaining;
 }
