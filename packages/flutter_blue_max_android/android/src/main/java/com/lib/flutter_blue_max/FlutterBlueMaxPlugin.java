@@ -3666,6 +3666,10 @@ abstract class L2CapChannel {
     // Each reader thread only runs while its own generation is still current,
     // so a reconnect can never end up with two threads competing for the stream.
     private final AtomicInteger readerGeneration = new AtomicInteger(0);
+    // Set by close() and never reset. Guarded by this. Tasks that were queued
+    // before close() still run, so they must not create sockets afterwards:
+    // the manager has already dropped the channel and could never close them.
+    protected boolean closed = false;
 
     public L2CapChannel(final FlutterBlueMaxPlugin plugin) {
         this.plugin = plugin;
@@ -3822,6 +3826,7 @@ abstract class L2CapChannel {
     }
 
     public synchronized void close() {
+        closed = true;
         // invalidate the running reader; closing the streams below also unblocks it
         invalidateReader();
         if (outputStream != null) {
@@ -3852,7 +3857,7 @@ abstract class L2CapChannel {
             }
         }
         // closing the socket above unblocks any in-flight connect/write; tasks
-        // still queued will fail fast on the closed streams
+        // still queued will fail fast on the closed streams or the closed flag
         ioExecutor.shutdown();
     }
 }
@@ -3882,6 +3887,10 @@ class L2CapClientChannel extends L2CapChannel {
         try {
             final BluetoothSocket newSocket;
             synchronized (this) {
+                if (closed) {
+                    resultCallback.error("channel_closed", "The L2CAP channel is closed.", null);
+                    return;
+                }
                 // Close existing socket if present before creating a new one.
                 // Also drop the old streams so a failed connect doesn't leave stale
                 // references to the closed socket (startReaderLoop checks them).

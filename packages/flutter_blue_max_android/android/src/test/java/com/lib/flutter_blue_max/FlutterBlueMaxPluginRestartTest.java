@@ -1,5 +1,6 @@
 package com.lib.flutter_blue_max;
 
+import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
@@ -16,6 +17,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 
 import io.flutter.plugin.common.BinaryMessenger;
 import io.flutter.plugin.common.MethodCall;
@@ -36,6 +39,7 @@ import org.robolectric.util.ReflectionHelpers;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 import static org.robolectric.Shadows.shadowOf;
@@ -255,6 +259,38 @@ public class FlutterBlueMaxPluginRestartTest {
         assertEquals(0, call("connectedCount"));
     }
 
+    @Test
+    @Config(sdk = 34)
+    public void queuedL2capConnectCannotOpenSocketAfterRestart() throws InterruptedException {
+        shadowOf(RuntimeEnvironment.getApplication()).grantPermissions(Manifest.permission.BLUETOOTH_CONNECT);
+        call("connectedCount"); // creates the L2CAP manager
+        L2CapChannelManager manager = ReflectionHelpers.getField(plugin, "l2CapChannelManager");
+        List<L2CapInfo> channels = ReflectionHelpers.getField(manager, "openL2CapChannelInfos");
+        RecordingResult opened = new RecordingResult();
+        manager.openL2CapChannel(REMOTE_ID, 0x80, true, opened);
+        L2CapClientChannel channel = ((ClientSocketInfo) channels.get(0)).l2capChannel;
+        CountDownLatch release = new CountDownLatch(1);
+        channel.ioExecutor.execute(() -> {
+            try {
+                release.await();
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        RecordingResult reopened = new RecordingResult();
+        manager.openL2CapChannel(REMOTE_ID, 0x80, true, reopened);
+
+        call("flutterRestart");
+        release.countDown();
+        assertTrue(channel.ioExecutor.awaitTermination(5, TimeUnit.SECONDS));
+        shadowOf(Looper.getMainLooper()).idle();
+
+        assertTrue(opened.succeeded);
+        assertEquals("channel_closed", reopened.errorCode);
+        assertNull(channel.getSocket());
+        assertTrue(channels.isEmpty());
+    }
+
     @Implements(BluetoothGatt.class)
     public static class ThrowingDisconnectGattShadow extends ShadowBluetoothGatt {
         @Implementation
@@ -318,6 +354,26 @@ public class FlutterBlueMaxPluginRestartTest {
             }
         });
         return value[0];
+    }
+
+    private static class RecordingResult implements MethodChannel.Result {
+        boolean succeeded;
+        String errorCode;
+
+        @Override
+        public void success(Object result) {
+            succeeded = true;
+        }
+
+        @Override
+        public void error(String code, String message, Object details) {
+            errorCode = code;
+        }
+
+        @Override
+        public void notImplemented() {
+            throw new AssertionError("Unexpected notImplemented");
+        }
     }
 
     private static class RecordingMessenger implements BinaryMessenger {
