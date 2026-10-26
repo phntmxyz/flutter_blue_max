@@ -76,6 +76,7 @@
 
 @interface TestCentralManager : NSObject
 @property(nonatomic) NSUInteger cancellations;
+@property(nonatomic, weak) id delegate;
 @end
 
 @implementation TestCentralManager
@@ -111,6 +112,24 @@
 }
 @end
 
+// Keep manager construction at its native boundary; the production plugin and
+// all delegate/retirement paths run unchanged.
+@interface TestPlugin : FlutterBlueMaxPlugin
+@end
+@implementation TestPlugin
+- (CBCentralManager *)createCentralManager {
+    return (id)[TestCentralManager new];
+}
+@end
+
+@interface TestChannel : NSObject
+@property(nonatomic) CBL2CAPPSM PSM;
+@property(nonatomic) NSInputStream *inputStream;
+@property(nonatomic) NSOutputStream *outputStream;
+@end
+@implementation TestChannel
+@end
+
 static id Call(FlutterBlueMaxPlugin *plugin, NSString *method) {
     __block id response = nil;
     [plugin handleMethodCall:[FlutterMethodCall methodCallWithMethodName:method arguments:nil]
@@ -122,7 +141,7 @@ static id Call(FlutterBlueMaxPlugin *plugin, NSString *method) {
 static TestRegistrar *CreatePlugin(TestPeripheral **peripheralOut) {
     TestRegistrar *registrar = [TestRegistrar new];
     registrar.messenger = [RecordingMessenger new];
-    [FlutterBlueMaxPlugin registerWithRegistrar:(id)registrar];
+    [TestPlugin registerWithRegistrar:(id)registrar];
     [registrar.plugin setValue:[TestCentralManager new] forKey:@"centralManager"];
     [registrar.plugin setValue:@0 forKey:@"logLevel"];
 
@@ -203,6 +222,7 @@ static void TestNewSessionEvents(void) {
     Call(registrar.plugin, @"flutterRestart");
     FinishRestart(registrar, peripheral);
     peripheral.state = CBPeripheralStateConnected;
+    [[registrar.plugin valueForKey:@"currentlyConnectingPeripherals"] setObject:peripheral forKey:peripheral.identifier.UUIDString];
     [registrar.plugin centralManager:[registrar.plugin valueForKey:@"centralManager"]
                didConnectPeripheral:(id)peripheral];
     [registrar.messenger.events removeAllObjects];
@@ -308,7 +328,7 @@ static void TestStalledTeardownEndsAtDeadline(void) {
     NSCAssert(peripheral.delegate == nil, @"Old peripheral kept its delegate");
     [plugin peripheralDidUpdateName:(id)peripheral];
     NSArray *methods = [registrar.messenger.events valueForKey:@"method"];
-    NSCAssert([methods isEqual:@[@"OnNameChanged"]], @"Events stayed blocked after the deadline: %@", methods);
+    NSCAssert(methods.count == 0, @"Retired peripheral reached the replacement session: %@", methods);
     [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
 }
 
@@ -370,6 +390,13 @@ static void TestRetiredListenerCannotServeNewListen(void) {
     NSMutableArray *listenResults = [NSMutableArray new];
     TestPeripheralManager *current = AddPendingListener(l2cap, listenResults);
 
+    // Even after cleanup released its strong retirement record, this old
+    // producer cannot acquire authority over the replacement listen.
+    [l2cap peripheralManager:(id)old didUnpublishL2CAPChannel:0x82 error:nil];
+    [l2cap peripheralManager:(id)old didPublishL2CAPChannel:0x82 error:nil];
+    [l2cap peripheralManager:(id)old didUnpublishL2CAPChannel:0x82 error:nil];
+    NSCAssert(listenResults.count == 0, @"Old publish completed new listen");
+    NSCAssert([old.unpublished isEqual:@[@0x82]], @"Unowned publication was not retired");
     [l2cap peripheralManagerDidUpdateState:(id)old];
     [l2cap peripheralManagerDidUpdateState:(id)current];
     [l2cap peripheralManager:(id)current didPublishL2CAPChannel:0x83 error:nil];
@@ -379,6 +406,100 @@ static void TestRetiredListenerCannotServeNewListen(void) {
     NSCAssert([listenResults isEqual:@[@{@"psm": @0x83}]], @"New listen result missing: %@", listenResults);
     NSArray *methods = [registrar.messenger.events valueForKey:@"method"];
     NSCAssert([methods isEqual:@[@"OnL2CapChannelPublished"]], @"New listener events missing: %@", methods);
+}
+
+static void TestOldManagerCannotMutateReplacement(void) {
+    TestPeripheral *old;
+    TestRegistrar *registrar = CreatePlugin(&old);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    id oldCentral = [plugin valueForKey:@"centralManager"];
+    Call(plugin, @"flutterRestart");
+    [plugin setValue:[NSDate distantPast] forKey:@"flutterRestartDeadline"];
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@0], @"Deadline did not finish");
+    id currentCentral = [plugin valueForKey:@"centralManager"];
+    NSCAssert(currentCentral != oldCentral, @"Native session was reused");
+    TestPeripheral *replacement = [TestPeripheral new];
+    replacement.identifier = old.identifier;
+    replacement.state = CBPeripheralStateConnecting;
+    replacement.services = @[];
+    NSMutableDictionary *pending = [plugin valueForKey:@"currentlyConnectingPeripherals"];
+    pending[replacement.identifier.UUIDString] = replacement;
+    [registrar.messenger.events removeAllObjects];
+
+    [plugin centralManager:oldCentral didConnectPeripheral:(id)old];
+    [plugin centralManager:oldCentral didDisconnectPeripheral:(id)old error:nil];
+    [plugin centralManager:oldCentral didFailToConnectPeripheral:(id)old error:nil];
+    [plugin centralManagerDidUpdateState:oldCentral];
+    NSCAssert(pending[replacement.identifier.UUIDString] == replacement, @"Old callback removed replacement");
+    NSCAssert([[plugin valueForKey:@"connectedPeripherals"] count] == 0, @"Old connection adopted");
+    NSCAssert(registrar.messenger.events.count == 0, @"Old manager emitted events");
+
+    replacement.state = CBPeripheralStateConnected;
+    [plugin centralManager:currentCentral didConnectPeripheral:(id)replacement];
+    NSCAssert([[plugin valueForKey:@"connectedPeripherals"] objectForKey:replacement.identifier.UUIDString] == replacement,
+              @"Replacement connection was rejected");
+    [plugin peripheral:(id)replacement didReadRSSI:@(-50) error:nil];
+    NSCAssert(registrar.messenger.events.count == 2, @"New session events missing");
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+static void TestEmptyRestartStillRetiresItsProducer(void) {
+    TestPeripheral *old;
+    TestRegistrar *registrar = CreatePlugin(&old);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    id oldCentral = [plugin valueForKey:@"centralManager"];
+    [[plugin valueForKey:@"connectedPeripherals"] removeAllObjects];
+    NSCAssert([Call(plugin, @"flutterRestart") isEqual:@0], @"Empty restart blocked");
+    NSCAssert([plugin valueForKey:@"centralManager"] != oldCentral, @"Empty restart reused producer");
+    [plugin centralManager:oldCentral didConnectPeripheral:(id)old];
+    NSCAssert([[plugin valueForKey:@"connectedPeripherals"] count] == 0, @"Old connection adopted");
+    NSCAssert(registrar.messenger.events.count == 0, @"Old session emitted event");
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+static TestChannel *NewChannel(void) {
+    TestChannel *channel = [TestChannel new];
+    channel.PSM = 0x81;
+    channel.inputStream = [NSInputStream inputStreamWithData:[NSData data]];
+    channel.outputStream = [NSOutputStream outputStreamToMemory];
+    return channel;
+}
+
+static void TestLateClientOpenCannotReviveChannel(void) {
+    TestPeripheral *old;
+    TestRegistrar *registrar = CreatePlugin(&old);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    id manager = [plugin valueForKey:@"l2CapChannelManager"];
+    Call(plugin, @"flutterRestart");
+    for (NSUInteger phase = 0; phase < 2; phase++) {
+        TestChannel *channel = NewChannel();
+        [plugin peripheral:(id)old didOpenL2CAPChannel:(id)channel error:nil];
+        NSCAssert([[manager valueForKey:@"channels"] count] == 0, @"Retired open adopted");
+        NSCAssert([[manager valueForKey:@"pendingStreamReady"] count] == 0, @"Retired readiness installed");
+        NSCAssert(registrar.messenger.events.count == 0, @"Retired open emitted event");
+        [plugin setValue:[NSDate distantPast] forKey:@"flutterRestartDeadline"];
+        Call(plugin, @"connectedCount");
+    }
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+static void TestQueuedStreamSetupCannotOutliveCleanup(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    id manager = [plugin valueForKey:@"l2CapChannelManager"];
+    TestChannel *channel = NewChannel();
+    [plugin peripheral:(id)peripheral didOpenL2CAPChannel:(id)channel error:nil];
+    NSCAssert([[manager valueForKey:@"channels"] count] == 1, @"Active open not adopted");
+    Call(plugin, @"flutterRestart");
+    // Drain the real main queue after cleanup, including the queued setup block.
+    __block BOOL drained = NO;
+    dispatch_async(dispatch_get_main_queue(), ^{ drained = YES; });
+    while (!drained) [[NSRunLoop mainRunLoop] runUntilDate:[NSDate dateWithTimeIntervalSinceNow:0.001]];
+    NSCAssert(channel.inputStream.delegate == nil && channel.outputStream.delegate == nil, @"Retired streams rescheduled");
+    NSCAssert([[manager valueForKey:@"channels"] count] == 0, @"Channel survived cleanup");
+    NSCAssert(registrar.messenger.events.count == 0, @"Retired stream emitted event");
+    FinishRestart(registrar, peripheral);
 }
 
 int main(void) {
@@ -394,7 +515,11 @@ int main(void) {
         TestRetiredListenerCannotServeNewListen();
         TestStalledTeardownEndsAtDeadline();
         TestRetriedRestartKeepsDeadline();
-        puts("11 Darwin restart regression tests passed");
+        TestOldManagerCannotMutateReplacement();
+        TestLateClientOpenCannotReviveChannel();
+        TestQueuedStreamSetupCannotOutliveCleanup();
+        TestEmptyRestartStillRetiresItsProducer();
+        puts("15 Darwin restart regression tests passed");
     }
     return 0;
 }

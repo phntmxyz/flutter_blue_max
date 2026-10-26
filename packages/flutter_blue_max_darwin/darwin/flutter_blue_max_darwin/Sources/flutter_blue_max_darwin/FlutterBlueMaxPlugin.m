@@ -97,6 +97,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 @property(nonatomic) NSMutableData *readBuffer;
 @property(nonatomic) NSMutableArray<L2CapPendingWrite *> *pendingWrites;
 @property(nonatomic, getter=isListening) BOOL listening;
+// Terminal lifetime flag, confined to the main queue with all stream work.
+@property(nonatomic) BOOL retired;
 - (instancetype)initWithPsm:(NSNumber *)psm remoteId:(NSString *)remoteId channel:(CBL2CAPChannel *)channel;
 @end
 
@@ -114,6 +116,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // confirms that they publish nothing, so late callbacks can be recognized by
 // identity and never reach the new isolate.
 @property(nonatomic) NSMutableSet<CBPeripheralManager *> *retiredPeripheralManagers;
+// Current-session stops still deliver their completion event. Restart retires
+// these owners too, so their callbacks cannot complete a replacement listen.
+@property(nonatomic) NSMutableSet<CBPeripheralManager *> *unpublishingPeripheralManagers;
 @property(nonatomic) NSMutableDictionary<NSString *, FlutterResult> *pendingOpenResults;
 @property(nonatomic) NSMutableDictionary<NSString *, NSNumber *> *pendingOpenRequestedPsm; // key: remoteId -> psm
 // Blocks to execute when the output stream becomes ready (HasSpaceAvailable).
@@ -167,6 +172,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // Set when a restart starts waiting for old connections. A retried restart
 // keeps it, so retries cannot extend the wait.
 @property(nonatomic) NSDate *flutterRestartDeadline;
+- (CBCentralManager *)createCentralManager;
+- (BOOL)ownsPeripheral:(CBPeripheral *)peripheral;
 - (NSUInteger)restartConnectionCount;
 - (NSUInteger)remainingRestartConnections;
 @end
@@ -176,7 +183,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 {
     FlutterMethodChannel *methodChannel = [FlutterMethodChannel methodChannelWithName:NAMESPACE @"/methods"
                                                                 binaryMessenger:[registrar messenger]];
-    FlutterBlueMaxPlugin *instance = [[FlutterBlueMaxPlugin alloc] init];
+    FlutterBlueMaxPlugin *instance = [[self alloc] init];
     instance.methodChannel = methodChannel;
     instance.knownPeripherals = [NSMutableDictionary new];
     instance.connectedPeripherals = [NSMutableDictionary new];
@@ -239,25 +246,19 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
             return;
         }
 
+        // A fresh isolate with no native session has nothing to retire. Create
+        // its manager lazily for the first real operation, with its options set.
+        if ([@"flutterRestart" isEqualToString:call.method] && self.centralManager == nil) {
+            result(@0);
+            return;
+        }
+
         // initialize adapter
         if (self.centralManager == nil)
         {
             Log(LDEBUG, @"initializing CBCentralManager");
 
-            NSMutableDictionary *options = [NSMutableDictionary dictionary];
-
-            if ([self.showPowerAlert boolValue]) {
-                options[CBCentralManagerOptionShowPowerAlertKey] = self.showPowerAlert;
-            }
-
-            if ([self.restoreState boolValue]) {
-                options[CBCentralManagerOptionRestoreIdentifierKey] = @"flutterBlueMaxRestoreIdentifier";
-            }
-
-            Log(LDEBUG, @"showPowerAlert: %@", [self.showPowerAlert boolValue] ? @"yes" : @"no");
-            Log(LDEBUG, @"restoreState: %@", [self.restoreState boolValue] ? @"yes" : @"no");
-
-            self.centralManager = [[CBCentralManager alloc] initWithDelegate:self queue:nil options:options];
+            self.centralManager = [self createCentralManager];
         }
         // initialize timer
         if (self.checkForMtuChangesTimer == nil)
@@ -300,8 +301,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
             // established and in-flight peripherals before accepting work from
             // the new isolate.
             BOOL wasRestarting = self.flutterRestarting;
-            self.flutterRestarting = [self restartConnectionCount] > 0;
-            if (self.flutterRestarting && !wasRestarting) {
+            self.flutterRestarting = YES;
+            if ([self restartConnectionCount] > 0 && !wasRestarting) {
                 self.flutterRestartDeadline = [NSDate dateWithTimeIntervalSinceNow:kHotRestartDisconnectTimeout];
             }
             [self disconnectAllDevices:@"flutterRestart"];
@@ -1174,6 +1175,28 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     [self.writeDescs removeAllObjects];
 }
 
+// A manager is the native session identity: CoreBluetooth connection callbacks
+// carry it even though they do not carry our connection-attempt generation.
+- (CBCentralManager *)createCentralManager
+{
+    NSMutableDictionary *options = [NSMutableDictionary dictionary];
+    if ([self.showPowerAlert boolValue]) {
+        options[CBCentralManagerOptionShowPowerAlertKey] = self.showPowerAlert;
+    }
+    if ([self.restoreState boolValue]) {
+        options[CBCentralManagerOptionRestoreIdentifierKey] = @"flutterBlueMaxRestoreIdentifier";
+    }
+    Log(LDEBUG, @"showPowerAlert: %@", [self.showPowerAlert boolValue] ? @"yes" : @"no");
+    Log(LDEBUG, @"restoreState: %@", [self.restoreState boolValue] ? @"yes" : @"no");
+    return [[CBCentralManager alloc] initWithDelegate:self queue:nil options:options];
+}
+
+- (BOOL)ownsPeripheral:(CBPeripheral *)peripheral
+{
+    return !self.flutterRestarting &&
+        self.connectedPeripherals[peripheral.identifier.UUIDString] == peripheral;
+}
+
 - (NSUInteger)restartConnectionCount
 {
     NSMutableSet<NSString *> *remoteIds =
@@ -1201,7 +1224,12 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         [self.currentlyConnectingPeripherals removeAllObjects];
         remaining = 0;
     }
-    if (remaining == 0) {
+    if (remaining == 0 && self.flutterRestarting) {
+        // Retirement stays terminal after the wait ends. Detaching CBPeripheral
+        // delegates alone cannot isolate late CBCentralManager callbacks.
+        self.centralManager.delegate = nil;
+        self.centralManager = nil;
+        self.centralManager = [self createCentralManager];
         self.flutterRestarting = NO;
         self.flutterRestartDeadline = nil;
         [self.knownPeripherals removeAllObjects];
@@ -1278,6 +1306,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)centralManager:(CBCentralManager *)central
       willRestoreState:(NSDictionary *)state {
+    if (central != self.centralManager) {
+        return;
+    }
+
 
     Log(LDEBUG, @"centralManagerWillRestoreState");
 
@@ -1288,6 +1320,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     
     for (CBPeripheral *peripheral in peripherals) {
         
+        // State restoration explicitly registers its attempts before callbacks
+        // can adopt them, just like a Dart connect request.
+        self.currentlyConnectingPeripherals[peripheral.identifier.UUIDString] = peripheral;
         // Set the delegate to self to receive the peripheral callbacks
         peripheral.delegate = self;
 
@@ -1323,6 +1358,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)centralManagerDidUpdateState:(nonnull CBCentralManager *)central
 {
+    if (central != self.centralManager) {
+        return;
+    }
+
     Log(LDEBUG, @"centralManagerDidUpdateState %@", [self cbManagerStateString:self.centralManager.state]);
 
     int adapterState = [self bmAdapterStateEnum:self.centralManager.state];
@@ -1352,6 +1391,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         advertisementData:(NSDictionary<NSString *, id> *)advertisementData
                      RSSI:(NSNumber *)RSSI
 {
+    if (central != self.centralManager) {
+        return;
+    }
+
     Log(LVERBOSE, @"centralManager didDiscoverPeripheral");
 
     NSString* remoteId = [[peripheral identifier] UUIDString];
@@ -1440,9 +1483,20 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 - (void)centralManager:(CBCentralManager *)central
   didConnectPeripheral:(CBPeripheral *)peripheral
 {
+    if (central != self.centralManager) {
+        return;
+    }
+
     Log(LDEBUG, @"didConnectPeripheral");
 
     NSString* remoteId = [[peripheral identifier] UUIDString];
+
+    if (self.currentlyConnectingPeripherals[remoteId] != peripheral &&
+        self.connectedPeripherals[remoteId] != peripheral) {
+        // No live attempt owns this completion. It cannot create authority.
+        [central cancelPeripheralConnection:peripheral];
+        return;
+    }
 
     // remember the connected peripherals of *this app*
     [self.connectedPeripherals setObject:peripheral forKey:remoteId];
@@ -1481,6 +1535,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didDisconnectPeripheral:(CBPeripheral *)peripheral
                       error:(NSError *)error
 {
+    if (central != self.centralManager) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didDisconnectPeripheral:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
@@ -1489,6 +1547,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     }
 
     NSString* remoteId = [[peripheral identifier] UUIDString];
+    if (self.connectedPeripherals[remoteId] != peripheral &&
+        self.currentlyConnectingPeripherals[remoteId] != peripheral) {
+        return;
+    }
 
     // remember the connected peripherals of *this app*
     [self.connectedPeripherals removeObjectForKey:remoteId];
@@ -1525,6 +1587,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didFailToConnectPeripheral:(CBPeripheral *)peripheral
                          error:(NSError *)error
 {
+    if (central != self.centralManager) {
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didFailToConnectPeripheral:");
         Log(LERROR, @"  error: %@", [error localizedDescription]);
@@ -1533,6 +1599,10 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     }
 
     NSString* remoteId = [[peripheral identifier] UUIDString];
+    if (self.connectedPeripherals[remoteId] != peripheral &&
+        self.currentlyConnectingPeripherals[remoteId] != peripheral) {
+        return;
+    }
 
     // remove from currently connecting peripherals
     [self.currentlyConnectingPeripherals removeObjectForKey:remoteId];
@@ -1566,7 +1636,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 - (void)peripheral:(CBPeripheral *)peripheral
     didDiscoverServices:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1589,7 +1659,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didDiscoverCharacteristicsForService:(CBService *)service
                                    error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1620,7 +1690,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didDiscoverDescriptorsForCharacteristic:(CBCharacteristic *)characteristic
                                       error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1670,7 +1740,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didDiscoverIncludedServicesForService:(CBService *)service
                                     error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1691,7 +1761,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didUpdateValueForCharacteristic:(CBCharacteristic *)characteristic
                               error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1731,7 +1801,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didWriteValueForCharacteristic:(CBCharacteristic *)characteristic
                              error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1782,7 +1852,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didUpdateNotificationStateForCharacteristic:(CBCharacteristic *)characteristic
                                           error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1835,7 +1905,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didUpdateValueForDescriptor:(CBDescriptor *)descriptor
                           error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1879,7 +1949,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     didWriteValueForDescriptor:(CBDescriptor *)descriptor
                          error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1931,7 +2001,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)peripheralDidUpdateName:(CBPeripheral *)peripheral
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1949,7 +2019,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 - (void)peripheral:(CBPeripheral *)peripheral 
     didModifyServices:(NSArray<CBService *> *)invalidatedServices
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1963,7 +2033,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 - (void)peripheral:(CBPeripheral *)peripheral
     didReadRSSI:(NSNumber *)rssi error:(NSError *)error
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -1988,7 +2058,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)peripheralIsReadyToSendWriteWithoutResponse:(CBPeripheral *)peripheral
 {
-    if (self.flutterRestarting) {
+    if (![self ownsPeripheral:peripheral]) {
         return;
     }
 
@@ -2559,6 +2629,12 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // L2CAP channel delegate method for client side
 - (void)peripheral:(CBPeripheral *)peripheral didOpenL2CAPChannel:(CBL2CAPChannel *)channel error:(NSError *)error API_AVAILABLE(ios(11.0))
 {
+    if (![self ownsPeripheral:peripheral]) {
+        [channel.inputStream close];
+        [channel.outputStream close];
+        return;
+    }
+
     if (error) {
         Log(LERROR, @"didOpenL2CAPChannel error: %@ (%@, code=%ld)", error.localizedDescription, error.domain, (long)error.code);
         NSString *remoteId = [[peripheral identifier] UUIDString];
@@ -2643,6 +2719,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         self.peripheralManagers = [[NSMutableDictionary alloc] init];
         self.publishedServices = [[NSMutableDictionary alloc] init];
         self.retiredPeripheralManagers = [[NSMutableSet alloc] init];
+        self.unpublishingPeripheralManagers = [[NSMutableSet alloc] init];
         // Track pending client open requests keyed by "<remoteId>:<psm>"
         if (!self.pendingOpenResults) {
             self.pendingOpenResults = [[NSMutableDictionary alloc] init];
@@ -3026,6 +3103,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     
     CBPeripheralManager *peripheralManager = self.peripheralManagers[psmValue];
     if (peripheralManager) {
+        [self.unpublishingPeripheralManagers addObject:peripheralManager];
         [peripheralManager unpublishL2CAPChannel:psmValue.unsignedShortValue];
         [self.peripheralManagers removeObjectForKey:psmValue];
         [self.publishedServices removeObjectForKey:psmValue];
@@ -3058,7 +3136,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 {
     NSLog(@"Peripheral manager state updated: %ld", (long)peripheral.state);
 
-    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+    if (![self.peripheralManagers.allValues containsObject:peripheral]) {
         // Never publish for the previous isolate. A powered-off manager
         // publishes nothing anymore.
         if (peripheral.state != CBManagerStatePoweredOn) {
@@ -3084,7 +3162,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)peripheralManager:(CBPeripheralManager *)peripheral didPublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error API_AVAILABLE(ios(11.0))
 {
-    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+    if (![self.peripheralManagers.allValues containsObject:peripheral]) {
         // The publication was requested before hot restart and finished after it.
         if (error) {
             [self.retiredPeripheralManagers removeObject:peripheral];
@@ -3120,7 +3198,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 
 - (void)peripheralManager:(CBPeripheralManager *)peripheral didOpenL2CAPChannel:(CBL2CAPChannel *)channel error:(NSError *)error API_AVAILABLE(ios(11.0))
 {
-    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+    if (![self.peripheralManagers.allValues containsObject:peripheral]) {
+        [channel.inputStream close];
+        [channel.outputStream close];
         // A peer connected before the unpublish completed. Without a reference
         // the channel is released and its streams are never opened.
         return;
@@ -3171,6 +3251,11 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         return;
     }
     
+    if (![self.unpublishingPeripheralManagers containsObject:peripheral] &&
+        ![self.peripheralManagers.allValues containsObject:peripheral]) {
+        return;
+    }
+    [self.unpublishingPeripheralManagers removeObject:peripheral];
     [self.methodChannel invokeMethod:@"OnL2CapChannelUnpublished" arguments:@{@"psm": @(PSM)}];
 }
 
@@ -3180,6 +3265,9 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         CBL2CAPChannel *channel = channelInfo.channel;
         // Ensure stream setup happens on the main run loop to avoid xpc_fd_dup errors
         dispatch_async(dispatch_get_main_queue(), ^{
+            if (channelInfo.retired || ![self.channels containsObject:channelInfo]) {
+                return;
+            }
             channel.inputStream.delegate = (id<NSStreamDelegate>)self;
             channel.outputStream.delegate = (id<NSStreamDelegate>)self;
 
@@ -3203,7 +3291,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
             // The channel may have been purged (adapter off, disconnect) since
             // it was moved back into self.channels. The purge already failed
             // the pending open — don't resurrect the dead streams.
-            if (![self.channels containsObject:channelInfo]) {
+            if (channelInfo.retired || ![self.channels containsObject:channelInfo]) {
                 return;
             }
             channel.inputStream.delegate = (id<NSStreamDelegate>)self;
@@ -3440,6 +3528,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // open of the same PSM.
 - (void)teardownStreamsForChannel:(L2CapChannelInfo *)channelInfo
 {
+    channelInfo.retired = YES;
     if (!channelInfo.channel) {
         return;
     }
@@ -3565,6 +3654,8 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
 // no longer exists.
 - (void)retireAllListeners
 {
+    [self.retiredPeripheralManagers unionSet:self.unpublishingPeripheralManagers];
+    [self.unpublishingPeripheralManagers removeAllObjects];
     for (NSNumber *psm in self.peripheralManagers.allKeys) {
         CBPeripheralManager *peripheralManager = self.peripheralManagers[psm];
         [self.retiredPeripheralManagers addObject:peripheralManager];
