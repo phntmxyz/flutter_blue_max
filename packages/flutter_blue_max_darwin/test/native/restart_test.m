@@ -5,6 +5,12 @@
 - (void)checkForMtuChangesCallback;
 @end
 
+@protocol RestartTestPeripheralManagerDelegate
+- (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral;
+- (void)peripheralManager:(CBPeripheralManager *)peripheral didPublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error;
+- (void)peripheralManager:(CBPeripheralManager *)peripheral didUnpublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error;
+@end
+
 @interface RecordingMessenger : NSObject<FlutterBinaryMessenger>
 @property(nonatomic) NSMutableArray<FlutterMethodCall *> *events;
 @end
@@ -79,6 +85,29 @@
 - (void)stopScan {}
 - (void)cancelPeripheralConnection:(CBPeripheral *)peripheral {
     self.cancellations++;
+}
+@end
+
+@interface TestPeripheralManager : NSObject
+@property(nonatomic) CBManagerState state;
+@property(nonatomic) NSUInteger publishRequests;
+@property(nonatomic) NSMutableArray<NSNumber *> *unpublished;
+@end
+
+@implementation TestPeripheralManager
+- (instancetype)init {
+    self = [super init];
+    if (self) {
+        _state = CBManagerStatePoweredOn;
+        _unpublished = [NSMutableArray new];
+    }
+    return self;
+}
+- (void)publishL2CAPChannelWithEncryption:(BOOL)encryptionRequired {
+    self.publishRequests++;
+}
+- (void)unpublishL2CAPChannel:(CBL2CAPPSM)PSM {
+    [self.unpublished addObject:@(PSM)];
 }
 @end
 
@@ -262,6 +291,61 @@ static void TestPendingAndConnectedPeripheralIsCountedOnce(void) {
     NSCAssert(pending.count == 0, @"Pending entry survived terminal disconnect");
 }
 
+// A listen in flight: its manager still waits for didPublishL2CAPChannel.
+static TestPeripheralManager *AddPendingListener(id l2cap, NSMutableArray *results) {
+    TestPeripheralManager *pending = [TestPeripheralManager new];
+    NSMutableDictionary *managers = [l2cap valueForKey:@"peripheralManagers"];
+    managers[@0] = pending;
+    [l2cap setValue:^(id value) { [results addObject:value]; } forKey:@"pendingListenResult"];
+    return pending;
+}
+
+static void TestRestartRetiresListeners(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    id<RestartTestPeripheralManagerDelegate> l2cap = [registrar.plugin valueForKey:@"l2CapChannelManager"];
+    TestPeripheralManager *published = [TestPeripheralManager new];
+    NSMutableDictionary *managers = [(id)l2cap valueForKey:@"peripheralManagers"];
+    managers[@0x81] = published;
+    NSMutableArray *listenResults = [NSMutableArray new];
+    TestPeripheralManager *pending = AddPendingListener(l2cap, listenResults);
+
+    NSCAssert([Call(registrar.plugin, @"flutterRestart") isEqual:@1], @"Restart did not begin");
+
+    NSCAssert([published.unpublished isEqual:@[@0x81]], @"Old listener stayed published: %@", published.unpublished);
+    NSCAssert(managers.count == 0, @"Old listeners stayed registered");
+    NSCAssert(listenResults.count == 1 && [listenResults[0] isKindOfClass:[FlutterError class]],
+              @"Pending listen was not failed: %@", listenResults);
+    [l2cap peripheralManager:(id)pending didPublishL2CAPChannel:0x82 error:nil];
+    [l2cap peripheralManager:(id)published didUnpublishL2CAPChannel:0x81 error:nil];
+    NSCAssert([pending.unpublished isEqual:@[@0x82]], @"Late publication stayed published: %@", pending.unpublished);
+    NSCAssert(managers.count == 0, @"Late publication was registered");
+    NSCAssert(listenResults.count == 1, @"Late publication completed the old listen");
+    NSCAssert(registrar.messenger.events.count == 0, @"Old listener events reached Dart");
+    FinishRestart(registrar, peripheral);
+}
+
+static void TestRetiredListenerCannotServeNewListen(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    id<RestartTestPeripheralManagerDelegate> l2cap = [registrar.plugin valueForKey:@"l2CapChannelManager"];
+    TestPeripheralManager *old = AddPendingListener(l2cap, [NSMutableArray new]);
+    Call(registrar.plugin, @"flutterRestart");
+    FinishRestart(registrar, peripheral);
+    NSMutableArray *listenResults = [NSMutableArray new];
+    TestPeripheralManager *current = AddPendingListener(l2cap, listenResults);
+
+    [l2cap peripheralManagerDidUpdateState:(id)old];
+    [l2cap peripheralManagerDidUpdateState:(id)current];
+    [l2cap peripheralManager:(id)current didPublishL2CAPChannel:0x83 error:nil];
+
+    NSCAssert(old.publishRequests == 0, @"Retired manager published for the new isolate");
+    NSCAssert(current.publishRequests == 1, @"New listener did not publish");
+    NSCAssert([listenResults isEqual:@[@{@"psm": @0x83}]], @"New listen result missing: %@", listenResults);
+    NSArray *methods = [registrar.messenger.events valueForKey:@"method"];
+    NSCAssert([methods isEqual:@[@"OnL2CapChannelPublished"]], @"New listener events missing: %@", methods);
+}
+
 int main(void) {
     @autoreleasepool {
         TestMtuTimerDuringRestart();
@@ -271,7 +355,9 @@ int main(void) {
         TestPendingConnectionCompletesDuringRestart();
         TestRepeatedRestartRetainsPendingConnection();
         TestPendingAndConnectedPeripheralIsCountedOnce();
-        puts("7 Darwin restart regression tests passed");
+        TestRestartRetiresListeners();
+        TestRetiredListenerCannotServeNewListen();
+        puts("9 Darwin restart regression tests passed");
     }
     return 0;
 }

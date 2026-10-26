@@ -105,6 +105,10 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 @property(nonatomic) NSMutableArray<L2CapChannelInfo *> *zombieChannels;
 @property(nonatomic) NSMutableDictionary<NSNumber *, CBPeripheralManager *> *peripheralManagers;
 @property(nonatomic) NSMutableDictionary<NSNumber *, CBMutableService *> *publishedServices;
+// Listeners of a previous Dart isolate. They stay retained until CoreBluetooth
+// confirms that they publish nothing, so late callbacks can be recognized by
+// identity and never reach the new isolate.
+@property(nonatomic) NSMutableSet<CBPeripheralManager *> *retiredPeripheralManagers;
 @property(nonatomic) NSMutableDictionary<NSString *, FlutterResult> *pendingOpenResults;
 @property(nonatomic) NSMutableDictionary<NSString *, NSNumber *> *pendingOpenRequestedPsm; // key: remoteId -> psm
 // Blocks to execute when the output stream becomes ready (HasSpaceAvailable).
@@ -128,6 +132,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)reattachStreamsForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)cleanupChannelsForPeripheral:(NSString *)remoteId;
 - (void)cleanupAllChannels;
+- (void)retireAllListeners;
 - (void)completePendingOpenForRemoteId:(NSString *)remoteId psm:(CBL2CAPPSM)psm error:(NSError *)error;
 - (void)drainWritesForChannel:(L2CapChannelInfo *)channelInfo;
 - (void)failPendingWritesForChannel:(L2CapChannelInfo *)channelInfo error:(FlutterError *)error;
@@ -1144,6 +1149,11 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
     // is not delivered in these cases, so cleanupChannelsForPeripheral never
     // runs for them.
     [self.l2CapChannelManager cleanupAllChannels];
+
+    // The new isolate knows none of the published PSMs and could never stop them.
+    if ([func isEqualToString:@"flutterRestart"]) {
+        [self.l2CapChannelManager retireAllListeners];
+    }
 
     // note: we do *not* clear self.knownPeripherals
     // Otherwise the peripheral would not have any strong references 
@@ -2599,6 +2609,7 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         self.zombieChannels = [[NSMutableArray alloc] init];
         self.peripheralManagers = [[NSMutableDictionary alloc] init];
         self.publishedServices = [[NSMutableDictionary alloc] init];
+        self.retiredPeripheralManagers = [[NSMutableSet alloc] init];
         // Track pending client open requests keyed by "<remoteId>:<psm>"
         if (!self.pendingOpenResults) {
             self.pendingOpenResults = [[NSMutableDictionary alloc] init];
@@ -3013,6 +3024,15 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 - (void)peripheralManagerDidUpdateState:(CBPeripheralManager *)peripheral
 {
     NSLog(@"Peripheral manager state updated: %ld", (long)peripheral.state);
+
+    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+        // Never publish for the previous isolate. A powered-off manager
+        // publishes nothing anymore.
+        if (peripheral.state != CBManagerStatePoweredOn) {
+            [self.retiredPeripheralManagers removeObject:peripheral];
+        }
+        return;
+    }
     
     if (@available(iOS 11.0, *)) {
         if (peripheral.state == CBManagerStatePoweredOn && self.pendingListenResult) {
@@ -3031,6 +3051,16 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 
 - (void)peripheralManager:(CBPeripheralManager *)peripheral didPublishL2CAPChannel:(CBL2CAPPSM)PSM error:(NSError *)error API_AVAILABLE(ios(11.0))
 {
+    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+        // The publication was requested before hot restart and finished after it.
+        if (error) {
+            [self.retiredPeripheralManagers removeObject:peripheral];
+        } else {
+            [peripheral unpublishL2CAPChannel:PSM];
+        }
+        return;
+    }
+
     if (error) {
         NSLog(@"Failed to publish L2CAP channel: %@", error.localizedDescription);
         if (self.pendingListenResult) {
@@ -3057,6 +3087,12 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 
 - (void)peripheralManager:(CBPeripheralManager *)peripheral didOpenL2CAPChannel:(CBL2CAPChannel *)channel error:(NSError *)error API_AVAILABLE(ios(11.0))
 {
+    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+        // A peer connected before the unpublish completed. Without a reference
+        // the channel is released and its streams are never opened.
+        return;
+    }
+
     if (error) {
         NSLog(@"Failed to open L2CAP channel: %@", error.localizedDescription);
         return;
@@ -3095,6 +3131,11 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 {
     if (error) {
         NSLog(@"Failed to unpublish L2CAP channel: %@", error.localizedDescription);
+    }
+
+    if ([self.retiredPeripheralManagers containsObject:peripheral]) {
+        [self.retiredPeripheralManagers removeObject:peripheral];
+        return;
     }
     
     [self.methodChannel invokeMethod:@"OnL2CapChannelUnpublished" arguments:@{@"psm": @(PSM)}];
@@ -3484,6 +3525,34 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
                                     details:nil]);
     }
     [self.pendingOpenRequestedPsm removeAllObjects];
+}
+
+// Hot restart drops every PSM handle in Dart. Published listeners would stay
+// reachable by peers, and a pending listen would publish for an isolate that
+// no longer exists.
+- (void)retireAllListeners
+{
+    for (NSNumber *psm in self.peripheralManagers.allKeys) {
+        CBPeripheralManager *peripheralManager = self.peripheralManagers[psm];
+        [self.retiredPeripheralManagers addObject:peripheralManager];
+        // PSM 0 is the placeholder of a listen that has not published yet;
+        // its didPublishL2CAPChannel unpublishes it once it arrives.
+        if (psm.unsignedShortValue != 0) {
+            if (@available(iOS 11.0, *)) {
+                [peripheralManager unpublishL2CAPChannel:psm.unsignedShortValue];
+            }
+        }
+    }
+    [self.peripheralManagers removeAllObjects];
+    [self.publishedServices removeAllObjects];
+
+    if (self.pendingListenResult) {
+        FlutterResult pending = self.pendingListenResult;
+        self.pendingListenResult = nil;
+        pending([FlutterError errorWithCode:@"listenL2capChannel"
+                                    message:@"flutter hot restart"
+                                    details:nil]);
+    }
 }
 
 @end
