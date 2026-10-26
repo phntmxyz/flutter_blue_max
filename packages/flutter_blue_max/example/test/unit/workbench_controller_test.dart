@@ -54,6 +54,37 @@ void main() {
     expect(controller.services, isEmpty);
     expect(controller.channels.single.incoming, isTrue);
     expect(controller.serverPsm, 129);
+    final outgoing = controller.channelSessions.singleWhere((session) => !session.incoming);
+    expect(outgoing.closed, isTrue, reason: 'Link loss keeps the closed session for its diagnostics');
+    expect(platform.closeRequests.single.psm, 131);
+  });
+
+  test('selecting a peer keeps the channel it opened to the local server', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.startServer(secure: true);
+    const remoteId = DeviceIdentifier('AA:BB:CC:DD:EE:05');
+    platform.accepted.add(L2CapChannelConnected(remoteId: remoteId, psm: 129));
+
+    controller.select(BluetoothDevice(remoteId: remoteId));
+    await Future<void>.delayed(Duration.zero);
+
+    final session = controller.channels.single;
+    expect(session.incoming, isTrue);
+    platform.received.add(L2CapChannelData(remoteId: remoteId, psm: 129, value: [1, 2]));
+    expect(session.received, 2);
+    await controller.stopServer();
+    expect(platform.closeRequests.single.remoteId, remoteId.str);
+  });
+
+  test('a failed log level still subscribes to the adapter state', () async {
+    final (:controller, :platform) = await _setup(
+      configure: (platform) {
+        platform.overrideSetLogLevel = (_) async => throw PlatformException(code: 'bluez', message: 'No bluetoothd');
+      },
+    );
+
+    expect(controller.error, contains('No bluetoothd'));
+    expect(controller.ready, isTrue);
   });
 
   test('duplicate server submission is ignored and late startup is cleaned up on disposal', () async {
@@ -192,6 +223,36 @@ void main() {
       expect(platform.connectRequests.length, connections + 1);
       expect(c.channels.single.channel.deviceId, peer.remoteId);
       expect(peer.isConnected, isTrue);
+    });
+
+    test('channel open does not reconnect a peer the user disconnected while opening', () async {
+      final fixture = await _setup();
+      final c = fixture.controller;
+      final platform = fixture.platform;
+      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:55');
+      c.select(peer);
+      await c.connect();
+      final gate = Completer<void>();
+      platform.overrideOpenL2CapChannel = (request) async {
+        platform.openRequests.add(request);
+        await gate.future;
+        throw StateError('Temporary channel failure');
+      };
+      final attempts = platform.openRequests.length;
+      final connections = platform.connectRequests.length;
+
+      final opening = c.openChannel(131, device: peer, secure: true);
+      await _until(() => platform.openRequests.length == attempts + 1);
+      final disconnecting = c.disconnect();
+      gate.complete();
+      await opening;
+      await disconnecting;
+
+      expect(c.error, contains('Temporary channel failure'));
+      expect(platform.openRequests.length, attempts + 1);
+      expect(platform.connectRequests.length, connections);
+      expect(peer.isConnected, isFalse);
+      expect(c.channels, isEmpty);
     });
 
     test('test traffic preserves large payloads and drains the public plugin write queue', () async {
@@ -367,8 +428,12 @@ void main() {
   });
 }
 
-Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setup({bool dispose = true}) async {
+Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setup({
+  bool dispose = true,
+  void Function(FakeBluetoothPlatform platform)? configure,
+}) async {
   _platform.reset();
+  configure?.call(_platform);
   FlutterBlueMaxPlatform.instance = _platform;
   final controller = WorkbenchController();
   await controller.start();

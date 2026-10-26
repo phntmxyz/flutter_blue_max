@@ -15,6 +15,10 @@ class WorkbenchController() extends ChangeNotifier {
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
   final _busy = <String>{};
   final _logs = <String>[];
+
+  /// Counts user-requested disconnects per peer so a pending channel open can
+  /// tell a transient drop from an intentional disconnect.
+  final _disconnectRequests = <DeviceIdentifier, int>{};
   bool _disposed = false;
   bool _started = false;
   bool _startingServer = false;
@@ -140,24 +144,26 @@ class WorkbenchController() extends ChangeNotifier {
     );
     await run('initialize', () async {
       await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
-      if (_disposed) {
-        return;
-      }
-      _subscriptions.add(
-        FlutterBlueMax.adapterState.listen((state) {
-          adapter = state;
-          if (state == BluetoothAdapterState.on && localName == null) {
-            unawaited(_loadLocalName());
-          }
-          if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
-            _channels.clear();
-            _services.clear();
-            serverPsm = null;
-          }
-          _update();
-        }, onError: _streamError),
-      );
     });
+    // A failed log level (e.g. Linux without bluetoothd) is reported above, but
+    // must not leave the app waiting for an adapter state it never subscribed to.
+    if (_disposed) {
+      return;
+    }
+    _subscriptions.add(
+      FlutterBlueMax.adapterState.listen((state) {
+        adapter = state;
+        if (state == BluetoothAdapterState.on && localName == null) {
+          unawaited(_loadLocalName());
+        }
+        if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
+          _channels.clear();
+          _services.clear();
+          serverPsm = null;
+        }
+        _update();
+      }, onError: _streamError),
+    );
   }
 
   void setQuery(String value) {
@@ -186,11 +192,16 @@ class WorkbenchController() extends ChangeNotifier {
           log('Services changed on ${nameOf(device)}. Discover services again.');
         }),
       );
+      // The stream replays a cached state on listen, which is `disconnected` for
+      // peers never connected over GATT. Only a real link loss ends the session.
+      var wasConnected = false;
       _subscriptions.add(
         device.connectionState.listen((state) {
-          if (state == BluetoothConnectionState.disconnected) {
+          final lostConnection = wasConnected && state == BluetoothConnectionState.disconnected;
+          wasConnected = state == BluetoothConnectionState.connected;
+          if (lostConnection) {
             _services.remove(device.remoteId);
-            _channels.removeWhere((key, _) => key.$1 == device.remoteId);
+            _closeOutgoingChannels(device.remoteId);
           }
           log(
             '${nameOf(device)}: ${state.name}'
@@ -275,7 +286,9 @@ class WorkbenchController() extends ChangeNotifier {
   });
 
   Future<void> disconnect() => run('connection', () async {
-    await selected!.disconnect();
+    final device = selected!;
+    _disconnectRequests.update(device.remoteId, (count) => count + 1, ifAbsent: () => 1);
+    await device.disconnect();
   });
 
   Future<void> turnOn() => run('adapter', () async {
@@ -357,11 +370,15 @@ class WorkbenchController() extends ChangeNotifier {
     if (_channels[key]?.closed == false) {
       throw StateError('This peer already has a channel on PSM $psm.');
     }
+    final disconnects = _disconnectRequests[device.remoteId] ?? 0;
     final channel = await () async {
       try {
         return await device.openL2CapChannel(psm, secure: secure);
       } catch (error, stackTrace) {
-        if (_disposed || !ready || _isUnsupported(error)) {
+        // A secure handshake can drop the link transiently; a disconnect the
+        // user requested meanwhile must not be undone by the retry.
+        final userDisconnected = (_disconnectRequests[device.remoteId] ?? 0) != disconnects;
+        if (_disposed || !ready || userDisconnected || _isUnsupported(error)) {
           Error.throwWithStackTrace(error, stackTrace);
         }
         log('L2CAP open failed; retrying once: $error');
@@ -422,6 +439,21 @@ class WorkbenchController() extends ChangeNotifier {
     await session.channel.close();
     session.closed = true;
   });
+
+  /// Outgoing channels belong to the GATT session that opened them. Incoming
+  /// channels belong to the local server and stay untouched.
+  void _closeOutgoingChannels(DeviceIdentifier remoteId) {
+    final outgoing = channels.where((session) => !session.incoming && session.channel.deviceId == remoteId);
+    for (final session in outgoing.toList()) {
+      session.closed = true;
+      unawaited(
+        session.channel.close().catchError((Object exception, StackTrace stackTrace) {
+          log('L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception');
+          debugPrintStack(stackTrace: stackTrace);
+        }),
+      );
+    }
+  }
 
   void _trackChannel(BluetoothL2capChannel channel, {required bool incoming}) {
     final session = _channels.putIfAbsent((

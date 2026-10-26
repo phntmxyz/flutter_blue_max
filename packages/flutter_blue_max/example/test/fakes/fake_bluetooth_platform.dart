@@ -564,8 +564,8 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     if (override != null) {
       return await override(request);
     }
+    // Like the native plugins, a local close emits no onL2capClosed event.
     closeRequests.add(request);
-    closed.add(L2CapChannelClosed(remoteId: DeviceIdentifier(request.remoteId), psm: request.psm));
   }
 
   Future<void> Function(WriteL2CapChannelRequest request)? overrideWriteL2CapChannel;
