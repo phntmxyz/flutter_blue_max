@@ -291,6 +291,41 @@ static void TestPendingAndConnectedPeripheralIsCountedOnce(void) {
     NSCAssert(pending.count == 0, @"Pending entry survived terminal disconnect");
 }
 
+static void TestStalledTeardownEndsAtDeadline(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    FlutterBlueMaxPlugin *plugin = registrar.plugin;
+    peripheral.delegate = plugin;
+    NSCAssert([Call(plugin, @"flutterRestart") isEqual:@1], @"Restart did not begin");
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@1], @"Teardown ended before its deadline");
+
+    // CoreBluetooth never reports the disconnect; let the deadline pass.
+    [plugin setValue:[NSDate distantPast] forKey:@"flutterRestartDeadline"];
+
+    NSCAssert([Call(plugin, @"connectedCount") isEqual:@0], @"Stalled teardown blocked the new isolate");
+    NSCAssert(![[plugin valueForKey:@"flutterRestarting"] boolValue], @"Restart flag stayed set");
+    NSCAssert([[plugin valueForKey:@"connectedPeripherals"] count] == 0, @"Old connection stayed registered");
+    NSCAssert(peripheral.delegate == nil, @"Old peripheral kept its delegate");
+    [plugin peripheralDidUpdateName:(id)peripheral];
+    NSArray *methods = [registrar.messenger.events valueForKey:@"method"];
+    NSCAssert([methods isEqual:@[@"OnNameChanged"]], @"Events stayed blocked after the deadline: %@", methods);
+    [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
+static void TestRetriedRestartKeepsDeadline(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    Call(registrar.plugin, @"flutterRestart");
+    NSDate *deadline = [registrar.plugin valueForKey:@"flutterRestartDeadline"];
+    NSCAssert(deadline != nil, @"Restart has no deadline");
+
+    Call(registrar.plugin, @"flutterRestart");
+
+    NSCAssert([registrar.plugin valueForKey:@"flutterRestartDeadline"] == deadline, @"Retry extended the deadline");
+    FinishRestart(registrar, peripheral);
+    NSCAssert([registrar.plugin valueForKey:@"flutterRestartDeadline"] == nil, @"Finished restart kept its deadline");
+}
+
 // A listen in flight: its manager still waits for didPublishL2CAPChannel.
 static TestPeripheralManager *AddPendingListener(id l2cap, NSMutableArray *results) {
     TestPeripheralManager *pending = [TestPeripheralManager new];
@@ -357,7 +392,9 @@ int main(void) {
         TestPendingAndConnectedPeripheralIsCountedOnce();
         TestRestartRetiresListeners();
         TestRetiredListenerCannotServeNewListen();
-        puts("9 Darwin restart regression tests passed");
+        TestStalledTeardownEndsAtDeadline();
+        TestRetriedRestartKeepsDeadline();
+        puts("11 Darwin restart regression tests passed");
     }
     return 0;
 }

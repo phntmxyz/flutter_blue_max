@@ -75,6 +75,11 @@ static const NSUInteger kL2CapReadBufferCap = 64 * 1024;
 // handleBytesAvailableForChannel).
 static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 
+// How long the new Dart isolate waits for CoreBluetooth to report the end of
+// the old connections after hot restart. Matches the Android plugin and stays
+// below the 10s handshake timeout in Dart.
+static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
+
 // A queued outgoing write. NSOutputStream may accept fewer bytes than offered
 // (partial write) or none at all (no space); the unwritten remainder stays
 // queued and is flushed on HasSpaceAvailable. The Dart result completes only
@@ -159,7 +164,11 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
 @property(nonatomic) NSNumber *restoreState;
 @property(nonatomic, retain) L2CapChannelManager *l2CapChannelManager;
 @property(nonatomic) BOOL flutterRestarting;
+// Set when a restart starts waiting for old connections. A retried restart
+// keeps it, so retries cannot extend the wait.
+@property(nonatomic) NSDate *flutterRestartDeadline;
 - (NSUInteger)restartConnectionCount;
+- (NSUInteger)remainingRestartConnections;
 @end
 
 @implementation FlutterBlueMaxPlugin
@@ -290,28 +299,25 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
             // All Dart state is reset after hot restart. Disconnect both
             // established and in-flight peripherals before accepting work from
             // the new isolate.
+            BOOL wasRestarting = self.flutterRestarting;
             self.flutterRestarting = [self restartConnectionCount] > 0;
+            if (self.flutterRestarting && !wasRestarting) {
+                self.flutterRestartDeadline = [NSDate dateWithTimeIntervalSinceNow:kHotRestartDisconnectTimeout];
+            }
             [self disconnectAllDevices:@"flutterRestart"];
 
-            NSUInteger remaining = [self restartConnectionCount];
+            NSUInteger remaining = [self remainingRestartConnections];
             Log(LDEBUG, @"hotRestartConnections: %lu", remaining);
-
-            if (remaining == 0) {
-                self.flutterRestarting = NO;
-                [self.knownPeripherals removeAllObjects];
-            }
             
             result(@(remaining));
             return;
         }
         else if ([@"connectedCount" isEqualToString:call.method])
         {
-            NSUInteger remaining = [self restartConnectionCount];
+            NSUInteger remaining = [self remainingRestartConnections];
             Log(LDEBUG, @"hotRestartConnections: %lu", remaining);
             if (remaining == 0) {
                 Log(LDEBUG, @"Hot Restart: complete");
-                self.flutterRestarting = NO;
-                [self.knownPeripherals removeAllObjects];
             }
             result(@(remaining));
             return;
@@ -1174,6 +1180,33 @@ static const NSUInteger kL2CapDrainBudgetPerPass = 64 * 1024;
         [NSMutableSet setWithArray:self.connectedPeripherals.allKeys];
     [remoteIds addObjectsFromArray:self.currentlyConnectingPeripherals.allKeys];
     return remoteIds.count;
+}
+
+// CoreBluetooth may never report the end of an old connection, e.g. when the
+// adapter was not powered on during flutterRestart and nothing was cancelled.
+// While flutterRestarting is set every peripheral callback is dropped, so the
+// wait is bounded instead of blocking the new isolate until the app is killed.
+- (NSUInteger)remainingRestartConnections
+{
+    NSUInteger remaining = [self restartConnectionCount];
+    if (remaining > 0 && self.flutterRestarting && [self.flutterRestartDeadline timeIntervalSinceNow] <= 0) {
+        Log(LWARNING, @"Hot Restart: dropping %lu old connection(s) after timeout", remaining);
+        NSMutableArray<CBPeripheral *> *peripherals = [[self.connectedPeripherals allValues] mutableCopy];
+        [peripherals addObjectsFromArray:[self.currentlyConnectingPeripherals allValues]];
+        for (CBPeripheral *peripheral in peripherals) {
+            peripheral.delegate = nil;
+            [self.peripheralMtu removeObjectForKey:peripheral];
+        }
+        [self.connectedPeripherals removeAllObjects];
+        [self.currentlyConnectingPeripherals removeAllObjects];
+        remaining = 0;
+    }
+    if (remaining == 0) {
+        self.flutterRestarting = NO;
+        self.flutterRestartDeadline = nil;
+        [self.knownPeripherals removeAllObjects];
+    }
+    return remaining;
 }
 
 ////////////////////////////////////
