@@ -2,6 +2,16 @@ package com.lib.flutter_blue_max;
 
 import android.Manifest;
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.IOException;
+import java.util.concurrent.atomic.AtomicReference;
+import org.robolectric.shadow.api.Shadow;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCallback;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -276,13 +286,18 @@ public class FlutterBlueMaxPluginRestartTest {
         manager.openL2CapChannel(REMOTE_ID, 0x80, true, opened);
         L2CapClientChannel channel = ((ClientSocketInfo) channels.get(0)).l2capChannel;
         CountDownLatch release = new CountDownLatch(1);
+        CountDownLatch queued = new CountDownLatch(1);
         channel.ioExecutor.execute(() -> {
+            queued.countDown();
             try {
                 release.await();
             } catch (InterruptedException e) {
                 Thread.currentThread().interrupt();
             }
         });
+        assertTrue(queued.await(5, TimeUnit.SECONDS));
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(opened.succeeded);
         RecordingResult reopened = new RecordingResult();
         manager.openL2CapChannel(REMOTE_ID, 0x80, true, reopened);
 
@@ -295,6 +310,127 @@ public class FlutterBlueMaxPluginRestartTest {
         assertEquals("channel_closed", reopened.errorCode);
         assertNull(channel.getSocket());
         assertTrue(channels.isEmpty());
+    }
+
+    private ServerSocketInfo newServer(List<String> events) {
+        BluetoothServerSocket socket = Shadow.newInstanceOf(BluetoothServerSocket.class);
+        return new ServerSocketInfo(socket,
+            (device, psm) -> events.add("connected"),
+            (device, psm, data) -> events.add("data"),
+            (device, psm) -> events.add("closed"), plugin);
+    }
+
+    @Test
+    @Config(sdk = 34, shadows = {AcceptedSocketShadow.class, ListenerSocketShadow.class})
+    public void socketReturnedAfterListenerRetirementIsClosedWithoutOpeningStreams() throws IOException {
+        List<String> events = new ArrayList<>();
+        ServerSocketInfo server = newServer(events);
+        server.closeSocket();
+        BluetoothSocket socket = Shadow.newInstanceOf(BluetoothSocket.class);
+        AcceptedSocketShadow shadow = Shadow.extract(socket);
+
+        server.adoptAcceptedSocket(socket);
+        server.acceptConnections(); // retirement cannot be undone by retry
+        shadowOf(Looper.getMainLooper()).idle();
+
+        assertTrue(shadow.closed);
+        assertEquals(0, shadow.streamRequests);
+        assertNull(server.getAnyL2CapChannel());
+        assertTrue(events.isEmpty());
+    }
+
+    @Test
+    @Config(sdk = 34, shadows = {AcceptedSocketShadow.class, ListenerSocketShadow.class})
+    public void listenerRetirementOwnsSocketWhileStreamSetupIsInFlight() throws Exception {
+        List<String> events = new ArrayList<>();
+        ServerSocketInfo server = newServer(events);
+        BluetoothSocket socket = Shadow.newInstanceOf(BluetoothSocket.class);
+        AcceptedSocketShadow shadow = Shadow.extract(socket);
+        shadow.entered = new CountDownLatch(1);
+        shadow.release = new CountDownLatch(1);
+        AtomicReference<Throwable> failure = new AtomicReference<>();
+        Thread accept = new Thread(() -> {
+            try { server.adoptAcceptedSocket(socket); }
+            catch (Throwable e) { failure.set(e); }
+        });
+        accept.start();
+        assertTrue(shadow.entered.await(5, TimeUnit.SECONDS));
+        assertTrue(server.getAnyL2CapChannel() != null);
+        Thread close = new Thread(server::closeSocket);
+        close.start();
+        // Wait until retirement wins the owner lock, before releasing I/O.
+        long deadline = System.nanoTime() + TimeUnit.SECONDS.toNanos(5);
+        boolean retired = false;
+        while (!retired && System.nanoTime() < deadline) {
+            synchronized (server) { retired = ReflectionHelpers.getField(server, "retired"); }
+            Thread.yield();
+        }
+        shadow.release.countDown();
+        accept.join(5000);
+        close.join(5000);
+        shadowOf(Looper.getMainLooper()).idle();
+
+        assertTrue(retired);
+        assertFalse(accept.isAlive());
+        assertFalse(close.isAlive());
+        assertNull(failure.get());
+        assertTrue(shadow.closed);
+        assertNull(server.getAnyL2CapChannel());
+        assertTrue(events.isEmpty());
+    }
+
+    @Test
+    @Config(sdk = 34, shadows = {AcceptedSocketShadow.class, ListenerSocketShadow.class})
+    public void acceptedSocketEventsKeepTheirOriginalSessionUntilDelivery() throws IOException {
+        List<String> events = new ArrayList<>();
+        ServerSocketInfo old = newServer(events);
+        old.adoptAcceptedSocket(Shadow.newInstanceOf(BluetoothSocket.class));
+        assertTrue(old.getAnyL2CapChannel() != null);
+        call("flutterRestart");
+        old.closeSocket();
+        shadowOf(Looper.getMainLooper()).idle();
+        assertTrue(events.isEmpty());
+
+        ServerSocketInfo current = newServer(events);
+        current.adoptAcceptedSocket(Shadow.newInstanceOf(BluetoothSocket.class));
+        shadowOf(Looper.getMainLooper()).idle();
+        assertEquals(List.of("connected"), events);
+        current.closeSocket();
+    }
+
+    @Implements(BluetoothServerSocket.class)
+    public static class ListenerSocketShadow {
+        @Implementation public int getPsm() { return 0x81; }
+        @Implementation public void close() {}
+        @Implementation public BluetoothSocket accept() throws IOException {
+            throw new IOException("No socket queued");
+        }
+    }
+
+    @Implements(BluetoothSocket.class)
+    public static class AcceptedSocketShadow {
+        volatile boolean closed;
+        int streamRequests;
+        CountDownLatch entered;
+        CountDownLatch release;
+        @Implementation public InputStream getInputStream() throws IOException {
+            streamRequests++;
+            if (entered != null) {
+                entered.countDown();
+                try {
+                    if (!release.await(5, TimeUnit.SECONDS)) throw new IOException("Test latch timed out");
+                } catch (InterruptedException e) { throw new IOException(e); }
+            }
+            return new ByteArrayInputStream(new byte[0]);
+        }
+        @Implementation public OutputStream getOutputStream() {
+            return new ByteArrayOutputStream();
+        }
+        @Implementation public BluetoothDevice getRemoteDevice() {
+            return BluetoothAdapter.getDefaultAdapter().getRemoteDevice(REMOTE_ID);
+        }
+        @Implementation public boolean isConnected() { return !closed; }
+        @Implementation public void close() { closed = true; }
     }
 
     @Implements(BluetoothGatt.class)
