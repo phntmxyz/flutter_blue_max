@@ -116,14 +116,20 @@ public class FlutterBlueMaxPluginRestartTest {
     }
 
     @Test
-    public void eventsQueuedBeforeGattReplacementAreDiscardedAtDelivery() {
-        BluetoothGatt oldGatt = addConnectedGatt();
-        callback.onMtuChanged(oldGatt, 100, 0);
-        addConnectedGatt();
+    public void eventsQueuedBeforeDisconnectStillReachDart() {
+        BluetoothGatt gatt = addConnectedGatt();
+        BluetoothGattService service = new BluetoothGattService(
+            UUID.fromString("0000180d-0000-1000-8000-00805f9b34fb"), BluetoothGattService.SERVICE_TYPE_PRIMARY);
+        BluetoothGattCharacteristic characteristic = new BluetoothGattCharacteristic(
+            UUID.fromString("00002a37-0000-1000-8000-00805f9b34fb"), BluetoothGattCharacteristic.PROPERTY_WRITE, 0);
+        service.addCharacteristic(characteristic);
 
+        // e.g. a reboot command: the peripheral acks the write, then drops the link
+        callback.onCharacteristicWrite(gatt, characteristic, 0);
+        callback.onConnectionStateChange(gatt, 0, BluetoothProfile.STATE_DISCONNECTED);
         shadowOf(Looper.getMainLooper()).idle();
 
-        assertTrue(messenger.events.isEmpty());
+        assertEquals(List.of("OnCharacteristicWritten", "OnConnectionStateChanged"), messenger.events);
     }
 
     @Test

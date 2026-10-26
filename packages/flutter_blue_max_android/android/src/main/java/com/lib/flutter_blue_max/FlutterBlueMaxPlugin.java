@@ -2626,7 +2626,7 @@ public class FlutterBlueMaxPlugin implements
                 response.put("error_code", status);
                 response.put("error_string", gattErrorString(status));
 
-                invokeMethodUIThread("OnDiscoveredServices", response, gatt);
+                invokeMethodUIThread("OnDiscoveredServices", response);
             });
         }
 
@@ -2642,7 +2642,7 @@ public class FlutterBlueMaxPlugin implements
                     // Service Changed 0x2A05
                     if (uuidStr(characteristic.getUuid()).toUpperCase().equals("2A05")) {
                         HashMap<String, Object> response = bmBluetoothDevice(gatt.getDevice());
-                        invokeMethodUIThread("OnServicesReset", response, gatt);
+                        invokeMethodUIThread("OnServicesReset", response);
                     }
                 }
 
@@ -2663,7 +2663,7 @@ public class FlutterBlueMaxPlugin implements
                     response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
                 }
 
-                invokeMethodUIThread("OnCharacteristicReceived", response, gatt);
+                invokeMethodUIThread("OnCharacteristicReceived", response);
             });
         }
 
@@ -2735,7 +2735,7 @@ public class FlutterBlueMaxPlugin implements
                     response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
                 }
 
-                invokeMethodUIThread("OnCharacteristicWritten", response, gatt);
+                invokeMethodUIThread("OnCharacteristicWritten", response);
             });
         }
 
@@ -2768,7 +2768,7 @@ public class FlutterBlueMaxPlugin implements
                     response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
                 }
 
-                invokeMethodUIThread("OnDescriptorRead", response, gatt);
+                invokeMethodUIThread("OnDescriptorRead", response);
             });
         }
 
@@ -2814,7 +2814,7 @@ public class FlutterBlueMaxPlugin implements
                     response.put("primary_service_uuid", uuidStr(primaryService.getUuid()));
                 }
 
-                invokeMethodUIThread("OnDescriptorWritten", response, gatt);
+                invokeMethodUIThread("OnDescriptorWritten", response);
             });
         }
 
@@ -2843,7 +2843,7 @@ public class FlutterBlueMaxPlugin implements
                 response.put("error_code", status);
                 response.put("error_string", gattErrorString(status));
 
-                invokeMethodUIThread("OnReadRssi", response, gatt);
+                invokeMethodUIThread("OnReadRssi", response);
             });
         }
 
@@ -2869,7 +2869,7 @@ public class FlutterBlueMaxPlugin implements
                 response.put("error_code", status);
                 response.put("error_string", gattErrorString(status));
 
-                invokeMethodUIThread("OnMtuChanged", response, gatt);
+                invokeMethodUIThread("OnMtuChanged", response);
             });
         }
 
@@ -3170,17 +3170,13 @@ public class FlutterBlueMaxPlugin implements
 
     private void invokeMethodUIThread(final String method, HashMap<String, Object> data)
     {
-        invokeMethodUIThread(method, data, null);
-    }
-
-    private void invokeMethodUIThread(final String method, HashMap<String, Object> data, BluetoothGatt owner)
-    {
         final long generation = mBleSessionGeneration;
         new Handler(Looper.getMainLooper()).post(() -> {
-            // The event may have been queued before the restart or before this
-            // device acquired a replacement GATT handle.
-            if (generation != mBleSessionGeneration ||
-                (owner != null && mConnectedDevices.get(owner.getDevice().getAddress()) != owner)) {
+            // The event may have been queued before the restart. GATT ownership
+            // is checked when the event is queued (runIfCurrentGatt): checking it
+            // again here would drop events that arrived right before a
+            // disconnect, e.g. the write ack of a reboot command.
+            if (generation != mBleSessionGeneration) {
                 return;
             }
             //Could already be teared down at this moment
