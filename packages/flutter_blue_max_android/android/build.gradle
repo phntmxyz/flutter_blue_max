@@ -20,6 +20,10 @@ android {
         minSdkVersion 21
     }
 
+    testOptions {
+        unitTests.includeAndroidResources = true
+    }
+
     gradle.projectsEvaluated {
         tasks.withType(JavaCompile) {
             options.compilerArgs << "-Xlint:deprecation"
@@ -27,4 +31,9 @@ android {
         }
     }
 
+}
+
+dependencies {
+    testImplementation 'junit:junit:4.13.2'
+    testImplementation 'org.robolectric:robolectric:4.11.1'
 }
