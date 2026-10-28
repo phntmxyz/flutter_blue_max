@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "com.lib.flutter_blue_max_example"
-    compileSdk = 34 // Minimum required by the plugin and Flutter's AndroidX dependencies.
+    compileSdk = flutter.compileSdkVersion // shared_preferences_android and jni need API 36 and 35.
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
