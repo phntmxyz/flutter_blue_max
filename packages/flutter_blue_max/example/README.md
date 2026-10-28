@@ -49,6 +49,10 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
 
 - **Devices:** scan or choose a browser device, connect, then open **GATT** to discover services, read/write characteristics and descriptors, or subscribe to notifications.
   Native platforms also expose advertisement data, RSSI and system-connected devices; Android adds bonding and MTU requests.
+  On native platforms, **Track advertisements** in a device's **Advertisement** card scans only that device and keeps its latest 200 advertisements with RSSI, intervals and payload changes; the history can be filtered by text, changed payloads or parsed values.
+- **Parsers:** define how manufacturer or service data is read as named values, optionally bound to one device; parsed values appear below the raw data and in the tracker history.
+  Parsers are saved locally (shared preferences, browser local storage on web); first launches start with Battery (`180F`), Eddystone TLM, iBeacon and Apple Continuity examples, which **Add common examples** restores.
+  Apple platforms hide iBeacon frames from apps.
 - **L2CAP:** on supported platforms, connect to a peer, open its **L2CAP** tab and enter the remote server's PSM.
   **Local server** accepts incoming channels and displays its assigned PSM.
   Peer discovery and PSM exchange must be provided separately; starting this server does not advertise a GATT peripheral.

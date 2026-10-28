@@ -4,6 +4,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spot/spot.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
@@ -13,6 +14,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> launch({required Size size}) async {
     platform.reset();
+    SharedPreferences.setMockInitialValues({});
     logEvent('Launch the real workbench at $size');
     addTearDown(dispose);
     FlutterBlueMaxPlatform.instance = platform;
@@ -87,6 +89,33 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   }
 
   Future<void> connectSelected() => tapLabel('Connect');
+
+  Future<void> trackAdvertisements() async {
+    await tapLabel('Advertisement');
+    await tapLabel('Track advertisements');
+    logEvent('Receive repeated advertisements with a changing payload');
+    platform.advertise(
+      rssi: -60,
+      manufacturerData: {
+        0x59: [1],
+      },
+    );
+    platform.advertise(
+      rssi: -40,
+      manufacturerData: {
+        0x59: [2],
+      },
+    );
+    await idle();
+    spotText('2 advertisements', exact: true).existsOnce();
+    spotText('-60 … -40 dBm', exact: true).existsOnce();
+    spotText('1 payload changes', exact: true).existsOnce();
+    spotText('-40 dBm · Connectable · Tracking 2', exact: true).existsOnce();
+    await tapLabel('Stop tracking');
+    expect(controller.tracking, isFalse);
+    spotText('Track advertisements', exact: true).existsOnce();
+    spotText('-40 dBm · Connectable · 2 tracked', exact: true).existsOnce();
+  }
 
   void expectLocalDeviceName() {
     logEvent('Verify the local device name in discovery');

@@ -5,6 +5,7 @@ import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_in
 import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
+import '../robot/advertisement_robot.dart';
 import '../robot/restored_features_robot.dart';
 import '../robot/workbench_robot.dart';
 
@@ -62,6 +63,29 @@ void main() {
     await robot.openActivity();
     await robot.openLocalServer();
     await robot.stopServer();
+  });
+
+  testWidgets('phone: track the advertisements of a selected device', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.scanForPeripheral();
+    await robot.selectPeripheral();
+    await robot.trackAdvertisements();
+  });
+
+  testWidgets('phone: parse sensor values and filter the tracked history', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.scanForSensor();
+    await robot.addTemperatureParser();
+    await robot.filterTrackedHistory();
+    await robot.removeParser();
+  });
+
+  testWidgets('desktop: manage saved parsers globally', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.manageGlobalParsers();
   });
 
   testWidgets('phone: system back returns to the list without dropping the connection', (tester) async {

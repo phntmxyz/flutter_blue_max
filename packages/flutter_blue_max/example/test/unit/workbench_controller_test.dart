@@ -1,11 +1,17 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 
@@ -74,6 +80,112 @@ void main() {
     expect(session.received, 2);
     await controller.stopServer();
     expect(platform.closeRequests.single.remoteId, remoteId.str);
+  });
+
+  test('tracking records every advertisement of one peer and keeps the device list', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.scan();
+    platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
+    await Future<void>.delayed(Duration.zero);
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:01');
+
+    await controller.trackAdvertisements(device);
+    final request = platform.scanRequests.last;
+    expect(request.withRemoteIds, [device.remoteId.str]);
+    expect(request.continuousUpdates, isTrue);
+    expect(controller.tracking, isTrue);
+    platform.advertise(
+      rssi: -60,
+      manufacturerData: {
+        0x59: [1],
+      },
+    );
+    platform.advertise(
+      rssi: -40,
+      manufacturerData: {
+        0x59: [1],
+      },
+    );
+    platform.advertise(
+      rssi: -50,
+      manufacturerData: {
+        0x59: [2],
+      },
+    );
+    platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
+    await Future<void>.delayed(Duration.zero);
+
+    final tracker = controller.advertisementTracker!;
+    expect(tracker.count, 3, reason: 'Duplicates are recorded; other peers are not');
+    expect((tracker.minRssi, tracker.maxRssi), (-60, -40));
+    expect(tracker.payloadChanges, 1);
+    expect(tracker.history.map((entry) => entry.changed), [true, false, true]);
+    expect(describeAdvertisement(tracker.history.first.data).join('\n'), contains('Manufacturer 0x59: 02'));
+    expect(tracker.averageInterval, isNotNull);
+    expect(controller.scanResults.map((result) => result.device.remoteId.str), {
+      'AA:BB:CC:DD:EE:01',
+      'AA:BB:CC:DD:EE:02',
+    });
+
+    await controller.stopTracking();
+    expect(controller.tracking, isFalse);
+    expect(controller.advertisementTracker!.count, 3, reason: 'History stays available after stopping');
+    await controller.scan();
+    expect(platform.scanRequests.last.withRemoteIds, isEmpty);
+    expect(controller.tracking, isFalse);
+  });
+
+  group('Saved parsers', () {
+    test('the first launch starts with the common examples', () async {
+      final (:controller, platform: _) = await _setup();
+      expect(controller.parsers.map((parser) => parser.name), [
+        'Battery',
+        'Eddystone TLM',
+        'iBeacon',
+        'Apple Continuity',
+      ]);
+      expect(controller.error, isNull);
+    });
+
+    test('changes survive a restart, including removing every parser', () async {
+      final (:controller, platform: _) = await _setup();
+      for (final parser in controller.parsers.skip(1).toList()) {
+        await controller.removeParser(parser);
+      }
+      const ruuvi = AdvertisementParser(
+        name: 'Ruuvi',
+        source: AdvertisementSource.manufacturer,
+        companyId: 0x0499,
+        device: DeviceIdentifier('AA:BB:CC:DD:EE:01'),
+        fields: [AdvertisementField('Temperature', 1, AdvertisementFieldType.int16be, scale: 0.005, unit: '°C')],
+      );
+      await controller.saveParser(ruuvi, previous: controller.parsers.first);
+
+      final restarted = await _setup(resetStorage: false);
+      final restored = restarted.controller.parsers.single;
+      expect(jsonEncode(restored), jsonEncode(ruuvi));
+      expect(restored.appliesTo(const DeviceIdentifier('AA:BB:CC:DD:EE:02')), isFalse);
+
+      await restarted.controller.removeParser(restored);
+      final emptied = await _setup(resetStorage: false);
+      expect(emptied.controller.parsers, isEmpty, reason: 'Deleting the examples must not bring them back');
+    });
+
+    test('restoring the examples adds only missing ones', () async {
+      final (:controller, platform: _) = await _setup();
+      await controller.removeParser(controller.parsers.first);
+      await controller.addExampleParsers(commonParsers);
+      await controller.addExampleParsers(commonParsers);
+      expect(controller.parsers, hasLength(commonParsers.length));
+    });
+
+    test('unreadable stored parsers are reported instead of crashing the app', () async {
+      SharedPreferences.setMockInitialValues({parserStoreKey: '{"not": "a list"}'});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.parsers, isEmpty);
+      expect(controller.error, contains('parsers'));
+      expect(controller.ready, isTrue);
+    });
   });
 
   test('a failed log level still subscribes to the adapter state', () async {
@@ -430,9 +542,13 @@ void main() {
 
 Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setup({
   bool dispose = true,
+  bool resetStorage = true,
   void Function(FakeBluetoothPlatform platform)? configure,
 }) async {
   _platform.reset();
+  if (resetStorage) {
+    SharedPreferences.setMockInitialValues({});
+  }
   configure?.call(_platform);
   FlutterBlueMaxPlatform.instance = _platform;
   final controller = WorkbenchController();

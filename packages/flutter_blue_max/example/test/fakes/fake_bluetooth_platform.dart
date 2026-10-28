@@ -326,6 +326,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     int rssi = -45,
     bool connectable = true,
     int? appearance,
+    Map<int, List<int>> manufacturerData = const {},
   }) {
     advertisements.add(
       BmScanResponse(
@@ -337,7 +338,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
             connectable: connectable,
             txPowerLevel: null,
             appearance: appearance,
-            manufacturerData: {},
+            manufacturerData: manufacturerData,
             serviceData: {},
             serviceUuids: [Guid('180F')],
             rssi: rssi,

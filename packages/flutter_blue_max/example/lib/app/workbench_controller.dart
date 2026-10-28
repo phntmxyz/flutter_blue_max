@@ -1,8 +1,13 @@
 import 'dart:async';
+import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
@@ -15,6 +20,10 @@ class WorkbenchController() extends ChangeNotifier {
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
   final _busy = <String>{};
   final _logs = <String>[];
+  final _parsers = <AdvertisementParser>[];
+
+  /// Serializes writes so a slow save never overwrites a newer one.
+  Future<void> _parserWrites = Future.value();
 
   /// Counts user-requested disconnects per peer so a pending channel open can
   /// tell a transient drop from an intentional disconnect.
@@ -22,6 +31,9 @@ class WorkbenchController() extends ChangeNotifier {
   bool _disposed = false;
   bool _started = false;
   bool _startingServer = false;
+
+  /// Set by a tracking scan and cleared by the next regular scan.
+  bool _trackingScan = false;
 
   List<BluetoothDevice> systemDevices = [];
   BluetoothDevice? connectingDevice;
@@ -32,6 +44,9 @@ class WorkbenchController() extends ChangeNotifier {
   /// The local Bluetooth name shown alongside nearby devices.
   String? localName;
   List<ScanResult> scanResults = [];
+
+  /// The most recent tracking session, kept after the scan stops for inspection.
+  AdvertisementTracker? advertisementTracker;
   BluetoothDevice? selected;
   bool scanning = false;
   int? serverPsm;
@@ -44,6 +59,11 @@ class WorkbenchController() extends ChangeNotifier {
   static const maxLogEntries = 500;
 
   List<String> get logs => List.unmodifiable(_logs);
+
+  /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
+  List<AdvertisementParser> get parsers => List.unmodifiable(_parsers);
+  List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>
+      _parsers.where((parser) => parser.appliesTo(remoteId)).toList();
   List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((session) => !session.closed));
 
   /// Closed channels keep their diagnostics available until the device session resets.
@@ -60,6 +80,7 @@ class WorkbenchController() extends ChangeNotifier {
   }
 
   bool get connected => selected?.isConnected ?? false;
+  bool get tracking => _trackingScan && scanning;
   bool get ready => adapter == BluetoothAdapterState.on;
   bool busy(String operation) => _busy.contains(operation);
 
@@ -103,7 +124,18 @@ class WorkbenchController() extends ChangeNotifier {
     _subscriptions.add(FlutterBlueMax.logs.listen(log));
     _subscriptions.add(
       FlutterBlueMax.scanResults.listen((results) {
-        scanResults = results;
+        final tracker = _trackingScan ? advertisementTracker : null;
+        if (tracker == null) {
+          scanResults = results;
+        } else {
+          // A tracking scan delivers single advertisements; keep the rest of the device list.
+          for (final result in results) {
+            if (result.device.remoteId == tracker.remoteId) {
+              tracker.record(result);
+            }
+            scanResults = [...scanResults.where((known) => known != result), result];
+          }
+        }
         _update();
       }, onError: _streamError),
     );
@@ -164,6 +196,17 @@ class WorkbenchController() extends ChangeNotifier {
         _update();
       }, onError: _streamError),
     );
+    // Not run(): starting an operation clears the error, which would hide a failed initialization.
+    try {
+      _parsers
+        ..clear()
+        ..addAll(await loadParsers() ?? commonParsers);
+    } catch (exception, stackTrace) {
+      error = 'Loading parsers: $exception';
+      log('ERROR loading parsers: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    _update();
   }
 
   void setQuery(String value) {
@@ -234,6 +277,7 @@ class WorkbenchController() extends ChangeNotifier {
       if (!kIsWeb) {
         await refreshSystemDevices();
       }
+      _trackingScan = false;
       await FlutterBlueMax.startScan(
         timeout: const Duration(seconds: 15),
         // Preserve the original example's browser service permissions.
@@ -247,6 +291,23 @@ class WorkbenchController() extends ChangeNotifier {
       await scan();
     }
   }
+
+  /// Reports every advertisement of one peer until stopped, replacing any running scan.
+  Future<void> trackAdvertisements(BluetoothDevice device) => run('scan', () async {
+    if (scanning) {
+      await FlutterBlueMax.stopScan();
+    }
+    advertisementTracker = AdvertisementTracker(device.remoteId);
+    _trackingScan = true;
+    await FlutterBlueMax.startScan(withRemoteIds: [device.remoteId.str], continuousUpdates: true, oneByOne: true);
+    log('Tracking advertisements of ${nameOf(device)}');
+  });
+
+  Future<void> stopTracking() => run('scan', () async {
+    if (tracking) {
+      await FlutterBlueMax.stopScan();
+    }
+  });
 
   Future<void> refreshSystemDevices() => run('systemDevices', () async {
     systemDevices = await FlutterBlueMax.systemDevices([Guid('180f')]);
@@ -486,6 +547,42 @@ class WorkbenchController() extends ChangeNotifier {
       _busy.remove(operation);
       _update();
     }
+  }
+
+  /// Replaces [previous] in place so the display order stays stable while editing.
+  Future<void> saveParser(AdvertisementParser parser, {AdvertisementParser? previous}) {
+    final index = previous == null ? -1 : _parsers.indexOf(previous);
+    if (index < 0) {
+      _parsers.add(parser);
+    } else {
+      _parsers[index] = parser;
+    }
+    return _persistParsers();
+  }
+
+  Future<void> removeParser(AdvertisementParser parser) {
+    _parsers.remove(parser);
+    return _persistParsers();
+  }
+
+  /// Adds the [examples] that are not already present, e.g. after deleting them.
+  Future<void> addExampleParsers(List<AdvertisementParser> examples) {
+    final existing = {for (final parser in _parsers) jsonEncode(parser)};
+    _parsers.addAll(examples.where((parser) => !existing.contains(jsonEncode(parser))));
+    return _persistParsers();
+  }
+
+  Future<void> _persistParsers() {
+    _update();
+    final snapshot = List.of(_parsers);
+    return _parserWrites = _parserWrites.then((_) => saveParsers(snapshot)).catchError((
+      Object exception,
+      StackTrace stackTrace,
+    ) {
+      error = 'Saving parsers: $exception';
+      log('ERROR saving parsers: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    });
   }
 
   void dismissError() {

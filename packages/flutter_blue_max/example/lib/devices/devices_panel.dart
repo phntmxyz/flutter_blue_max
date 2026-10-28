@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
 /// Adapts discovery and inspection from a two-pane desktop layout to a phone.
@@ -388,36 +388,8 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
               ),
               const SizedBox(height: 28),
               if (!kIsWeb) ...[
-                if (advertisement != null)
-                  Card(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    child: ExpansionTile(
-                      title: const Text('Advertisement'),
-                      subtitle: Text(
-                        '${advertisement.rssi} dBm · '
-                        '${advertisement.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}',
-                      ),
-                      expandedAlignment: Alignment.centerLeft,
-                      childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      children: [
-                        SelectableText(
-                          [
-                            'Name: ${advertisement.advertisementData.advName}',
-                            if (advertisement.advertisementData.txPowerLevel != null)
-                              'TX power: ${advertisement.advertisementData.txPowerLevel} dBm',
-                            if (advertisement.advertisementData.appearance != null)
-                              'Appearance: 0x${advertisement.advertisementData.appearance!.toRadixString(16)}',
-                            for (final uuid in advertisement.advertisementData.serviceUuids) 'Service: $uuid',
-                            for (final entry in advertisement.advertisementData.manufacturerData.entries)
-                              'Manufacturer 0x${entry.key.toRadixString(16)}: ${PayloadCodec.hex(entry.value)}',
-                            for (final entry in advertisement.advertisementData.serviceData.entries)
-                              'Service data ${entry.key}: ${PayloadCodec.hex(entry.value)}',
-                          ].join('\n'),
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 12),
-                        ),
-                      ],
-                    ),
-                  ),
+                if (advertisement != null || c.advertisementTracker?.remoteId == device.remoteId)
+                  AdvertisementCard(device: device, controller: c),
               ],
             ],
           ),
