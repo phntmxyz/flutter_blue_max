@@ -1,0 +1,740 @@
+import 'dart:async';
+import 'dart:convert';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+
+/// Owns the example's Bluetooth session across navigation and device selection.
+/// The package remains responsible for platform I/O and operation serialization.
+class WorkbenchController() extends ChangeNotifier {
+  final _subscriptions = <StreamSubscription<dynamic>>[];
+  final _watched = <DeviceIdentifier>{};
+  final _services = <DeviceIdentifier, List<BluetoothService>>{};
+  final _channels = <(DeviceIdentifier, int), ChannelSession>{};
+  final _busy = <String>{};
+  final _logs = <String>[];
+  final _parsers = <AdvertisementParser>[];
+  final _catalog = <KnownService>[];
+
+  /// Serializes writes so a slow save never overwrites a newer one.
+  Future<void> _writes = Future.value();
+
+  /// Counts user-requested disconnects per peer so a pending channel open can
+  /// tell a transient drop from an intentional disconnect.
+  final _disconnectRequests = <DeviceIdentifier, int>{};
+  bool _disposed = false;
+  bool _started = false;
+  bool _startingServer = false;
+
+  /// Set by a tracking scan and cleared by the next regular scan.
+  bool _trackingScan = false;
+
+  List<BluetoothDevice> systemDevices = [];
+  BluetoothDevice? connectingDevice;
+  bool _cancelConnection = false;
+
+  BluetoothAdapterState adapter = BluetoothAdapterState.unknown;
+
+  /// The local Bluetooth name shown alongside nearby devices.
+  String? localName;
+  List<ScanResult> scanResults = [];
+
+  /// The most recent tracking session, kept after the scan stops for inspection.
+  AdvertisementTracker? advertisementTracker;
+  BluetoothDevice? selected;
+  bool scanning = false;
+  int? serverPsm;
+  String? error;
+  String query = '';
+  int? rssi;
+  int? mtu;
+
+  /// Bounded to keep a long-running diagnostic session from growing indefinitely.
+  static const maxLogEntries = 500;
+
+  List<String> get logs => List.unmodifiable(_logs);
+
+  /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
+  List<AdvertisementParser> get parsers => List.unmodifiable(_parsers);
+  List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>
+      _parsers.where((parser) => parser.appliesTo(remoteId)).toList();
+
+  /// The user's own GATT catalog services, saved across launches.
+  List<KnownService> get catalog => List.unmodifiable(_catalog);
+
+  /// The user's own entries replace built-in ones with the same UUID.
+  KnownService? knownService(Guid uuid) {
+    for (final service in _catalog) {
+      if (service.uuid == uuid) {
+        return service;
+      }
+    }
+    return builtInService(uuid);
+  }
+
+  List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((session) => !session.closed));
+
+  /// Closed channels keep their diagnostics available until the device session resets.
+  List<ChannelSession> get channelSessions => List.unmodifiable(_channels.values);
+  List<BluetoothService> get services => _services[selected?.remoteId] ?? [];
+  List<BluetoothDevice> get connectedDevices => FlutterBlueMax.connectedDevices;
+  ScanResult? get selectedAdvertisement {
+    for (final result in scanResults) {
+      if (result.device == selected) {
+        return result;
+      }
+    }
+    return null;
+  }
+
+  bool get connected => selected?.isConnected ?? false;
+  bool get tracking => _trackingScan && scanning;
+  bool get ready => adapter == BluetoothAdapterState.on;
+  bool busy(String operation) => _busy.contains(operation);
+
+  /// The current web and Linux backends do not implement L2CAP.
+  bool get supportsL2cap =>
+      !kIsWeb &&
+      switch (defaultTargetPlatform) {
+        TargetPlatform.android || TargetPlatform.iOS || TargetPlatform.macOS => true,
+        _ => false,
+      };
+
+  List<ScanResult> get visibleDevices {
+    final search = query.trim().toLowerCase();
+    return scanResults.where((result) {
+      final searchable =
+          '${nameOf(result.device)} ${result.device.remoteId} '
+                  '${result.advertisementData.advName} ${result.advertisementData.serviceUuids}'
+              .toLowerCase();
+      return searchable.contains(search);
+    }).toList();
+  }
+
+  /// Advertised names may arrive before the platform resolves a device name.
+  String nameOf(BluetoothDevice device) {
+    if (device.platformName.isNotEmpty) {
+      return device.platformName;
+    }
+    for (final result in scanResults) {
+      if (result.device == device && result.advertisementData.advName.isNotEmpty) {
+        return result.advertisementData.advName;
+      }
+    }
+    return 'Unnamed device';
+  }
+
+  Future<void> start() async {
+    if (_started) {
+      return;
+    }
+    _started = true;
+    _subscriptions.add(FlutterBlueMax.logs.listen(log));
+    _subscriptions.add(
+      FlutterBlueMax.scanResults.listen((results) {
+        final tracker = _trackingScan ? advertisementTracker : null;
+        if (tracker == null) {
+          scanResults = results;
+        } else {
+          // A tracking scan delivers single advertisements; keep the rest of the device list.
+          for (final result in results) {
+            if (result.device.remoteId == tracker.remoteId) {
+              tracker.record(result);
+            }
+            // Replace in place so the device keeps its position in the list.
+            scanResults = [
+              ...scanResults.map((known) => known == result ? result : known),
+              if (!scanResults.contains(result)) result,
+            ];
+          }
+        }
+        _update();
+      }, onError: _streamError),
+    );
+    _subscriptions.add(
+      FlutterBlueMax.isScanning.listen((value) {
+        scanning = value;
+        _update();
+      }),
+    );
+    _subscriptions.add(
+      FlutterBlueMax.onL2capConnected.listen((event) {
+        if (event.psm == serverPsm || _startingServer) {
+          final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
+          _trackChannel(channel, incoming: true);
+          log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
+        }
+      }),
+    );
+    _subscriptions.add(
+      FlutterBlueMax.onL2capReceived.listen((event) {
+        final session = _channels[(event.remoteId, event.psm)];
+        if (session == null || session.closed) {
+          return;
+        }
+        session.received += event.value.length;
+        session.recordReceived(event.value, source: 'Stream');
+        log(
+          'RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · '
+          '${PayloadCodec.hex(event.value.take(64).toList())}',
+        );
+      }),
+    );
+    _subscriptions.add(
+      FlutterBlueMax.onL2capClosed.listen((event) {
+        _channels[(event.remoteId, event.psm)]?.closed = true;
+        log('L2CAP closed ${event.remoteId} / PSM ${event.psm}');
+      }),
+    );
+    await run('initialize', () async {
+      await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
+    });
+    // A failed log level (e.g. Linux without bluetoothd) is reported above, but
+    // must not leave the app waiting for an adapter state it never subscribed to.
+    if (_disposed) {
+      return;
+    }
+    _subscriptions.add(
+      FlutterBlueMax.adapterState.listen((state) {
+        adapter = state;
+        if (state == BluetoothAdapterState.on && localName == null) {
+          unawaited(_loadLocalName());
+        }
+        if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
+          _channels.clear();
+          _services.clear();
+          serverPsm = null;
+        }
+        _update();
+      }, onError: _streamError),
+    );
+    // Not run(): starting an operation clears the error, which would hide a failed initialization.
+    try {
+      _parsers
+        ..clear()
+        ..addAll(await loadParsers() ?? testDongleParsers);
+    } catch (exception, stackTrace) {
+      error = 'Loading parsers: $exception';
+      log('ERROR loading parsers: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    try {
+      _catalog
+        ..clear()
+        ..addAll(await loadCatalog());
+    } catch (exception, stackTrace) {
+      error = 'Loading GATT catalog: $exception';
+      log('ERROR loading GATT catalog: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    _update();
+  }
+
+  void setQuery(String value) {
+    query = value;
+    _update();
+  }
+
+  Future<void> _loadLocalName() async {
+    try {
+      localName = (await FlutterBlueMax.adapterName).trim();
+    } catch (exception, stackTrace) {
+      log('Local device name: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    _update();
+  }
+
+  void select(BluetoothDevice device) {
+    selected = device;
+    rssi = null;
+    mtu = device.mtuNow;
+    if (_watched.add(device.remoteId)) {
+      _subscriptions.add(
+        device.onServicesReset.listen((_) {
+          _services.remove(device.remoteId);
+          log('Services changed on ${nameOf(device)}. Discover services again.');
+        }),
+      );
+      // The stream replays a cached state on listen, which is `disconnected` for
+      // peers never connected over GATT. Only a real link loss ends the session.
+      var wasConnected = false;
+      _subscriptions.add(
+        device.connectionState.listen((state) {
+          final lostConnection = wasConnected && state == BluetoothConnectionState.disconnected;
+          wasConnected = state == BluetoothConnectionState.connected;
+          if (lostConnection) {
+            _services.remove(device.remoteId);
+            _closeOutgoingChannels(device.remoteId);
+          }
+          log(
+            '${nameOf(device)}: ${state.name}'
+            '${state == BluetoothConnectionState.disconnected ? ' · ${device.disconnectReason}' : ''}',
+          );
+          if (state == BluetoothConnectionState.connected && selected == device) {
+            unawaited(readRssi());
+          }
+        }),
+      );
+      _subscriptions.add(
+        device.mtu.listen((value) {
+          if (selected == device) {
+            mtu = value;
+            _update();
+          }
+        }),
+      );
+    }
+    if (device.isConnected) {
+      unawaited(readRssi());
+    }
+    _update();
+  }
+
+  Future<void> scan() => run('scan', () async {
+    if (scanning) {
+      await FlutterBlueMax.stopScan();
+    } else {
+      if (!kIsWeb) {
+        await refreshSystemDevices();
+      }
+      _trackingScan = false;
+      await FlutterBlueMax.startScan(
+        timeout: const Duration(seconds: 15),
+        // Preserve the original example's browser service permissions.
+        webOptionalServices: [Guid('180f'), Guid('180a'), Guid('1800'), Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e')],
+      );
+    }
+  });
+
+  Future<void> refreshScan() async {
+    if (!scanning && ready) {
+      await scan();
+    }
+  }
+
+  /// Reports every advertisement of one peer until stopped, replacing any running scan.
+  Future<void> trackAdvertisements(BluetoothDevice device) => run('scan', () async {
+    if (scanning) {
+      await FlutterBlueMax.stopScan();
+    }
+    advertisementTracker = AdvertisementTracker(device.remoteId);
+    _trackingScan = true;
+    await FlutterBlueMax.startScan(withRemoteIds: [device.remoteId.str], continuousUpdates: true, oneByOne: true);
+    log('Tracking advertisements of ${nameOf(device)}');
+  });
+
+  Future<void> stopTracking() => run('scan', () async {
+    if (tracking) {
+      await FlutterBlueMax.stopScan();
+    }
+  });
+
+  Future<void> refreshSystemDevices() => run('systemDevices', () async {
+    systemDevices = await FlutterBlueMax.systemDevices([Guid('180f')]);
+  });
+
+  Future<void> connect() => run('connection', () async {
+    final device = selected!;
+    connectingDevice = device;
+    _cancelConnection = false;
+    _update();
+    try {
+      await FlutterBlueMax.stopScan();
+      if (_cancelConnection) {
+        return;
+      }
+      await device.connect(mtu: null);
+      if (_disposed || _cancelConnection) {
+        await device.disconnect(queue: false);
+      }
+    } on FlutterBlueMaxException catch (error, stackTrace) {
+      if (!_cancelConnection) {
+        Error.throwWithStackTrace(error, stackTrace);
+      }
+    } finally {
+      connectingDevice = null;
+    }
+  });
+
+  /// Cancellation bypasses both the sample's connection lock and the plugin queue.
+  Future<void> cancelConnect() => run('cancelConnection', () async {
+    final device = connectingDevice;
+    if (device == null) {
+      return;
+    }
+    _cancelConnection = true;
+    await device.disconnect(queue: false);
+  });
+
+  Future<void> disconnect() => run('connection', () async {
+    final device = selected!;
+    _disconnectRequests.update(device.remoteId, (count) => count + 1, ifAbsent: () => 1);
+    await device.disconnect();
+  });
+
+  Future<void> turnOn() => run('adapter', () async {
+    await FlutterBlueMax.turnOn();
+  });
+
+  Future<void> discover() => run('discover', () async {
+    final device = selected!;
+    final result = await device.discoverServices();
+    if (device.isConnected) {
+      _services[device.remoteId] = result;
+      log('${result.length} services discovered on ${nameOf(device)}');
+      _update();
+      await _readUserDescriptions(device, result);
+    }
+  });
+
+  /// Labels characteristics the GATT catalog does not know. A failed read only loses that label.
+  Future<void> _readUserDescriptions(BluetoothDevice device, List<BluetoothService> services) async {
+    for (final service in services) {
+      for (final characteristic in service.characteristics) {
+        for (final descriptor in characteristic.descriptors) {
+          if (descriptor.uuid != userDescriptionUuid) {
+            continue;
+          }
+          if (!device.isConnected) {
+            return;
+          }
+          try {
+            await descriptor.read();
+          } catch (exception) {
+            log('User description of ${characteristic.uuid}: $exception');
+          }
+          _update();
+        }
+      }
+    }
+  }
+
+  Future<void> readRssi() async {
+    if (kIsWeb) {
+      return;
+    }
+    final device = selected!;
+    await run('rssi:${device.remoteId}', () async {
+      final value = await device.readRssi();
+      if (selected == device) {
+        rssi = value;
+      }
+    });
+  }
+
+  Future<void> requestMtu(int value) => run('mtu', () async {
+    await selected!.requestMtu(value);
+  });
+
+  Future<void> startServer({required bool secure}) => run('server', () async {
+    if (!supportsL2cap) {
+      throw UnsupportedError('L2CAP is not available on this platform.');
+    }
+    if (serverPsm != null) {
+      return;
+    }
+    _startingServer = true;
+    final int psm;
+    try {
+      psm = await FlutterBlueMax.listenL2capChannel(secure: secure);
+    } finally {
+      _startingServer = false;
+    }
+    if (_disposed || !ready) {
+      await FlutterBlueMax.stopL2capServer(psm);
+      return;
+    }
+    serverPsm = psm;
+    log('Server listening on PSM $psm (${secure ? 'secure' : 'insecure'})');
+  });
+
+  Future<void> stopServer() => run('server', () async {
+    final psm = serverPsm;
+    if (psm == null) {
+      return;
+    }
+    await FlutterBlueMax.stopL2capServer(psm);
+    serverPsm = null;
+    // Unpublishing on Apple stops accepting peers but leaves accepted streams open.
+    // Close them explicitly, retaining any failed close in the UI for retry.
+    final accepted = channels.where((session) => session.incoming && session.channel.psm == psm).toList();
+    await Future.wait(
+      accepted.map((session) async {
+        await session.channel.close();
+        session.closed = true;
+      }),
+    );
+  });
+
+  /// Binds an outgoing channel to the inspected peer, never to later device selection.
+  Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) => run('open', () async {
+    if (!supportsL2cap) {
+      throw UnsupportedError('L2CAP is not available on this platform.');
+    }
+    final key = (device.remoteId, psm);
+    if (_channels[key]?.closed == false) {
+      throw StateError('This peer already has a channel on PSM $psm.');
+    }
+    final disconnects = _disconnectRequests[device.remoteId] ?? 0;
+    final channel = await () async {
+      try {
+        return await device.openL2CapChannel(psm, secure: secure);
+      } catch (error, stackTrace) {
+        // A secure handshake can drop the link transiently; a disconnect the
+        // user requested meanwhile must not be undone by the retry.
+        final userDisconnected = (_disconnectRequests[device.remoteId] ?? 0) != disconnects;
+        if (_disposed || !ready || userDisconnected || _isUnsupported(error)) {
+          Error.throwWithStackTrace(error, stackTrace);
+        }
+        log('L2CAP open failed; retrying once: $error');
+        debugPrintStack(stackTrace: stackTrace);
+        if (!device.isConnected) {
+          await device.connect(mtu: null);
+        }
+        return await device.openL2CapChannel(psm, secure: secure);
+      }
+    }();
+    if (_disposed || !device.isConnected) {
+      await channel.close();
+      return;
+    }
+    _trackChannel(channel, incoming: false);
+    log('L2CAP opened ${device.remoteId} / PSM $psm');
+  });
+
+  Future<void> send(ChannelSession session, List<int> bytes) => run('channel:${session.key}', () async {
+    await session.channel.write(bytes);
+    session.transmitted += bytes.length;
+    log(
+      'TX ${session.channel.deviceId} / ${session.channel.psm} · ${bytes.length} B · '
+      '${PayloadCodec.hex(bytes.take(64).toList())}',
+    );
+  });
+
+  /// Explicit reads drain the native buffer; streamed bytes are not counted twice.
+  Future<void> readChannel(ChannelSession session) => run('channel:${session.key}', () async {
+    final bytes = await session.channel.read();
+    session.recordReceived(bytes, source: 'Buffer read');
+    log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
+  });
+
+  /// Patterned traffic exposes truncation; concurrent writes exercise native backpressure.
+  Future<void> sendTestTraffic(ChannelSession session, {required int size, required int count}) =>
+      run('channel:${session.key}', () async {
+        if (size <= 0 || count <= 0) {
+          throw const FormatException('Payload size and write count must be positive.');
+        }
+        final payload = List<int>.generate(size, (i) => i & 0xff);
+        var successes = 0;
+        await Future.wait(
+          List.generate(count, (_) async {
+            await session.channel.write(payload);
+            session.transmitted += payload.length;
+            successes++;
+          }),
+        ).whenComplete(() {
+          log(
+            'Test traffic ${session.channel.deviceId} / ${session.channel.psm}: '
+            '$successes/$count writes of $size B completed',
+          );
+        });
+      });
+
+  Future<void> closeChannel(ChannelSession session) => run('channel:${session.key}', () async {
+    await session.channel.close();
+    session.closed = true;
+  });
+
+  /// Outgoing channels belong to the GATT session that opened them. Incoming
+  /// channels belong to the local server and stay untouched.
+  void _closeOutgoingChannels(DeviceIdentifier remoteId) {
+    final outgoing = channels.where((session) => !session.incoming && session.channel.deviceId == remoteId);
+    for (final session in outgoing.toList()) {
+      session.closed = true;
+      unawaited(
+        session.channel.close().catchError((Object exception, StackTrace stackTrace) {
+          log('L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception');
+          debugPrintStack(stackTrace: stackTrace);
+        }),
+      );
+    }
+  }
+
+  void _trackChannel(BluetoothL2capChannel channel, {required bool incoming}) {
+    final session = _channels.putIfAbsent((
+      channel.deviceId,
+      channel.psm,
+    ), () => ChannelSession(channel, incoming: incoming));
+    session.channel = channel;
+    session.incoming = incoming;
+    session.closed = false;
+  }
+
+  /// Reports errors once and prevents duplicate submissions of the same action.
+  Future<void> run(String operation, Future<void> Function() action) async {
+    if (_disposed || !_busy.add(operation)) {
+      return;
+    }
+    error = null;
+    _update();
+    try {
+      await action();
+    } catch (exception, stackTrace) {
+      if (_isUnsupported(exception)) {
+        error = 'This operation is not supported on this device.';
+      } else {
+        error = '$operation: $exception';
+      }
+      log('ERROR $operation: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    } finally {
+      _busy.remove(operation);
+      _update();
+    }
+  }
+
+  /// Replaces [previous] in place so the display order stays stable while editing.
+  Future<void> saveParser(AdvertisementParser parser, {AdvertisementParser? previous}) {
+    final index = previous == null ? -1 : _parsers.indexOf(previous);
+    if (index < 0) {
+      _parsers.add(parser);
+    } else {
+      _parsers[index] = parser;
+    }
+    return _persistParsers();
+  }
+
+  Future<void> removeParser(AdvertisementParser parser) {
+    _parsers.remove(parser);
+    return _persistParsers();
+  }
+
+  /// Adds the [examples] that are not already present, e.g. after deleting them.
+  Future<void> addExampleParsers(List<AdvertisementParser> examples) {
+    final existing = {for (final parser in _parsers) jsonEncode(parser)};
+    _parsers.addAll(examples.where((parser) => !existing.contains(jsonEncode(parser))));
+    return _persistParsers();
+  }
+
+  /// Replaces [previous] in place, like [saveParser].
+  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) {
+    final index = previous == null ? -1 : _catalog.indexOf(previous);
+    if (index < 0) {
+      _catalog.add(service);
+    } else {
+      _catalog[index] = service;
+    }
+    return _persistCatalog();
+  }
+
+  Future<void> removeCatalogService(KnownService service) {
+    _catalog.remove(service);
+    return _persistCatalog();
+  }
+
+  Future<void> _persistParsers() {
+    final snapshot = List.of(_parsers);
+    return _persist('parsers', () => saveParsers(snapshot));
+  }
+
+  Future<void> _persistCatalog() {
+    final snapshot = List.of(_catalog);
+    return _persist('GATT catalog', () => saveCatalog(snapshot));
+  }
+
+  Future<void> _persist(String what, Future<void> Function() save) {
+    _update();
+    return _writes = _writes.then((_) => save()).catchError((Object exception, StackTrace stackTrace) {
+      error = 'Saving $what: $exception';
+      log('ERROR saving $what: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    });
+  }
+
+  void dismissError() {
+    error = null;
+    _update();
+  }
+
+  void clearLogs() {
+    _logs.clear();
+    _update();
+  }
+
+  void log(String message) {
+    if (_disposed) {
+      return;
+    }
+    _logs.add('${DateTime.now().toIso8601String()}  $message');
+    if (_logs.length > maxLogEntries) {
+      _logs.removeRange(0, _logs.length - maxLogEntries);
+    }
+    _update();
+  }
+
+  void _streamError(Object exception, StackTrace stackTrace) {
+    error = exception.toString();
+    log('ERROR $error');
+    debugPrintStack(stackTrace: stackTrace);
+  }
+
+  void _update() {
+    if (!_disposed) {
+      notifyListeners();
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    for (final subscription in _subscriptions) {
+      unawaited(subscription.cancel());
+    }
+    // Navigation never disposes this controller; shutdown does. Native hot-restart
+    // cleanup is still the fallback when the Dart isolate is terminated abruptly.
+    unawaited(_shutdown());
+    super.dispose();
+  }
+
+  Future<void> _shutdown() async {
+    final psm = serverPsm;
+    final cleanup = <Future<void> Function()>[
+      if (scanning) FlutterBlueMax.stopScan,
+      for (final session in channels) session.channel.close,
+      if (psm != null) () => FlutterBlueMax.stopL2capServer(psm),
+      for (final id in _watched) () => BluetoothDevice(remoteId: id).disconnect(),
+    ];
+    for (final action in cleanup) {
+      try {
+        await action();
+      } catch (exception, stackTrace) {
+        debugPrint('Bluetooth cleanup: $exception');
+        debugPrintStack(stackTrace: stackTrace);
+      }
+    }
+  }
+}
+
+// Match typed failures and the native Android capability error, not arbitrary
+// error text: permission and connection failures must remain retryable.
+bool _isUnsupported(Object exception) {
+  if (exception is UnsupportedError || exception is UnimplementedError) {
+    return true;
+  }
+  if (exception is PlatformException) {
+    return exception.code == 'platform_not_supported';
+  }
+  return exception is FlutterBlueMaxException &&
+      exception.platform == ErrorPlatform.fbp &&
+      (exception.code == FbpErrorCode.androidOnly.index || exception.code == FbpErrorCode.applePlatformOnly.index);
+}
