@@ -35,6 +35,14 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final readRequests = <ReadL2CapChannelRequest>[];
   final characteristicReads = <BmReadCharacteristicRequest>[];
   final descriptorWrites = <BmWriteDescriptorRequest>[];
+  final descriptorReads = <BmReadDescriptorRequest>[];
+
+  /// Descriptor values by characteristic UUID; others read as `41`.
+  final descriptorValues = <Guid, List<int>>{};
+
+  /// Discovered after the battery service as service UUID → characteristic UUID → properties.
+  /// Each characteristic carries a User Description.
+  final extraServices = <Guid, Map<Guid, BmCharacteristicProperties>>{};
   final notifyRequests = <BmSetNotifyValueRequest>[];
   final systemPeers = <BmBluetoothDevice>[];
   final rssiValues = StreamController<BmReadRssiResult>.broadcast(sync: true);
@@ -45,6 +53,25 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   Completer<void>? pendingWrites;
   int turnOnRequests = 0;
   int scanStarts = 0;
+
+  static BmCharacteristicProperties properties({
+    bool read = false,
+    bool write = false,
+    bool writeWithoutResponse = false,
+    bool notify = false,
+    bool indicate = false,
+  }) => BmCharacteristicProperties(
+    broadcast: false,
+    read: read,
+    writeWithoutResponse: writeWithoutResponse,
+    write: write,
+    notify: notify,
+    indicate: indicate,
+    authenticatedSignedWrites: false,
+    extendedProperties: false,
+    notifyEncryptionRequired: false,
+    indicateEncryptionRequired: false,
+  );
 
   /// Clear per-test behavior while preserving the plugin's subscribed streams.
   void reset() {
@@ -61,6 +88,9 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     readRequests.clear();
     characteristicReads.clear();
     descriptorWrites.clear();
+    descriptorReads.clear();
+    descriptorValues.clear();
+    extraServices.clear();
     notifyRequests.clear();
     systemPeers.clear();
     pendingServer = null;
@@ -183,6 +213,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     if (override != null) {
       return await override(request);
     }
+    descriptorReads.add(request);
     descriptorRead.add(
       BmDescriptorData(
         remoteId: request.remoteId,
@@ -191,7 +222,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         descriptorUuid: request.descriptorUuid,
         primaryServiceUuid: request.primaryServiceUuid,
         instanceId: request.instanceId,
-        value: [0x41],
+        value: descriptorValues[request.characteristicUuid] ?? [0x41],
         success: true,
         errorCode: 0,
         errorString: '',
@@ -445,6 +476,33 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
               ),
             ],
           ),
+          for (final MapEntry(key: serviceUuid, value: characteristics) in extraServices.entries)
+            BmBluetoothService(
+              remoteId: request.remoteId,
+              serviceUuid: serviceUuid,
+              primaryServiceUuid: null,
+              characteristics: [
+                for (final MapEntry(key: characteristicUuid, value: properties) in characteristics.entries)
+                  BmBluetoothCharacteristic(
+                    remoteId: request.remoteId,
+                    serviceUuid: serviceUuid,
+                    characteristicUuid: characteristicUuid,
+                    primaryServiceUuid: null,
+                    instanceId: 1,
+                    descriptors: [
+                      BmBluetoothDescriptor(
+                        remoteId: request.remoteId,
+                        serviceUuid: serviceUuid,
+                        characteristicUuid: characteristicUuid,
+                        descriptorUuid: Guid('2901'),
+                        primaryServiceUuid: null,
+                        instanceId: 1,
+                      ),
+                    ],
+                    properties: properties,
+                  ),
+              ],
+            ),
         ],
         success: true,
         errorCode: 0,

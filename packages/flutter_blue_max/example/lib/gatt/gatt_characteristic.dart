@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 
@@ -56,18 +57,36 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final p = c.properties;
     final key = 'gatt:${c.remoteId}:${c.serviceUuid}:${c.uuid}:${c.instanceId}';
     final enabled = !widget.controller.busy(key) && c.device.isConnected;
+    final service = knownService(c.serviceUuid);
+    final known = service?.characteristic(c.uuid);
+    final expected = (service?.test ?? false) && known != null ? known.matches(p) : null;
+    final description = userDescription(c);
+    final uuid = c.uuid.str.toUpperCase();
+    final name = known == null ? description : '${expected ?? false ? 'Test · ' : ''}${known.name}';
     return ExpansionTile(
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
-      title: Text(c.uuid.str.toUpperCase(), style: const TextStyle(fontFamily: 'monospace', fontSize: 13)),
-      subtitle: Text(
-        [
-          if (p.read) 'Read',
-          if (p.write) 'Write',
-          if (p.writeWithoutResponse) 'Write without response',
-          if (p.notify) 'Notify',
-          if (p.indicate) 'Indicate',
-          if (c.instanceId != null) 'Instance ${c.instanceId}',
-        ].join(' · '),
+      title: GattTitle(
+        name ?? uuid,
+        style: name == null ? const TextStyle(fontFamily: 'monospace', fontSize: 13) : null,
+        expected: expected,
+      ),
+      subtitle: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (name != null) Text(uuid, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+          if (description != null && description != name) Text(description),
+          Text(
+            [
+              for (final property in GattProperty.of(p)) property.label,
+              if (c.instanceId != null) 'Instance ${c.instanceId}',
+            ].join(' · '),
+          ),
+          if (expected == false)
+            Text(
+              'Expected ${GattProperty.values.where(known!.properties!.contains).map((property) => property.label).join(' · ')}',
+              style: TextStyle(color: Theme.of(context).colorScheme.error),
+            ),
+        ],
       ),
       children: [
         Padding(
@@ -193,6 +212,28 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
             ],
           ),
         ),
+      ],
+    );
+  }
+}
+
+/// A catalog or peripheral name, or a UUID in [style], marked when a test entry is or is not as [expected].
+class const GattTitle(final String text, {super.key, final TextStyle? style, final bool? expected})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final colors = Theme.of(context).colorScheme;
+    return Row(
+      children: [
+        if (expected != null) ...[
+          Icon(
+            expected! ? Icons.check_circle_rounded : Icons.error_outline_rounded,
+            size: 16,
+            color: expected! ? colors.primary : colors.error,
+          ),
+          const SizedBox(width: 6),
+        ],
+        Flexible(child: Text(text, style: style)),
       ],
     );
   }

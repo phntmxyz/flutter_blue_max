@@ -8,6 +8,7 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
@@ -366,8 +367,32 @@ class WorkbenchController() extends ChangeNotifier {
     if (device.isConnected) {
       _services[device.remoteId] = result;
       log('${result.length} services discovered on ${nameOf(device)}');
+      _update();
+      await _readUserDescriptions(device, result);
     }
   });
+
+  /// Labels characteristics the GATT catalog does not know. A failed read only loses that label.
+  Future<void> _readUserDescriptions(BluetoothDevice device, List<BluetoothService> services) async {
+    for (final service in services) {
+      for (final characteristic in service.characteristics) {
+        for (final descriptor in characteristic.descriptors) {
+          if (descriptor.uuid != userDescriptionUuid) {
+            continue;
+          }
+          if (!device.isConnected) {
+            return;
+          }
+          try {
+            await descriptor.read();
+          } catch (exception) {
+            log('User description of ${characteristic.uuid}: $exception');
+          }
+          _update();
+        }
+      }
+    }
+  }
 
   Future<void> readRssi() async {
     if (kIsWeb) {

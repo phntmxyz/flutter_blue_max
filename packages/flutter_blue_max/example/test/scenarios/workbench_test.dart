@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/advertisement_robot.dart';
+import '../robot/gatt_catalog_robot.dart';
 import '../robot/restored_features_robot.dart';
 import '../robot/workbench_robot.dart';
 
@@ -181,6 +182,15 @@ void main() {
       platform.includeGattExtras = true;
       await robot.inspectPeripheral();
       await robot.exerciseNotificationsAndDescriptors();
+    });
+
+    testWidgets('known GATT services are named and test services checked against the dongle', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.scanForPeripheral();
+      await robot.discoverPartialTestDongle();
+      robot.expectNamedServices();
+      await robot.inspectTestCharacteristics();
     });
 
     testWidgets('broadcast advertisements retain appearance and cannot be connected', (tester) async {

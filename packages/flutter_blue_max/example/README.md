@@ -49,6 +49,8 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
 
 - **Devices:** scan or choose a browser device, connect, then open **GATT** to discover services, read/write characteristics and descriptors, or subscribe to notifications.
   Native platforms also expose advertisement data, RSSI and system-connected devices; Android adds bonding and MTU requests.
+  Known services and characteristics are named from [a catalog](lib/gatt/gatt_catalog.dart), others by their User Description (`2901`), which discovery reads.
+  The services of the FBM test dongle firmware are checked as well: characteristics with exactly the expected properties show as **Test · …**, missing or deviating ones are reported.
   On native platforms, **Track advertisements** in a device's **Advertisement** card scans only that device and keeps its latest 200 advertisements with RSSI, intervals and payload changes; the history can be filtered by text, changed payloads or parsed values.
 - **Parsers:** define how manufacturer or service data is read as named values, optionally bound to one device; parsed values appear below the raw data and in the tracker history.
   Parsers are saved locally (shared preferences, browser local storage on web); first launches start with the status and sensor frames of the FBM test dongle firmware (manufacturer data `0xFFFF`), which **Add test dongle parsers** restores.

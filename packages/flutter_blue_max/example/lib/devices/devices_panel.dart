@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
 import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 
@@ -445,25 +445,10 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                         child: Text('No services discovered in this connection.'),
                       ),
                     for (final service in c.services)
-                      ExpansionTile(
+                      GattService(
                         key: ValueKey('${device.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
-                        tilePadding: EdgeInsets.zero,
-                        title: Text(
-                          service.uuid.str.toUpperCase(),
-                          style: const TextStyle(fontFamily: 'monospace', fontSize: 14),
-                        ),
-                        subtitle: Text(
-                          '${service.characteristics.length} characteristics · '
-                          '${service.isPrimary ? 'Primary' : 'Secondary'} service',
-                        ),
-                        children: [
-                          for (final characteristic in service.characteristics)
-                            GattCharacteristic(
-                              key: ObjectKey(characteristic),
-                              characteristic: characteristic,
-                              controller: c,
-                            ),
-                        ],
+                        service: service,
+                        controller: c,
                       ),
                   ],
                 ),
