@@ -28,9 +28,9 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
               label: const Text('Add parser'),
             ),
             OutlinedButton.icon(
-              onPressed: () => c.addExampleParsers(commonParsers),
+              onPressed: () => c.addExampleParsers(testDongleParsers),
               icon: const Icon(Icons.restore),
-              label: const Text('Add common examples'),
+              label: const Text('Add test dongle parsers'),
             ),
           ],
         ),

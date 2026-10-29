@@ -136,14 +136,9 @@ void main() {
   });
 
   group('Saved parsers', () {
-    test('the first launch starts with the common examples', () async {
+    test('the first launch starts with the test dongle parsers', () async {
       final (:controller, platform: _) = await _setup();
-      expect(controller.parsers.map((parser) => parser.name), [
-        'Battery',
-        'Eddystone TLM',
-        'iBeacon',
-        'Apple Continuity',
-      ]);
+      expect(controller.parsers.map((parser) => parser.name), ['FBM status', 'FBM sensor']);
       expect(controller.error, isNull);
     });
 
@@ -174,9 +169,9 @@ void main() {
     test('restoring the examples adds only missing ones', () async {
       final (:controller, platform: _) = await _setup();
       await controller.removeParser(controller.parsers.first);
-      await controller.addExampleParsers(commonParsers);
-      await controller.addExampleParsers(commonParsers);
-      expect(controller.parsers, hasLength(commonParsers.length));
+      await controller.addExampleParsers(testDongleParsers);
+      await controller.addExampleParsers(testDongleParsers);
+      expect(controller.parsers, hasLength(testDongleParsers.length));
     });
 
     test('unreadable stored parsers are reported instead of crashing the app', () async {

@@ -126,7 +126,7 @@ void main() {
   });
 
   test('parsers survive a JSON round trip unchanged', () {
-    final parsers = [ruuvi, ...commonParsers];
+    final parsers = [ruuvi, ...testDongleParsers];
     final restored = [
       for (final json in jsonDecode(jsonEncode(parsers)) as List)
         AdvertisementParser.fromJson(json as Map<String, dynamic>),
@@ -135,47 +135,41 @@ void main() {
     expect(() => AdvertisementParser.fromJson({'name': 'Broken'}), throwsFormatException);
   });
 
-  group('Common examples', () {
-    List<String> read({int? companyId, Guid? serviceUuid, required List<int> bytes}) => [
-      for (final parser in commonParsers) ...parser.read(companyId: companyId, serviceUuid: serviceUuid, bytes: bytes),
+  group('Test dongle parsers', () {
+    List<String> read(List<int> bytes) => [
+      for (final parser in testDongleParsers) ...parser.read(companyId: 0xffff, bytes: bytes),
     ];
 
-    test('battery level from the Battery Service', () {
-      expect(read(serviceUuid: Guid('180f'), bytes: [0x55]), ['Battery · Level: 85 %']);
-    });
-
-    test('Eddystone telemetry, but not other Eddystone frames', () {
-      final tlm = [0x20, 0x00, 0x0b, 0xb8, 0x15, 0x80, 0x00, 0x00, 0x00, 0x64, 0x00, 0x00, 0x03, 0xe8];
-      expect(read(serviceUuid: Guid('feaa'), bytes: tlm), [
-        'Eddystone TLM · Battery: 3000 mV',
-        'Eddystone TLM · Temperature: 21.500 °C',
-        'Eddystone TLM · Advertisements: 100',
-        'Eddystone TLM · Uptime: 100.0 s',
+    test('status frame', () {
+      expect(read([0x01, 0x00, 0x01, 0x05, 0x39, 0x30, 0x07]), [
+        'FBM status · Mode: 0',
+        'FBM status · Platform: 1',
+        'FBM status · Flags: 05',
+        'FBM status · Counter: 12345',
+        'FBM status · Button: 7',
       ]);
-      expect(
-        read(serviceUuid: Guid('feaa'), bytes: [0x10, 0xeb, 0x00]),
-        isEmpty,
-        reason: 'Eddystone URL',
-      );
     });
 
-    test('iBeacon is also a Continuity message', () {
-      final beacon = [
-        0x02, 0x15, //
-        ...List.filled(16, 0xab),
-        0x00, 0x01, 0x00, 0x02, 0xc5,
+    test('sensor frame for counter 1234 after 70000 s', () {
+      final frame = [
+        0x02, 0xd2, 0x04, 0x00, 0x00, 0x60, 0x09, 0x16, 0x10, 0x68, 0x00, 0x40, 0x7e, 0x44, //
+        0xd2, 0x70, 0x11, 0x01, 0x46, 0x42, 0x4d, 0x32, 0x33, 0x34,
       ];
-      expect(read(companyId: 0x004c, bytes: beacon), [
-        'iBeacon · UUID: ${List.filled(16, 'AB').join(' ')}',
-        'iBeacon · Major: 1',
-        'iBeacon · Minor: 2',
-        'iBeacon · Measured power: -59 dBm',
-        'Apple Continuity · Message type: 02',
+      expect(read(frame), [
+        'FBM sensor · Counter: 1234',
+        'FBM sensor · Temperature: 24.00 °C',
+        'FBM sensor · Humidity: 22 %',
+        'FBM sensor · Battery: 4200 mV',
+        'FBM sensor · Pressure: 1017.00 hPa',
+        'FBM sensor · Delta: -46',
+        'FBM sensor · Uptime: 70000 s',
+        'FBM sensor · Tag: FBM234',
       ]);
     });
 
-    test('other Apple devices show their Continuity message type', () {
-      expect(read(companyId: 0x004c, bytes: [0x10, 0x05, 0x01, 0x18]), ['Apple Continuity · Message type: 10']);
+    test('other frame types and companies are ignored', () {
+      expect(read([0x03, 0x00]), isEmpty);
+      expect(testDongleParsers.first.read(companyId: 0x004c, bytes: [0x01, 0, 0, 0, 0, 0, 0]), isEmpty);
     });
   });
 }

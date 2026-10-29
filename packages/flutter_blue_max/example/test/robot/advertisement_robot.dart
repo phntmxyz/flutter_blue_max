@@ -91,17 +91,17 @@ extension AdvertisementRobot on WorkbenchRobot {
 
   Future<void> manageGlobalParsers() async {
     await tapLabel('Parsers');
-    logEvent('Verify the bundled common examples');
-    expect(controller.parsers, hasLength(commonParsers.length));
-    spotText('Manufacturer 0x4c · match 02 15 at 0 · 4 fields · All devices').existsOnce();
+    logEvent('Verify the bundled test dongle parsers');
+    expect(controller.parsers, hasLength(testDongleParsers.length));
+    spotText('Manufacturer 0xffff · match 02 at 0 · 8 fields · All devices').existsOnce();
     final remove = spot<IconButton>().withTooltip('Remove parser');
-    for (var i = 0; i < commonParsers.length; i++) {
+    for (var i = 0; i < testDongleParsers.length; i++) {
       await act.tap(remove.first());
       await idle();
     }
     spotText('No parsers yet.', exact: true).existsOnce();
-    await tapLabel('Add common examples');
-    expect(controller.parsers, hasLength(commonParsers.length));
+    await tapLabel('Add test dongle parsers');
+    expect(controller.parsers, hasLength(testDongleParsers.length));
 
     logEvent('Edit a parser without a device context');
     await act.tap(spot<IconButton>().withTooltip('Edit parser').first());

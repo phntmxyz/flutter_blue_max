@@ -204,7 +204,7 @@ class WorkbenchController() extends ChangeNotifier {
     try {
       _parsers
         ..clear()
-        ..addAll(await loadParsers() ?? commonParsers);
+        ..addAll(await loadParsers() ?? testDongleParsers);
     } catch (exception, stackTrace) {
       error = 'Loading parsers: $exception';
       log('ERROR loading parsers: $exception');
