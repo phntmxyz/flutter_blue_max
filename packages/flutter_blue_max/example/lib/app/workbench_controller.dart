@@ -100,7 +100,7 @@ class WorkbenchController() extends ChangeNotifier {
                   '${result.advertisementData.advName} ${result.advertisementData.serviceUuids}'
               .toLowerCase();
       return searchable.contains(search);
-    }).toList()..sort((a, b) => b.rssi.compareTo(a.rssi));
+    }).toList();
   }
 
   /// Advertised names may arrive before the platform resolves a device name.
@@ -133,7 +133,11 @@ class WorkbenchController() extends ChangeNotifier {
             if (result.device.remoteId == tracker.remoteId) {
               tracker.record(result);
             }
-            scanResults = [...scanResults.where((known) => known != result), result];
+            // Replace in place so the device keeps its position in the list.
+            scanResults = [
+              ...scanResults.map((known) => known == result ? result : known),
+              if (!scanResults.contains(result)) result,
+            ];
           }
         }
         _update();

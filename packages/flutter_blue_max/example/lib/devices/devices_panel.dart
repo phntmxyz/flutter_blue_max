@@ -158,7 +158,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
                             if (kIsWeb) {
                               return 'Selected devices';
                             }
-                            return 'Strongest signal first';
+                            return 'In order of discovery';
                           })();
                         })(),
                         style: Theme.of(context).textTheme.bodySmall,
@@ -169,7 +169,13 @@ class _DevicesPanelState() extends State<DevicesPanel> {
               ),
             ),
           ),
-          if (c.scanning) const SliverToBoxAdapter(child: LinearProgressIndicator(minHeight: 2)),
+          // Reserves the indicator's space so the list does not shift when a scan starts or stops.
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            sliver: SliverToBoxAdapter(
+              child: SizedBox(height: 2, child: c.scanning ? const LinearProgressIndicator(minHeight: 2) : null),
+            ),
+          ),
           if (results.isEmpty)
             SliverFillRemaining(
               hasScrollBody: false,
