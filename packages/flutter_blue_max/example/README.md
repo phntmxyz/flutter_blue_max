@@ -66,6 +66,18 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
 
 The layout adapts to phones and desktops, supports light/dark themes and keeps Bluetooth sessions across workspace navigation.
 
+## Screenshots
+
+The desktop layout with the in-memory platform fake from the widget tests.
+
+| GATT explorer | L2CAP client |
+| --- | --- |
+| ![GATT explorer naming the test dongle services and reporting a deviating characteristic](https://github.com/user-attachments/assets/af98bafa-ebb1-46cf-8b92-3959c5fa60b0) | ![Outgoing L2CAP channel with transmitted and received data](https://github.com/user-attachments/assets/585ccd1b-4f42-4d9a-81b9-9febe17eaae7) |
+| **L2CAP server** | **Library: parsers** |
+| ![Local L2CAP server with an accepted incoming channel](https://github.com/user-attachments/assets/a2f5472d-09b5-4176-9ef7-fe293e7c1d26) | ![Library with the bundled test dongle advertisement parsers](https://github.com/user-attachments/assets/3fa392c2-aaa6-4164-b2c9-3f163d210600) |
+| **Library: GATT catalog** | |
+| ![Library with the built-in GATT catalog entries](https://github.com/user-attachments/assets/763509dc-3654-490a-9bff-aa90e8c516e7) | |
+
 ## Download builds from GitHub Actions
 
 The [Build example downloads](../../../.github/workflows/example_build.yml) workflow builds all five supported targets with Flutter 3.47.7 and retains downloads for 14 days.
