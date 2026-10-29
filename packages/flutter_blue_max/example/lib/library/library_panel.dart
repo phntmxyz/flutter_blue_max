@@ -18,8 +18,8 @@ class _LibraryPanelState() extends State<LibraryPanel> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
-          child: SizedBox(
-            width: double.infinity,
+          child: Align(
+            alignment: Alignment.centerLeft,
             child: SegmentedButton<bool>(
               segments: const [
                 ButtonSegment(value: false, icon: Icon(Icons.data_object_rounded), label: Text('Parsers')),

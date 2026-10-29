@@ -48,6 +48,7 @@ class const L2capChannelCard({
             Text(PayloadCodec.text(session.lastReceived), maxLines: 4, overflow: TextOverflow.ellipsis),
           ],
           ExpansionTile(
+            expandedCrossAxisAlignment: CrossAxisAlignment.start,
             tilePadding: EdgeInsets.zero,
             title: const Text('Receive history'),
             subtitle: Text('${session.history.length} entries · buffer reads can repeat streamed bytes'),

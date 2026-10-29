@@ -64,6 +64,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final uuid = c.uuid.str.toUpperCase();
     final name = known == null ? description : '${expected ?? false ? 'Test · ' : ''}${known.name}';
     return ExpansionTile(
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
       title: GattTitle(
         name ?? uuid,
@@ -254,6 +255,7 @@ class _DescriptorState() extends State<_Descriptor> {
     final key = 'descriptor:${d.remoteId}:${d.serviceUuid}:${d.characteristicUuid}:${d.uuid}:${d.instanceId}';
     final enabled = !widget.controller.busy(key) && d.device.isConnected;
     return ExpansionTile(
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),
       children: [
         StreamBuilder<List<int>>(

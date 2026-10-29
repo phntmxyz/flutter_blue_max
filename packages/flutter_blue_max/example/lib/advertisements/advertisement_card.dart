@@ -62,7 +62,6 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
             if (tracking) 'Tracking ${tracker.count}' else if (tracker != null) '${tracker.count} tracked',
           ].join(' · '),
         ),
-        expandedAlignment: Alignment.centerLeft,
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [

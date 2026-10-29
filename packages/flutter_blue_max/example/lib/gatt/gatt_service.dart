@@ -19,6 +19,7 @@ class const GattService({
     final uuid = service.uuid.str.toUpperCase();
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
     return ExpansionTile(
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: EdgeInsets.zero,
       title: GattTitle(
         known?.name ?? uuid,

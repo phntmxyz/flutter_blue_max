@@ -109,6 +109,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
                   const SizedBox(height: 14),
                   if (c.systemDevices.isNotEmpty) ...[
                     ExpansionTile(
+                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
                       title: const Text('Connected to the system'),
                       subtitle: const Text('These peers may be connected through another app.'),
                       children: [

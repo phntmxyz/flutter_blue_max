@@ -67,8 +67,12 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
         style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16)),
       ),
       dividerTheme: DividerThemeData(color: colors.outlineVariant.withValues(alpha: 0.45)),
-      // Expanded tiles otherwise draw lines flush against their header and last child.
-      expansionTileTheme: const ExpansionTileThemeData(shape: Border(), collapsedShape: Border()),
+      // Expanded tiles otherwise draw lines flush against their header and last child, and center their children.
+      expansionTileTheme: const ExpansionTileThemeData(
+        shape: Border(),
+        collapsedShape: Border(),
+        expandedAlignment: Alignment.centerLeft,
+      ),
     );
   }
 
