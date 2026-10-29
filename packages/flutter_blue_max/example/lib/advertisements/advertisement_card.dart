@@ -39,7 +39,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
     final advertisement = c.selectedAdvertisement;
     final parsers = c.parsersFor(device.remoteId);
     final tracker = c.advertisementTracker?.remoteId == device.remoteId ? c.advertisementTracker : null;
-    // Global parsers for other payloads stay in the Parsers tab instead of crowding every device.
+    // Global parsers for other payloads stay in the Library tab instead of crowding every device.
     final relevant = [
       for (final parser in parsers)
         if (parser.device != null ||
@@ -75,7 +75,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
           Text('Parsers', style: Theme.of(context).textTheme.titleSmall),
           const SizedBox(height: 4),
           Text(
-            'Parsers for the payloads of this device. Manage all parsers in the Parsers tab.',
+            'Parsers for the payloads of this device. Manage all parsers in the Library tab.',
             style: Theme.of(context).textTheme.bodySmall,
           ),
           for (final parser in relevant)

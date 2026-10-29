@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -29,9 +31,9 @@ void main() {
   });
 
   test('catalog entries are found by short and full UUID', () {
-    expect(knownService(Guid('0000180f-0000-1000-8000-00805f9b34fb'))?.name, 'Battery');
-    expect(knownService(Guid('7e570001-85d8-4594-ac4f-b32fc01e9a49'))?.test, isTrue);
-    expect(knownService(Guid('fff0')), isNull);
+    expect(builtInService(Guid('0000180f-0000-1000-8000-00805f9b34fb'))?.name, 'Battery');
+    expect(builtInService(Guid('7e570001-85d8-4594-ac4f-b32fc01e9a49'))?.test, isTrue);
+    expect(builtInService(Guid('fff0')), isNull);
   });
 
   test('every service and characteristic appears once', () {
@@ -44,5 +46,22 @@ void main() {
         reason: service.name,
       );
     }
+  });
+
+  test('catalog services survive a JSON round trip unchanged', () {
+    final services = [
+      ...testDongleServices,
+      ...standardServices,
+      KnownService(Guid('fff0'), 'Mixed', [
+        KnownCharacteristic(Guid('fff1'), 'Unchecked'),
+        KnownCharacteristic(Guid('fff2'), 'Empty', properties: {}),
+      ]),
+    ];
+    final restored = [
+      for (final json in jsonDecode(jsonEncode(services)) as List) KnownService.fromJson(json as Map<String, dynamic>),
+    ];
+    expect(jsonEncode(restored), jsonEncode(services));
+    expect(restored.last.characteristics.first.properties, isNull);
+    expect(() => KnownService.fromJson({'name': 'Broken'}), throwsFormatException);
   });
 }

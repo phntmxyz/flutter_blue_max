@@ -57,7 +57,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final p = c.properties;
     final key = 'gatt:${c.remoteId}:${c.serviceUuid}:${c.uuid}:${c.instanceId}';
     final enabled = !widget.controller.busy(key) && c.device.isConnected;
-    final service = knownService(c.serviceUuid);
+    final service = widget.controller.knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
     final expected = (service?.test ?? false) && known != null ? known.matches(p) : null;
     final description = userDescription(c);

@@ -193,6 +193,14 @@ void main() {
       await robot.inspectTestCharacteristics();
     });
 
+    testWidgets('a discovered service can be added to the GATT catalog and removed again', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.scanForPeripheral();
+      await robot.addDiscoveredServiceToCatalog();
+      await robot.removeOwnCatalogService();
+    });
+
     testWidgets('broadcast advertisements retain appearance and cannot be connected', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));

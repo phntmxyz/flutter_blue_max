@@ -8,6 +8,7 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
@@ -22,9 +23,10 @@ class WorkbenchController() extends ChangeNotifier {
   final _busy = <String>{};
   final _logs = <String>[];
   final _parsers = <AdvertisementParser>[];
+  final _catalog = <KnownService>[];
 
   /// Serializes writes so a slow save never overwrites a newer one.
-  Future<void> _parserWrites = Future.value();
+  Future<void> _writes = Future.value();
 
   /// Counts user-requested disconnects per peer so a pending channel open can
   /// tell a transient drop from an intentional disconnect.
@@ -65,6 +67,20 @@ class WorkbenchController() extends ChangeNotifier {
   List<AdvertisementParser> get parsers => List.unmodifiable(_parsers);
   List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>
       _parsers.where((parser) => parser.appliesTo(remoteId)).toList();
+
+  /// The user's own GATT catalog services, saved across launches.
+  List<KnownService> get catalog => List.unmodifiable(_catalog);
+
+  /// The user's own entries replace built-in ones with the same UUID.
+  KnownService? knownService(Guid uuid) {
+    for (final service in _catalog) {
+      if (service.uuid == uuid) {
+        return service;
+      }
+    }
+    return builtInService(uuid);
+  }
+
   List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((session) => !session.closed));
 
   /// Closed channels keep their diagnostics available until the device session resets.
@@ -209,6 +225,15 @@ class WorkbenchController() extends ChangeNotifier {
     } catch (exception, stackTrace) {
       error = 'Loading parsers: $exception';
       log('ERROR loading parsers: $exception');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+    try {
+      _catalog
+        ..clear()
+        ..addAll(await loadCatalog());
+    } catch (exception, stackTrace) {
+      error = 'Loading GATT catalog: $exception';
+      log('ERROR loading GATT catalog: $exception');
       debugPrintStack(stackTrace: stackTrace);
     }
     _update();
@@ -601,15 +626,37 @@ class WorkbenchController() extends ChangeNotifier {
     return _persistParsers();
   }
 
+  /// Replaces [previous] in place, like [saveParser].
+  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) {
+    final index = previous == null ? -1 : _catalog.indexOf(previous);
+    if (index < 0) {
+      _catalog.add(service);
+    } else {
+      _catalog[index] = service;
+    }
+    return _persistCatalog();
+  }
+
+  Future<void> removeCatalogService(KnownService service) {
+    _catalog.remove(service);
+    return _persistCatalog();
+  }
+
   Future<void> _persistParsers() {
-    _update();
     final snapshot = List.of(_parsers);
-    return _parserWrites = _parserWrites.then((_) => saveParsers(snapshot)).catchError((
-      Object exception,
-      StackTrace stackTrace,
-    ) {
-      error = 'Saving parsers: $exception';
-      log('ERROR saving parsers: $exception');
+    return _persist('parsers', () => saveParsers(snapshot));
+  }
+
+  Future<void> _persistCatalog() {
+    final snapshot = List.of(_catalog);
+    return _persist('GATT catalog', () => saveCatalog(snapshot));
+  }
+
+  Future<void> _persist(String what, Future<void> Function() save) {
+    _update();
+    return _writes = _writes.then((_) => save()).catchError((Object exception, StackTrace stackTrace) {
+      error = 'Saving $what: $exception';
+      log('ERROR saving $what: $exception');
       debugPrintStack(stackTrace: stackTrace);
     });
   }

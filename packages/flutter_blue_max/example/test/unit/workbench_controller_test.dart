@@ -8,6 +8,8 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.da
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -164,6 +166,30 @@ void main() {
       await restarted.controller.removeParser(restored);
       final emptied = await _setup(resetStorage: false);
       expect(emptied.controller.parsers, isEmpty, reason: 'Deleting the examples must not bring them back');
+    });
+
+    test('own catalog services survive a restart and replace built-in ones', () async {
+      final (:controller, platform: _) = await _setup();
+      expect(controller.catalog, isEmpty);
+      final battery = KnownService(Guid('180f'), 'Pack', test: true, [
+        KnownCharacteristic(Guid('2a19'), 'Charge', properties: {GattProperty.read, GattProperty.notify}),
+      ]);
+      await controller.saveCatalogService(battery);
+      expect(controller.knownService(Guid('180f'))?.name, 'Pack');
+
+      final restarted = await _setup(resetStorage: false);
+      expect(jsonEncode(restarted.controller.catalog.single), jsonEncode(battery));
+      await restarted.controller.removeCatalogService(restarted.controller.catalog.single);
+      expect(restarted.controller.knownService(Guid('180f'))?.name, 'Battery');
+      final emptied = await _setup(resetStorage: false);
+      expect(emptied.controller.catalog, isEmpty);
+    });
+
+    test('an unreadable stored catalog is reported instead of crashing the app', () async {
+      SharedPreferences.setMockInitialValues({catalogStoreKey: '[{"name": "Broken"}]'});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.catalog, isEmpty);
+      expect(controller.error, startsWith('Loading GATT catalog'));
     });
 
     test('restoring the examples adds only missing ones', () async {

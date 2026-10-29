@@ -4,10 +4,10 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/activity/activity_panel.dart';
-import 'package:flutter_blue_max_example/advertisements/parsers_panel.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
+import 'package:flutter_blue_max_example/library/library_panel.dart';
 
 /// A responsive diagnostic app for the plugin's native and web backends.
 class const WorkbenchApp({super.key, final WorkbenchController? controller}) extends StatefulWidget {
@@ -172,8 +172,8 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                                   label: Text('Local server'),
                                 ),
                               const NavigationRailDestination(
-                                icon: Icon(Icons.data_object_rounded),
-                                label: Text('Parsers'),
+                                icon: Icon(Icons.local_library_outlined),
+                                label: Text('Library'),
                               ),
                               const NavigationRailDestination(
                                 icon: Icon(Icons.terminal_rounded),
@@ -189,7 +189,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                             children: [
                               DevicesPanel(controller: c, active: _destination == 0),
                               if (c.supportsL2cap) L2capServerPanel(controller: c),
-                              ParsersPanel(controller: c),
+                              LibraryPanel(controller: c),
                               ActivityPanel(controller: c),
                             ],
                           ),
@@ -211,7 +211,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                   const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
                   if (c.supportsL2cap)
                     const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
-                  const NavigationDestination(icon: Icon(Icons.data_object_rounded), label: 'Parsers'),
+                  const NavigationDestination(icon: Icon(Icons.local_library_outlined), label: 'Library'),
                   const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
                 ],
               );

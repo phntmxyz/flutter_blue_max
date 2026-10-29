@@ -21,6 +21,35 @@ enum GattProperty(final String label) {
 
 /// A characteristic name and, for test services, the exact properties it must report.
 class const KnownCharacteristic(final Guid uuid, final String name, {final Set<GattProperty>? properties}) {
+  /// Throws a [FormatException] for stored data that no longer describes a characteristic.
+  factory fromJson(Map<String, dynamic> json) {
+    try {
+      final properties = json['properties'] as List?;
+      return KnownCharacteristic(
+        Guid(json['uuid'] as String),
+        json['name'] as String,
+        properties: properties == null
+            ? null
+            : {for (final property in properties) GattProperty.values.byName(property as String)},
+      );
+    } on FormatException {
+      rethrow;
+    } on Object catch (error) {
+      throw FormatException('Invalid catalog characteristic: $error');
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+    'uuid': uuid.str128,
+    'name': name,
+    'properties': properties == null
+        ? null
+        : [
+            for (final property in GattProperty.values)
+              if (properties!.contains(property)) property.name,
+          ],
+  };
+
   /// True when nothing is expected or [reported] are exactly the expected properties.
   bool matches(CharacteristicProperties reported) {
     final expected = properties;
@@ -40,6 +69,37 @@ class const KnownService(
   final List<KnownCharacteristic> characteristics, {
   final bool test = false,
 }) {
+  /// Throws a [FormatException] for stored data that no longer describes a service.
+  factory fromJson(Map<String, dynamic> json) {
+    try {
+      return KnownService(Guid(json['uuid'] as String), json['name'] as String, [
+        for (final characteristic in json['characteristics'] as List)
+          KnownCharacteristic.fromJson(characteristic as Map<String, dynamic>),
+      ], test: json['test'] as bool);
+    } on FormatException {
+      rethrow;
+    } on Object catch (error) {
+      throw FormatException('Invalid catalog service: $error');
+    }
+  }
+
+  /// A test entry for [discovered], named by its User Descriptions where it has them.
+  factory fromDiscovered(BluetoothService discovered) => KnownService(discovered.uuid, '', test: true, [
+    for (final characteristic in discovered.characteristics)
+      KnownCharacteristic(
+        characteristic.uuid,
+        userDescription(characteristic) ?? '',
+        properties: GattProperty.of(characteristic.properties),
+      ),
+  ]);
+
+  Map<String, dynamic> toJson() => {
+    'uuid': uuid.str128,
+    'name': name,
+    'test': test,
+    'characteristics': [for (final characteristic in characteristics) characteristic.toJson()],
+  };
+
   KnownCharacteristic? characteristic(Guid uuid) {
     for (final characteristic in characteristics) {
       if (characteristic.uuid == uuid) {
@@ -85,7 +145,8 @@ String? userDescription(BluetoothCharacteristic characteristic) {
   return null;
 }
 
-KnownService? knownService(Guid uuid) {
+/// The built-in entry for [uuid]; the controller looks up the user's own entries first.
+KnownService? builtInService(Guid uuid) {
   for (final service in [...testDongleServices, ...standardServices]) {
     if (service.uuid == uuid) {
       return service;

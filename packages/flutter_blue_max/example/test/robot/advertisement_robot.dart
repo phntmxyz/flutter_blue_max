@@ -90,7 +90,7 @@ extension AdvertisementRobot on WorkbenchRobot {
   }
 
   Future<void> manageGlobalParsers() async {
-    await tapLabel('Parsers');
+    await tapLabel('Library');
     logEvent('Verify the bundled test dongle parsers');
     expect(controller.parsers, hasLength(testDongleParsers.length));
     spotText('Manufacturer 0xffff · match 02 at 0 · 8 fields · All devices').existsOnce();

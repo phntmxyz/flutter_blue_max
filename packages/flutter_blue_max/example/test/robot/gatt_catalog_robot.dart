@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -60,5 +61,61 @@ extension GattCatalogRobot on WorkbenchRobot {
     spotText(_unlisted.str.toUpperCase(), exact: true).existsOnce();
     await tapLabel('FBM Dynamic');
     spotText('Test · Dynamic Value', exact: true).existsOnce();
+  }
+
+  Future<void> addDiscoveredServiceToCatalog() async {
+    logEvent('Discover a vendor service that no catalog knows, with User Descriptions');
+    final thermostat = Guid('fff0');
+    final level = Guid('fff1');
+    final setpoint = Guid('fff2');
+    platform.extraServices[thermostat] = {
+      level: FakeBluetoothPlatform.properties(read: true, notify: true),
+      setpoint: FakeBluetoothPlatform.properties(write: true),
+    };
+    platform.descriptorValues[level] = utf8.encode('Level');
+    platform.descriptorValues[setpoint] = utf8.encode('Setpoint');
+    await inspectPeripheral();
+    await tapLabel('FFF0');
+    await tapLabel('Add to catalog');
+    logEvent('The editor starts from the discovered characteristics');
+    expect(_field('Service UUID').snapshotWidget().controller!.text, 'fff0');
+    spotText('Replaces the built-in').doesNotExist();
+    final names = spot<TextField>().withChild(spotText('Characteristic name', exact: true));
+    expect([for (final field in names.snapshot().discoveredWidgets) field.controller!.text], ['Level', 'Setpoint']);
+    await _enter('Service name', 'Thermostat');
+    await tapLabel('Save entry');
+    expect(controller.catalog.single.name, 'Thermostat');
+    expect(controller.catalog.single.test, isTrue);
+    logEvent('The explorer now names and checks the service');
+    spotText('Thermostat', exact: true).existsOnce();
+    spotText('Test · Level', exact: true).existsOnce();
+    spotText('Test · Setpoint', exact: true).existsOnce();
+    spotText('Edit catalog entry', exact: true).existsOnce();
+  }
+
+  Future<void> removeOwnCatalogService() async {
+    await tapLabel('Library');
+    await tapLabel('GATT catalog');
+    spotText('FBM Test', exact: true).existsOnce();
+    spotText('Thermostat', exact: true).existsOnce();
+    await tapLabel('Thermostat');
+    await tapLabel('Remove');
+    expect(controller.catalog, isEmpty);
+    logEvent('Scroll back to the own services');
+    final list = find.descendant(of: find.byType(CatalogPanel), matching: find.byType(Scrollable)).first;
+    await tester.scrollUntilVisible(find.textContaining('None yet.'), -300, scrollable: list);
+    await idle();
+    spotText('None yet. Add a service here or from a discovered service in the GATT explorer.').existsOnce();
+  }
+
+  WidgetSelector<TextField> _field(String label) => spot<TextField>().withChild(spotText(label, exact: true));
+
+  Future<void> _enter(String label, String text) async {
+    logEvent('Enter "$text" into "$label"');
+    final field = _field(label)..existsOnce();
+    await tester.ensureVisible(find.widgetWithText(TextField, label));
+    await idle();
+    await act.enterText(field, text);
+    await idle();
   }
 }
