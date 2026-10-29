@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -10,6 +11,11 @@ const _ruuviId = 0x0499;
 const _warm = [0x05, 0x12, 0xfc];
 const _warmer = [0x05, 0x13, 0x88];
 const _otherFrame = [0x03, 0x00, 0x00];
+
+/// A sensor frame of vendor service data: frame type and counter, then records with a 2-byte type and a length,
+/// here only illuminance (0x0002) with 65 lx.
+final _sensorService = Guid('fff0');
+const _sensorLight = [0x10, 0x5a, 0x02, 0x00, 0x03, 0x41, 0x00, 0x00];
 
 /// Parsers and history filters, driven through the device inspector.
 extension AdvertisementRobot on WorkbenchRobot {
@@ -42,6 +48,40 @@ extension AdvertisementRobot on WorkbenchRobot {
     spotText('Manufacturer 0x499 · match 05 at 0 · 1 field · All devices', exact: true).existsOnce();
     logEvent('Verify that unrelated global parsers do not crowd the device');
     spotText('iBeacon').doesNotExist();
+  }
+
+  Future<void> scanForRecordSensor() async {
+    await tapLabel('Start scan');
+    logEvent('Receive a sensor advertisement with record-based service data');
+    platform.advertise(serviceData: {_sensorService: _sensorLight});
+    await idle();
+    await tapLabel('Stop scan');
+    await selectPeripheral();
+    await tapLabel('Advertisement');
+  }
+
+  Future<void> addRecordParser() async {
+    await tapLabel('Add parser');
+    logEvent('Verify that the service data source is prefilled from the latest advertisement');
+    expect(_field('Service UUID').snapshotWidget().controller!.text, 'fff0');
+    await _enter('Parser name', 'Sensor');
+    await tapLabel('Records');
+    await _enter('Records start at', '2');
+    await tapLabel('1 byte');
+    await tapLabel('2 bytes LE');
+    await _enter('Record type (hex)', '0002');
+    await _enter('Field name', 'Illuminance');
+    await tapLabel('uint8');
+    await tapLabel('uint24 LE');
+    await _enter('Unit', 'lx');
+    logEvent('Verify the live preview finds the record behind the frame header');
+    spotText('Sensor · Illuminance: 65 lx', exact: true).existsOnce();
+    await tapLabel('Save parser');
+    spotText('Sensor · Illuminance: 65 lx').existsOnce();
+    spotText(
+      'Service data fff0 · records from 2 · Type, length, value · type 2 bytes LE · 1 field · All devices',
+      exact: true,
+    ).existsOnce();
   }
 
   Future<void> filterTrackedHistory() async {

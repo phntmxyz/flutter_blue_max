@@ -42,11 +42,15 @@ class _FieldDraft() {
   final offset = TextEditingController(text: '0');
   final length = TextEditingController(text: '1');
   final scale = TextEditingController(text: '1');
+  final add = TextEditingController(text: '0');
   final unit = TextEditingController();
+  final record = TextEditingController();
+  final bit = TextEditingController(text: '0');
+  final bits = TextEditingController();
   AdvertisementFieldType type = AdvertisementFieldType.uint8;
 
   void dispose() {
-    for (final controller in [name, offset, length, scale, unit]) {
+    for (final controller in [name, offset, length, scale, add, unit, record, bit, bits]) {
       controller.dispose();
     }
   }
@@ -58,8 +62,12 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
   final _key = TextEditingController();
   final _match = TextEditingController();
   final _matchOffset = TextEditingController(text: '0');
+  final _recordOffset = TextEditingController(text: '0');
   final _fields = <_FieldDraft>[];
   AdvertisementSource _source = AdvertisementSource.manufacturer;
+  bool _records = false;
+  RecordTypeFormat _recordType = RecordTypeFormat.uint8;
+  RecordLength _recordLength = RecordLength.afterType;
   bool _deviceOnly = false;
 
   DeviceIdentifier? get _device => widget.initial?.device ?? widget.device;
@@ -77,6 +85,12 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       };
       _match.text = PayloadCodec.hex(initial.match);
       _matchOffset.text = '${initial.matchOffset}';
+      if (initial.records case final records?) {
+        _records = true;
+        _recordOffset.text = '${records.offset}';
+        _recordType = records.type;
+        _recordLength = records.length;
+      }
       _deviceOnly = initial.device != null;
       for (final field in initial.fields) {
         _fields.add(
@@ -85,7 +99,11 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             ..offset.text = '${field.offset}'
             ..length.text = '${field.length}'
             ..scale.text = _number(field.scale)
+            ..add.text = _number(field.add)
             ..unit.text = field.unit
+            ..record.text = field.record == null ? '' : field.record!.toRadixString(16).toUpperCase()
+            ..bit.text = '${field.bit}'
+            ..bits.text = field.bits == null ? '' : '${field.bits}'
             ..type = field.type,
         );
       }
@@ -104,7 +122,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
 
   @override
   void dispose() {
-    for (final controller in [_name, _key, _match, _matchOffset]) {
+    for (final controller in [_name, _key, _match, _matchOffset, _recordOffset]) {
       controller.dispose();
     }
     for (final field in _fields) {
@@ -117,7 +135,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
 
   static String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
 
-  int? get _companyId => int.tryParse(_key.text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
+  static int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
+
+  int? get _companyId => _hexNumber(_key.text);
 
   Guid? get _serviceUuid {
     try {
@@ -144,17 +164,29 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       if (companyId == null && serviceUuid == null) {
         return null;
       }
-      final fields = [
-        for (final draft in _fields)
+      final fields = <AdvertisementField>[];
+      for (final draft in _fields) {
+        final record = _hexNumber(draft.record.text);
+        if (_records && record == null) {
+          return null;
+        }
+        final bits = draft.bits.text.trim();
+        final ranged = draft.type.unsigned && bits.isNotEmpty;
+        fields.add(
           AdvertisementField(
             draft.name.text.trim().isEmpty ? 'Field' : draft.name.text.trim(),
             int.parse(draft.offset.text.trim()),
             draft.type,
             length: int.parse(draft.length.text.trim()),
             scale: double.parse(draft.scale.text.trim()),
+            add: double.parse(draft.add.text.trim()),
             unit: draft.unit.text.trim(),
+            record: _records ? record : null,
+            bit: ranged ? int.parse(draft.bit.text.trim()) : 0,
+            bits: ranged ? int.parse(bits) : null,
           ),
-      ];
+        );
+      }
       return AdvertisementParser(
         name: _name.text.trim().isEmpty ? 'Parser' : _name.text.trim(),
         source: _source,
@@ -162,6 +194,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         serviceUuid: serviceUuid,
         match: PayloadCodec.decode(_match.text, hex: true),
         matchOffset: int.parse(_matchOffset.text.trim()),
+        records: _records
+            ? RecordFormat(offset: int.parse(_recordOffset.text.trim()), type: _recordType, length: _recordLength)
+            : null,
         device: _deviceOnly ? _device : null,
         fields: fields,
       );
@@ -205,7 +240,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
           children: [
             TextFormField(
               controller: _name,
-              decoration: const InputDecoration(labelText: 'Parser name', hintText: 'Flower care'),
+              decoration: const InputDecoration(labelText: 'Parser name', hintText: 'My sensor'),
               validator: (value) => (value ?? '').trim().isEmpty ? 'Enter a name.' : null,
             ),
             const SizedBox(height: 16),
@@ -225,7 +260,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               controller: _key,
               decoration: InputDecoration(
                 labelText: _source == AdvertisementSource.manufacturer ? 'Company ID (hex)' : 'Service UUID',
-                hintText: _source == AdvertisementSource.manufacturer ? '0x0499' : 'fe95',
+                hintText: _source == AdvertisementSource.manufacturer ? '0xFFFF' : '180f',
               ),
               validator: (_) {
                 if (_source == AdvertisementSource.manufacturer) {
@@ -288,7 +323,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                 Expanded(
                   child: TextFormField(
                     controller: _match,
-                    decoration: const InputDecoration(labelText: 'Bytes (hex)', hintText: '05'),
+                    decoration: const InputDecoration(labelText: 'Bytes (hex)', hintText: '01'),
                     validator: (value) {
                       try {
                         PayloadCodec.decode(value ?? '', hex: true);
@@ -301,6 +336,67 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                 ),
               ],
             ),
+            const SizedBox(height: 20),
+            Text('Layout', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Fixed offsets read every field at its position. Records split the payload into type–length–value '
+              'records, as in BTHome; fields then name their record type.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 8),
+            SegmentedButton<bool>(
+              segments: const [
+                ButtonSegment(value: false, label: Text('Fixed offsets')),
+                ButtonSegment(value: true, label: Text('Records')),
+              ],
+              selected: {_records},
+              onSelectionChanged: (value) => setState(() => _records = value.single),
+            ),
+            if (_records) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: [
+                  SizedBox(
+                    width: 140,
+                    child: TextFormField(
+                      controller: _recordOffset,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Records start at'),
+                      validator: _offsetError,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 160,
+                    child: DropdownButtonFormField<RecordTypeFormat>(
+                      initialValue: _recordType,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Record type'),
+                      items: [
+                        for (final type in RecordTypeFormat.values)
+                          DropdownMenuItem(value: type, child: Text(type.label)),
+                      ],
+                      onChanged: (value) => setState(() => _recordType = value!),
+                    ),
+                  ),
+                  SizedBox(
+                    width: 220,
+                    child: DropdownButtonFormField<RecordLength>(
+                      initialValue: _recordLength,
+                      isExpanded: true,
+                      decoration: const InputDecoration(labelText: 'Record layout'),
+                      items: [
+                        for (final length in RecordLength.values)
+                          DropdownMenuItem(value: length, child: Text(length.label)),
+                      ],
+                      onChanged: (value) => setState(() => _recordLength = value!),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             if (_device != null)
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
@@ -369,12 +465,25 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               spacing: 12,
               runSpacing: 12,
               children: [
+                if (_records)
+                  SizedBox(
+                    width: 140,
+                    child: TextFormField(
+                      controller: draft.record,
+                      decoration: const InputDecoration(labelText: 'Record type (hex)', hintText: '02'),
+                      validator: (value) {
+                        final record = _hexNumber(value ?? '');
+                        final bits = _recordType.size * 8;
+                        return record == null || record >= 1 << bits ? 'Enter a $bits-bit hex type.' : null;
+                      },
+                    ),
+                  ),
                 SizedBox(
-                  width: 96,
+                  width: _records ? 140 : 96,
                   child: TextFormField(
                     controller: draft.offset,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'Offset'),
+                    decoration: InputDecoration(labelText: _records ? 'Offset in value' : 'Offset'),
                     validator: _offsetError,
                   ),
                 ),
@@ -391,6 +500,34 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                     onChanged: (value) => setState(() => draft.type = value!),
                   ),
                 ),
+                if (draft.type.unsigned) ...[
+                  SizedBox(
+                    width: 96,
+                    child: TextFormField(
+                      controller: draft.bit,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Bit offset'),
+                      validator: _offsetError,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 96,
+                    child: TextFormField(
+                      controller: draft.bits,
+                      keyboardType: TextInputType.number,
+                      decoration: const InputDecoration(labelText: 'Bit count', hintText: 'All'),
+                      validator: (value) {
+                        final text = value?.trim() ?? '';
+                        if (text.isEmpty) {
+                          return null;
+                        }
+                        final available = draft.type.size! * 8 - (int.tryParse(draft.bit.text.trim()) ?? 0);
+                        final bits = int.tryParse(text);
+                        return bits == null || bits < 1 || bits > available ? 'Enter 1 to $available.' : null;
+                      },
+                    ),
+                  ),
+                ],
                 if (variable)
                   SizedBox(
                     width: 96,
@@ -411,6 +548,15 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       controller: draft.scale,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                       decoration: const InputDecoration(labelText: 'Scale'),
+                      validator: (value) => double.tryParse(value?.trim() ?? '') == null ? 'Enter a number.' : null,
+                    ),
+                  ),
+                  SizedBox(
+                    width: 96,
+                    child: TextFormField(
+                      controller: draft.add,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                      decoration: const InputDecoration(labelText: 'Add'),
                       validator: (value) => double.tryParse(value?.trim() ?? '') == null ? 'Enter a number.' : null,
                     ),
                   ),

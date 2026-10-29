@@ -83,6 +83,13 @@ void main() {
     await robot.removeParser();
   });
 
+  testWidgets('phone: parse a record-based sensor frame', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.scanForRecordSensor();
+    await robot.addRecordParser();
+  });
+
   testWidgets('desktop: manage saved parsers globally', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));

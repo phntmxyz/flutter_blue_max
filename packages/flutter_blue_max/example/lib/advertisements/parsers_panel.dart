@@ -44,7 +44,7 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
               contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
               title: Text(parser.name),
               subtitle: Text(
-                [parser.summary, for (final field in parser.fields) '${field.name}: ${field.type.label}'].join('\n'),
+                [parser.summary, for (final field in parser.fields) field.summary(parser.records)].join('\n'),
               ),
               isThreeLine: true,
               trailing: Row(

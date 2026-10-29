@@ -53,6 +53,9 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
   The services of the FBM test dongle firmware are checked as well: characteristics with exactly the expected properties show as **Test · …**, missing or deviating ones are reported.
   On native platforms, **Track advertisements** in a device's **Advertisement** card scans only that device and keeps its latest 200 advertisements with RSSI, intervals and payload changes; the history can be filtered by text, changed payloads or parsed values.
 - **Library → Parsers:** define how manufacturer or service data is read as named values, optionally bound to one device; parsed values appear below the raw data and in the tracker history.
+  Fields sit at fixed offsets, or, with the **Records** layout, in type–length–value records such as BTHome, where each field names its record type and frames may carry only some of them.
+  Unsigned fields can read a bit range, and every numeric value is shown as raw × scale + add.
+  Encrypted payloads and values computed from several fields are not supported.
   Parsers are saved locally (shared preferences, browser local storage on web); first launches start with the status and sensor frames of the FBM test dongle firmware (manufacturer data `0xFFFF`), which **Add test dongle parsers** restores.
 - **Library → GATT catalog:** lists the built-in entries and your own services, saved locally like the parsers.
   **Add to catalog** on an unknown service in the GATT explorer starts an entry from its characteristics, User Descriptions and current properties; built-in entries can be copied and changed.

@@ -19,6 +19,30 @@ void main() {
     ],
   );
 
+  final sensor = AdvertisementParser(
+    name: 'Sensor',
+    source: AdvertisementSource.service,
+    serviceUuid: Guid('fff0'),
+    records: const RecordFormat(offset: 2, type: RecordTypeFormat.uint16le),
+    fields: const [
+      AdvertisementField('Temperature', 0, AdvertisementFieldType.int16le, scale: 0.1, unit: '°C', record: 0x0001),
+      AdvertisementField('Illuminance', 0, AdvertisementFieldType.uint24le, unit: 'lx', record: 0x0002),
+      AdvertisementField('Moisture', 0, AdvertisementFieldType.uint8, unit: '%', record: 0x0003),
+    ],
+  );
+  final bthome = AdvertisementParser(
+    name: 'BTHome',
+    source: AdvertisementSource.service,
+    serviceUuid: Guid('fcd2'),
+    match: const [0x40],
+    records: const RecordFormat(offset: 1, length: RecordLength.implied),
+    fields: const [
+      AdvertisementField('Battery', 0, AdvertisementFieldType.uint8, unit: '%', record: 0x01),
+      AdvertisementField('Temperature', 0, AdvertisementFieldType.int16le, scale: 0.01, unit: '°C', record: 0x02),
+      AdvertisementField('Humidity', 0, AdvertisementFieldType.uint16le, scale: 0.01, unit: '%', record: 0x03),
+    ],
+  );
+
   test('numeric types honour sign, byte order and scale', () {
     String read(AdvertisementFieldType type, List<int> bytes, {double scale = 1}) =>
         AdvertisementField('Value', 0, type, scale: scale).format(bytes);
@@ -60,7 +84,7 @@ void main() {
       reason: 'Other frame type',
     );
     expect(
-      ruuvi.read(serviceUuid: Guid('fe95'), bytes: [0x05, 0x12, 0xfc]),
+      ruuvi.read(serviceUuid: Guid('fff0'), bytes: [0x05, 0x12, 0xfc]),
       isEmpty,
       reason: 'Other source',
     );
@@ -70,16 +94,18 @@ void main() {
       reason: 'Pattern beyond the payload',
     );
 
-    final mi = AdvertisementParser(
-      name: 'Mi',
+    final vendor = AdvertisementParser(
+      name: 'Vendor',
       source: AdvertisementSource.service,
-      serviceUuid: Guid('fe95'),
-      match: [0x98, 0x00],
+      serviceUuid: Guid('fff0'),
+      match: [0x12, 0x34],
       matchOffset: 2,
       fields: [const AdvertisementField('Counter', 4, AdvertisementFieldType.uint8)],
     );
-    final frame = [0x31, 0x02, 0x98, 0x00, 0x07];
-    expect(mi.read(serviceUuid: Guid('0000fe95-0000-1000-8000-00805f9b34fb'), bytes: frame), ['Mi · Counter: 7']);
+    final frame = [0x31, 0x02, 0x12, 0x34, 0x07];
+    expect(vendor.read(serviceUuid: Guid('0000fff0-0000-1000-8000-00805f9b34fb'), bytes: frame), [
+      'Vendor · Counter: 7',
+    ]);
   });
 
   test('device-bound parsers apply only to their device', () {
@@ -106,7 +132,7 @@ void main() {
         ruuviId: [0x05, 0x12, 0xfc, 0x53, 0x94],
       },
       serviceData: {
-        Guid('fe95'): [0x01],
+        Guid('fff0'): [0x01],
       },
       serviceUuids: [],
     );
@@ -115,7 +141,7 @@ void main() {
       'Manufacturer 0x499: 05 12 FC 53 94',
       '  ↳ Ruuvi · Temperature: 24.300 °C',
       '  ↳ Ruuvi · Humidity: 53.490 %',
-      'Service data fe95: 01',
+      'Service data fff0: 01',
     ]);
     expect(parsedValues(data, [ruuvi]), ['Ruuvi · Temperature: 24.300 °C', 'Ruuvi · Humidity: 53.490 %']);
   });
@@ -125,8 +151,126 @@ void main() {
     expect(const AdvertisementField('Lux', 0, AdvertisementFieldType.uint24be).format([0x01, 0x03, 0xe8]), '66536');
   });
 
+  group('Records', () {
+    // Frame type and counter precede the records.
+    const header = [0x10, 0x5a];
+    List<String> read(List<int> records) => sensor.read(serviceUuid: Guid('fff0'), bytes: [...header, ...records]);
+
+    test('a frame reads only the records it carries, in any order', () {
+      expect(read([0x02, 0x00, 0x03, 0x41, 0x00, 0x00]), ['Sensor · Illuminance: 65 lx']);
+      expect(read([0x03, 0x00, 0x01, 0x2a, 0x01, 0x00, 0x02, 0xd2, 0x00]), [
+        'Sensor · Temperature: 21.0 °C',
+        'Sensor · Moisture: 42 %',
+      ]);
+    });
+
+    test('a truncated record is reported after the values read before it', () {
+      expect(read([0x03, 0x00, 0x01, 0x2a, 0x02, 0x00, 0x03, 0x41]), [
+        'Sensor · Moisture: 42 %',
+        'Sensor · record 0x0002 truncated at 6',
+      ]);
+      expect(read([0x02]), ['Sensor · record header truncated at 2']);
+    });
+
+    test('records without a length byte take their size from the fields', () {
+      List<String> read(List<int> bytes) => bthome.read(serviceUuid: Guid('fcd2'), bytes: bytes);
+
+      expect(read([0x40, 0x02, 0xca, 0x09, 0x01, 0x61, 0x03, 0xbf, 0x13]), [
+        'BTHome · Battery: 97 %',
+        'BTHome · Temperature: 25.06 °C',
+        'BTHome · Humidity: 50.55 %',
+      ], reason: 'Order of the records does not matter');
+      expect(read([0x40, 0x01, 0x61, 0x05, 0x10, 0x27, 0x00, 0x03, 0xbf, 0x13]), [
+        'BTHome · Battery: 97 %',
+        'BTHome · unknown record 0x05 at 3',
+      ], reason: 'An unknown size ends the split');
+      expect(read([0x41, 0x01, 0x61]), isEmpty, reason: 'Encrypted frames do not match');
+    });
+
+    test('a length byte before the type counts the type, and zero ends the records', () {
+      const parser = AdvertisementParser(
+        name: 'AD',
+        source: AdvertisementSource.manufacturer,
+        companyId: 0xffff,
+        records: RecordFormat(length: RecordLength.beforeType),
+        fields: [AdvertisementField('Name', 0, AdvertisementFieldType.ascii, length: 2, record: 0x09)],
+      );
+      expect(parser.read(companyId: 0xffff, bytes: [0x02, 0x01, 0x06, 0x03, 0x09, 0x48, 0x69, 0x00, 0xff]), [
+        'AD · Name: Hi',
+      ]);
+    });
+
+    test('summaries name the record layout and types', () {
+      expect(
+        sensor.summary,
+        'Service data fff0 · records from 2 · Type, length, value · type 2 bytes LE · 3 fields · All devices',
+      );
+      expect(sensor.fields.first.summary(sensor.records), 'Temperature: int16 LE · record 0x0001');
+      expect(bthome.fields.first.summary(bthome.records), 'Battery: uint8 · record 0x01');
+    });
+  });
+
+  group('Bit ranges', () {
+    // Ruuvi RAWv2 power info: 11 bits battery voltage above 1600 mV, 5 bits TX power in 2 dB steps above -40 dBm.
+    const power = [0xac, 0x36];
+
+    test('read packed values from the least significant bit', () {
+      const voltage = AdvertisementField(
+        'Voltage',
+        0,
+        AdvertisementFieldType.uint16be,
+        add: 1600,
+        unit: 'mV',
+        bit: 5,
+        bits: 11,
+      );
+      const txPower = AdvertisementField(
+        'TX power',
+        0,
+        AdvertisementFieldType.uint16be,
+        scale: 2,
+        add: -40,
+        unit: 'dBm',
+        bits: 5,
+      );
+      expect(voltage.format(power), '2977 mV');
+      expect(txPower.format(power), '4 dBm');
+      expect(const AdvertisementField('Flag', 0, AdvertisementFieldType.uint8, bit: 2, bits: 1).format([0x04]), '1');
+      expect(voltage.summary(null), 'Voltage: uint16 BE · bits 5–15');
+      expect(
+        const AdvertisementField('Flag', 0, AdvertisementFieldType.uint8, bit: 2, bits: 1).summary(null),
+        'Flag: uint8 · bit 2',
+      );
+    });
+
+    test('report ranges they cannot read', () {
+      expect(
+        const AdvertisementField('Signed', 0, AdvertisementFieldType.int16be, bits: 4).format(power),
+        'bits need an unsigned type',
+      );
+      expect(
+        const AdvertisementField('Wide', 0, AdvertisementFieldType.uint8, bit: 4, bits: 5).format(power),
+        'bits beyond 8-bit value',
+      );
+    });
+  });
+
+  test('add shifts the scaled value', () {
+    expect(
+      const AdvertisementField(
+        'Offset',
+        0,
+        AdvertisementFieldType.uint8,
+        scale: 0.5,
+        add: -20,
+        unit: '°C',
+      ).format([50]),
+      '5.0 °C',
+    );
+  });
+
   test('parsers survive a JSON round trip unchanged', () {
-    final parsers = [ruuvi, ...testDongleParsers];
+    final parsers = [ruuvi, sensor, bthome, ...testDongleParsers];
     final restored = [
       for (final json in jsonDecode(jsonEncode(parsers)) as List)
         AdvertisementParser.fromJson(json as Map<String, dynamic>),
