@@ -33,4 +33,16 @@ void main() {
     expect(knownService(Guid('7e570001-85d8-4594-ac4f-b32fc01e9a49'))?.test, isTrue);
     expect(knownService(Guid('fff0')), isNull);
   });
+
+  test('every service and characteristic appears once', () {
+    final services = [...testDongleServices, ...standardServices];
+    expect(services.map((service) => service.uuid).toSet(), hasLength(services.length));
+    for (final service in services) {
+      expect(
+        service.characteristics.map((characteristic) => characteristic.uuid).toSet(),
+        hasLength(service.characteristics.length),
+        reason: service.name,
+      );
+    }
+  });
 }

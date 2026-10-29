@@ -127,13 +127,15 @@ final testDongleServices = [
   ]),
 ];
 
-/// Bluetooth SIG services common enough to name; their properties differ between peripherals.
+/// Bluetooth SIG services common enough to name, from the Assigned Numbers; their properties differ between
+/// peripherals. Only the vendor services that are de facto standards are added.
 final standardServices = [
   KnownService(Guid('1800'), 'Generic Access', [
     KnownCharacteristic(Guid('2a00'), 'Device Name'),
     KnownCharacteristic(Guid('2a01'), 'Appearance'),
     KnownCharacteristic(Guid('2a04'), 'Peripheral Preferred Connection Parameters'),
     KnownCharacteristic(Guid('2aa6'), 'Central Address Resolution'),
+    KnownCharacteristic(Guid('2ac9'), 'Resolvable Private Address Only'),
   ]),
   KnownService(Guid('1801'), 'Generic Attribute', [
     KnownCharacteristic(Guid('2a05'), 'Service Changed'),
@@ -150,6 +152,106 @@ final standardServices = [
     KnownCharacteristic(Guid('2a28'), 'Software Revision'),
     KnownCharacteristic(Guid('2a23'), 'System ID'),
     KnownCharacteristic(Guid('2a50'), 'PnP ID'),
+    KnownCharacteristic(Guid('2a2a'), 'IEEE 11073-20601 Regulatory Certification Data List'),
   ]),
   KnownService(Guid('180f'), 'Battery', [KnownCharacteristic(Guid('2a19'), 'Battery Level')]),
+  KnownService(Guid('1802'), 'Immediate Alert', [KnownCharacteristic(Guid('2a06'), 'Alert Level')]),
+  KnownService(Guid('1803'), 'Link Loss', [KnownCharacteristic(Guid('2a06'), 'Alert Level')]),
+  KnownService(Guid('1804'), 'Tx Power', [KnownCharacteristic(Guid('2a07'), 'Tx Power Level')]),
+  KnownService(Guid('1805'), 'Current Time', [
+    KnownCharacteristic(Guid('2a2b'), 'Current Time'),
+    KnownCharacteristic(Guid('2a0f'), 'Local Time Information'),
+    KnownCharacteristic(Guid('2a14'), 'Reference Time Information'),
+  ]),
+  KnownService(Guid('1812'), 'Human Interface Device', [
+    KnownCharacteristic(Guid('2a4a'), 'HID Information'),
+    KnownCharacteristic(Guid('2a4b'), 'Report Map'),
+    KnownCharacteristic(Guid('2a4c'), 'HID Control Point'),
+    KnownCharacteristic(Guid('2a4d'), 'Report'),
+    KnownCharacteristic(Guid('2a4e'), 'Protocol Mode'),
+    KnownCharacteristic(Guid('2a22'), 'Boot Keyboard Input Report'),
+    KnownCharacteristic(Guid('2a32'), 'Boot Keyboard Output Report'),
+    KnownCharacteristic(Guid('2a33'), 'Boot Mouse Input Report'),
+  ]),
+  KnownService(Guid('1813'), 'Scan Parameters', [
+    KnownCharacteristic(Guid('2a4f'), 'Scan Interval Window'),
+    KnownCharacteristic(Guid('2a31'), 'Scan Refresh'),
+  ]),
+  KnownService(Guid('180d'), 'Heart Rate', [
+    KnownCharacteristic(Guid('2a37'), 'Heart Rate Measurement'),
+    KnownCharacteristic(Guid('2a38'), 'Body Sensor Location'),
+    KnownCharacteristic(Guid('2a39'), 'Heart Rate Control Point'),
+  ]),
+  KnownService(Guid('1809'), 'Health Thermometer', [
+    KnownCharacteristic(Guid('2a1c'), 'Temperature Measurement'),
+    KnownCharacteristic(Guid('2a1d'), 'Temperature Type'),
+    KnownCharacteristic(Guid('2a1e'), 'Intermediate Temperature'),
+    KnownCharacteristic(Guid('2a21'), 'Measurement Interval'),
+  ]),
+  KnownService(Guid('1810'), 'Blood Pressure', [
+    KnownCharacteristic(Guid('2a35'), 'Blood Pressure Measurement'),
+    KnownCharacteristic(Guid('2a36'), 'Intermediate Cuff Pressure'),
+    KnownCharacteristic(Guid('2a49'), 'Blood Pressure Feature'),
+  ]),
+  KnownService(Guid('1808'), 'Glucose', [
+    KnownCharacteristic(Guid('2a18'), 'Glucose Measurement'),
+    KnownCharacteristic(Guid('2a34'), 'Glucose Measurement Context'),
+    KnownCharacteristic(Guid('2a51'), 'Glucose Feature'),
+    KnownCharacteristic(Guid('2a52'), 'Record Access Control Point'),
+  ]),
+  KnownService(Guid('1822'), 'Pulse Oximeter', [
+    KnownCharacteristic(Guid('2a5e'), 'PLX Spot-Check Measurement'),
+    KnownCharacteristic(Guid('2a5f'), 'PLX Continuous Measurement'),
+    KnownCharacteristic(Guid('2a60'), 'PLX Features'),
+  ]),
+  KnownService(Guid('181d'), 'Weight Scale', [
+    KnownCharacteristic(Guid('2a9d'), 'Weight Measurement'),
+    KnownCharacteristic(Guid('2a9e'), 'Weight Scale Feature'),
+  ]),
+  KnownService(Guid('181b'), 'Body Composition', [
+    KnownCharacteristic(Guid('2a9c'), 'Body Composition Measurement'),
+    KnownCharacteristic(Guid('2a9b'), 'Body Composition Feature'),
+  ]),
+  KnownService(Guid('181a'), 'Environmental Sensing', [
+    KnownCharacteristic(Guid('2a6e'), 'Temperature'),
+    KnownCharacteristic(Guid('2a6f'), 'Humidity'),
+    KnownCharacteristic(Guid('2a6d'), 'Pressure'),
+    KnownCharacteristic(Guid('2a6c'), 'Elevation'),
+    KnownCharacteristic(Guid('2a76'), 'UV Index'),
+  ]),
+  KnownService(Guid('1814'), 'Running Speed and Cadence', [
+    KnownCharacteristic(Guid('2a53'), 'RSC Measurement'),
+    KnownCharacteristic(Guid('2a54'), 'RSC Feature'),
+    KnownCharacteristic(Guid('2a5d'), 'Sensor Location'),
+    KnownCharacteristic(Guid('2a55'), 'SC Control Point'),
+  ]),
+  KnownService(Guid('1816'), 'Cycling Speed and Cadence', [
+    KnownCharacteristic(Guid('2a5b'), 'CSC Measurement'),
+    KnownCharacteristic(Guid('2a5c'), 'CSC Feature'),
+    KnownCharacteristic(Guid('2a5d'), 'Sensor Location'),
+    KnownCharacteristic(Guid('2a55'), 'SC Control Point'),
+  ]),
+  KnownService(Guid('1818'), 'Cycling Power', [
+    KnownCharacteristic(Guid('2a63'), 'Cycling Power Measurement'),
+    KnownCharacteristic(Guid('2a65'), 'Cycling Power Feature'),
+    KnownCharacteristic(Guid('2a66'), 'Cycling Power Control Point'),
+    KnownCharacteristic(Guid('2a5d'), 'Sensor Location'),
+  ]),
+  KnownService(Guid('1826'), 'Fitness Machine', [
+    KnownCharacteristic(Guid('2acc'), 'Fitness Machine Feature'),
+    KnownCharacteristic(Guid('2acd'), 'Treadmill Data'),
+    KnownCharacteristic(Guid('2ace'), 'Cross Trainer Data'),
+    KnownCharacteristic(Guid('2ad1'), 'Rower Data'),
+    KnownCharacteristic(Guid('2ad2'), 'Indoor Bike Data'),
+    KnownCharacteristic(Guid('2ad3'), 'Training Status'),
+    KnownCharacteristic(Guid('2ad6'), 'Supported Resistance Level Range'),
+    KnownCharacteristic(Guid('2ad8'), 'Supported Power Range'),
+    KnownCharacteristic(Guid('2ad9'), 'Fitness Machine Control Point'),
+    KnownCharacteristic(Guid('2ada'), 'Fitness Machine Status'),
+  ]),
+  // Nordic UART Service: the de facto serial port over GATT on many maker and vendor boards.
+  KnownService(Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e'), 'Nordic UART', [
+    KnownCharacteristic(Guid('6e400002-b5a3-f393-e0a9-e50e24dcca9e'), 'RX'),
+    KnownCharacteristic(Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e'), 'TX'),
+  ]),
 ];
