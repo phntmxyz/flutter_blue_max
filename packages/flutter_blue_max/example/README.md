@@ -57,6 +57,8 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
   Unsigned fields can read a bit range, and every numeric value is shown as raw × scale + add.
   Encrypted payloads and values computed from several fields are not supported.
   Parsers are saved locally (shared preferences, browser local storage on web); first launches start with the status and sensor frames of the FBM test dongle firmware (manufacturer data `0xFFFF`), which **Add test dongle parsers** restores.
+  **Import** and **Export** read and write a JSON file with all or chosen parsers; phones export through the share sheet, because their file pickers cannot save, and the web downloads the file.
+  **Reset parsers** replaces every parser with the test dongle parsers, which also repairs stored parsers that no longer load.
 - **Library → GATT catalog:** lists the built-in entries and your own services, saved locally like the parsers.
   **Add to catalog** on an unknown service in the GATT explorer starts an entry from its characteristics, User Descriptions and current properties; built-in entries can be copied and changed.
   Your entries replace built-in ones with the same UUID; checked services report missing characteristics and other properties than expected.

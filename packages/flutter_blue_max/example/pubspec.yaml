@@ -8,18 +8,22 @@ environment:
   flutter: '>=3.47.0'
 
 dependencies:
+  file_selector: ^1.1.0
   flutter:
     sdk: flutter
   flutter_blue_max:
     path: ../
+  share_plus: ^13.3.1
   shared_preferences: ^2.5.6
 
 dev_dependencies:
+  file_selector_platform_interface: ^2.7.0
   flutter_blue_max_platform_interface:
     path: ../../flutter_blue_max_platform_interface
   flutter_test:
     sdk: flutter
   lint: ^2.14.0
+  share_plus_platform_interface: ^7.2.0
   spot: ^0.18.0
 
 flutter:

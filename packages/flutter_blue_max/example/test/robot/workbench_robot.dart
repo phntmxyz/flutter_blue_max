@@ -1,16 +1,22 @@
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spot/spot.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
+import '../fakes/fake_file_selector.dart';
+import '../fakes/fake_share.dart';
 
 class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform platform) {
   final controller = WorkbenchController();
+  final files = FakeFileSelector();
+  final share = FakeShare();
 
   Future<void> launch({required Size size}) async {
     platform.reset();
@@ -18,6 +24,8 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     logEvent('Launch the real workbench at $size');
     addTearDown(dispose);
     FlutterBlueMaxPlatform.instance = platform;
+    FileSelectorPlatform.instance = files;
+    SharePlatform.instance = share;
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
     await tester.pumpWidget(WorkbenchApp(controller: controller));

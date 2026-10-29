@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
@@ -7,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/advertisement_robot.dart';
 import '../robot/gatt_catalog_robot.dart';
+import '../robot/parser_files_robot.dart';
 import '../robot/restored_features_robot.dart';
 import '../robot/workbench_robot.dart';
 
@@ -94,6 +97,43 @@ void main() {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.manageGlobalParsers();
+  });
+
+  group('Parser files', () {
+    testWidgets('phone: export chosen parsers through the share sheet', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(390, 844));
+      await robot.exportChosenThroughShareSheet();
+    });
+
+    testWidgets('desktop: export all parsers to a file', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final directory = (await tester.runAsync(() => Directory.systemTemp.createTemp('parsers')))!;
+      addTearDown(() => directory.delete(recursive: true));
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.exportAllToFile(directory);
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('desktop: import adds only parsers that are not present', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.importSkippingPresentParsers();
+    });
+
+    testWidgets('desktop: a file without parsers is rejected', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.rejectFileWithoutParsers();
+    });
+
+    testWidgets('desktop: reset replaces every parser with the bundled ones', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.resetToBundledParsers();
+    });
   });
 
   testWidgets('phone: system back returns to the list without dropping the connection', (tester) async {

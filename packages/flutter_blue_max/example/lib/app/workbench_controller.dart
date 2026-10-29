@@ -619,10 +619,24 @@ class WorkbenchController() extends ChangeNotifier {
     return _persistParsers();
   }
 
-  /// Adds the [examples] that are not already present, e.g. after deleting them.
-  Future<void> addExampleParsers(List<AdvertisementParser> examples) {
+  /// Adds the [parsers] that are not already present, e.g. examples after deleting them or imported ones.
+  /// Returns how many were added.
+  Future<int> addParsers(List<AdvertisementParser> parsers) async {
     final existing = {for (final parser in _parsers) jsonEncode(parser)};
-    _parsers.addAll(examples.where((parser) => !existing.contains(jsonEncode(parser))));
+    final added = [
+      for (final parser in parsers)
+        if (existing.add(jsonEncode(parser))) parser,
+    ];
+    _parsers.addAll(added);
+    await _persistParsers();
+    return added.length;
+  }
+
+  /// Replaces every parser with the bundled ones, which also overwrites stored parsers that no longer load.
+  Future<void> resetParsers() {
+    _parsers
+      ..clear()
+      ..addAll(testDongleParsers);
     return _persistParsers();
   }
 

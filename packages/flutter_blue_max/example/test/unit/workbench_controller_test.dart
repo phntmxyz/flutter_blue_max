@@ -195,9 +195,30 @@ void main() {
     test('restoring the examples adds only missing ones', () async {
       final (:controller, platform: _) = await _setup();
       await controller.removeParser(controller.parsers.first);
-      await controller.addExampleParsers(testDongleParsers);
-      await controller.addExampleParsers(testDongleParsers);
+      await controller.addParsers(testDongleParsers);
+      await controller.addParsers(testDongleParsers);
       expect(controller.parsers, hasLength(testDongleParsers.length));
+    });
+
+    test('adding parsers skips present ones and reports how many were added', () async {
+      final (:controller, platform: _) = await _setup();
+      const own = AdvertisementParser(
+        name: 'Own',
+        source: AdvertisementSource.manufacturer,
+        companyId: 0x1234,
+        fields: [],
+      );
+      expect(await controller.addParsers([testDongleParsers.first, own, own]), 1);
+      expect(controller.parsers.map((parser) => parser.name), [...testDongleParsers.map((p) => p.name), 'Own']);
+    });
+
+    test('a reset repairs unreadable stored parsers', () async {
+      SharedPreferences.setMockInitialValues({parserStoreKey: '[{"name": "Broken"}]'});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.parsers, isEmpty);
+      await controller.resetParsers();
+      expect(jsonEncode(controller.parsers), jsonEncode(testDongleParsers));
+      expect(jsonEncode(await loadParsers()), jsonEncode(testDongleParsers));
     });
 
     test('unreadable stored parsers are reported instead of crashing the app', () async {
