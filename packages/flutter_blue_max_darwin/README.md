@@ -13,7 +13,8 @@ should add it to your `pubspec.yaml` as usual.
 
 ## Swift Package Manager
 
-The plugin supports Swift Package Manager with Flutter 3.44 or newer through the generated `FlutterFramework` dependency.
+The plugin supports Swift Package Manager.
+Where Flutter generates the `FlutterFramework` package (3.41 or newer), the plugin depends on it; older versions provide the engine through the framework search path.
 The [example app](../flutter_blue_max/example/README.md) uses this integration on both iOS and macOS.
 
 For an existing application, follow Flutter's [Swift Package Manager migration guide](https://docs.flutter.dev/packages-and-plugins/swift-package-manager/for-app-developers).

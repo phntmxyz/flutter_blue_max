@@ -1,7 +1,19 @@
 // swift-tools-version: 5.9
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
+import Foundation
 import PackageDescription
+
+// Flutter 3.41 and newer vend the engine as the FlutterFramework package next to the plugin packages and expect
+// plugins to depend on it. Older versions put the engine on the framework search path and have no such package,
+// so depending on it there would fail the package resolution.
+let flutterFramework = URL(fileURLWithPath: #filePath)
+    .deletingLastPathComponent()
+    .deletingLastPathComponent()
+    .appendingPathComponent("FlutterFramework")
+let hasFlutterFramework = FileManager.default.fileExists(
+    atPath: flutterFramework.appendingPathComponent("Package.swift").path
+)
 
 let package = Package(
     name: "flutter_blue_max_darwin",
@@ -12,11 +24,11 @@ let package = Package(
     products: [
         .library(name: "flutter-blue-max-darwin", targets: ["flutter_blue_max_darwin"])
     ],
-    dependencies: [.package(name: "FlutterFramework", path: "../FlutterFramework")],
+    dependencies: hasFlutterFramework ? [.package(name: "FlutterFramework", path: "../FlutterFramework")] : [],
     targets: [
         .target(
             name: "flutter_blue_max_darwin",
-            dependencies: [.product(name: "FlutterFramework", package: "FlutterFramework")],
+            dependencies: hasFlutterFramework ? [.product(name: "FlutterFramework", package: "FlutterFramework")] : [],
             cSettings: [
                 .headerSearchPath("include/flutter_blue_max_darwin")
             ],
