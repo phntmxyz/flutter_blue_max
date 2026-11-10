@@ -7,12 +7,13 @@ import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  const ruuviId = 0x0499;
-  const ruuvi = AdvertisementParser(
-    name: 'Ruuvi',
+  // Reserved by the Bluetooth SIG for testing.
+  const testCompany = 0xffff;
+  const climate = AdvertisementParser(
+    name: 'Climate',
     source: AdvertisementSource.manufacturer,
-    companyId: ruuviId,
-    match: [0x05],
+    companyId: testCompany,
+    match: [0x10],
     fields: [
       AdvertisementField('Temperature', 1, AdvertisementFieldType.int16be, scale: 0.005, unit: '°C'),
       AdvertisementField('Humidity', 3, AdvertisementFieldType.uint16be, scale: 0.0025, unit: '%'),
@@ -70,26 +71,26 @@ void main() {
   });
 
   test('a short payload is reported per field instead of failing the parser', () {
-    expect(ruuvi.read(companyId: ruuviId, bytes: [0x05, 0x12, 0xfc]), [
-      'Ruuvi · Temperature: 24.300 °C',
-      'Ruuvi · Humidity: too short (3 B)',
+    expect(climate.read(companyId: testCompany, bytes: [0x10, 0x0f, 0xa0]), [
+      'Climate · Temperature: 20.000 °C',
+      'Climate · Humidity: too short (3 B)',
     ]);
   });
 
   test('parsers only read payloads of their source and pattern', () {
-    expect(ruuvi.read(companyId: 0x004c, bytes: [0x05, 0x12, 0xfc]), isEmpty, reason: 'Other company');
+    expect(climate.read(companyId: 0xfffe, bytes: [0x10, 0x0f, 0xa0]), isEmpty, reason: 'Other company');
     expect(
-      ruuvi.read(companyId: ruuviId, bytes: [0x03, 0x12, 0xfc]),
+      climate.read(companyId: testCompany, bytes: [0x11, 0x0f, 0xa0]),
       isEmpty,
       reason: 'Other frame type',
     );
     expect(
-      ruuvi.read(serviceUuid: Guid('fff0'), bytes: [0x05, 0x12, 0xfc]),
+      climate.read(serviceUuid: Guid('fff0'), bytes: [0x10, 0x0f, 0xa0]),
       isEmpty,
       reason: 'Other source',
     );
     expect(
-      ruuvi.read(companyId: ruuviId, bytes: []),
+      climate.read(companyId: testCompany, bytes: []),
       isEmpty,
       reason: 'Pattern beyond the payload',
     );
@@ -113,13 +114,13 @@ void main() {
     const bound = AdvertisementParser(
       name: 'Bound',
       source: AdvertisementSource.manufacturer,
-      companyId: ruuviId,
+      companyId: testCompany,
       device: device,
       fields: [],
     );
     expect(bound.appliesTo(device), isTrue);
     expect(bound.appliesTo(const DeviceIdentifier('AA:BB:CC:DD:EE:02')), isFalse);
-    expect(ruuvi.appliesTo(device), isTrue);
+    expect(climate.appliesTo(device), isTrue);
   });
 
   test('parsed values follow the payload they were read from', () {
@@ -129,21 +130,21 @@ void main() {
       appearance: null,
       connectable: false,
       manufacturerData: {
-        ruuviId: [0x05, 0x12, 0xfc, 0x53, 0x94],
+        testCompany: [0x10, 0x0f, 0xa0, 0x4e, 0x20],
       },
       serviceData: {
         Guid('fff0'): [0x01],
       },
       serviceUuids: [],
     );
-    expect(describeAdvertisement(data, parsers: [ruuvi]), [
+    expect(describeAdvertisement(data, parsers: [climate]), [
       'Name: Sensor',
-      'Manufacturer 0x499: 05 12 FC 53 94',
-      '  ↳ Ruuvi · Temperature: 24.300 °C',
-      '  ↳ Ruuvi · Humidity: 53.490 %',
+      'Manufacturer 0xffff: 10 0F A0 4E 20',
+      '  ↳ Climate · Temperature: 20.000 °C',
+      '  ↳ Climate · Humidity: 50.000 %',
       'Service data fff0: 01',
     ]);
-    expect(parsedValues(data, [ruuvi]), ['Ruuvi · Temperature: 24.300 °C', 'Ruuvi · Humidity: 53.490 %']);
+    expect(parsedValues(data, [climate]), ['Climate · Temperature: 20.000 °C', 'Climate · Humidity: 50.000 %']);
   });
 
   test('uint24 reads three bytes in either byte order', () {
@@ -211,8 +212,8 @@ void main() {
   });
 
   group('Bit ranges', () {
-    // Ruuvi RAWv2 power info: 11 bits battery voltage above 1600 mV, 5 bits TX power in 2 dB steps above -40 dBm.
-    const power = [0xac, 0x36];
+    // A packed power word: 11 bits battery voltage above 1600 mV, 5 bits TX power in 2 dB steps above -40 dBm.
+    const power = [0xaf, 0x17];
 
     test('read packed values from the least significant bit', () {
       const voltage = AdvertisementField(
@@ -233,8 +234,8 @@ void main() {
         unit: 'dBm',
         bits: 5,
       );
-      expect(voltage.format(power), '2977 mV');
-      expect(txPower.format(power), '4 dBm');
+      expect(voltage.format(power), '3000 mV');
+      expect(txPower.format(power), '6 dBm');
       expect(const AdvertisementField('Flag', 0, AdvertisementFieldType.uint8, bit: 2, bits: 1).format([0x04]), '1');
       expect(voltage.summary(null), 'Voltage: uint16 BE · bits 5–15');
       expect(
@@ -270,7 +271,7 @@ void main() {
   });
 
   test('parsers survive a JSON round trip unchanged', () {
-    final parsers = [ruuvi, sensor, bthome, ...testDongleParsers];
+    final parsers = [climate, sensor, bthome, ...testDongleParsers];
     final restored = [
       for (final json in jsonDecode(jsonEncode(parsers)) as List)
         AdvertisementParser.fromJson(json as Map<String, dynamic>),
@@ -313,7 +314,7 @@ void main() {
 
     test('other frame types and companies are ignored', () {
       expect(read([0x03, 0x00]), isEmpty);
-      expect(testDongleParsers.first.read(companyId: 0x004c, bytes: [0x01, 0, 0, 0, 0, 0, 0]), isEmpty);
+      expect(testDongleParsers.first.read(companyId: 0xfffe, bytes: [0x01, 0, 0, 0, 0, 0, 0]), isEmpty);
     });
   });
 }

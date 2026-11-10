@@ -149,18 +149,18 @@ void main() {
       for (final parser in controller.parsers.skip(1).toList()) {
         await controller.removeParser(parser);
       }
-      const ruuvi = AdvertisementParser(
-        name: 'Ruuvi',
+      const climate = AdvertisementParser(
+        name: 'Climate',
         source: AdvertisementSource.manufacturer,
-        companyId: 0x0499,
+        companyId: 0xffff,
         device: DeviceIdentifier('AA:BB:CC:DD:EE:01'),
         fields: [AdvertisementField('Temperature', 1, AdvertisementFieldType.int16be, scale: 0.005, unit: '°C')],
       );
-      await controller.saveParser(ruuvi, previous: controller.parsers.first);
+      await controller.saveParser(climate, previous: controller.parsers.first);
 
       final restarted = await _setup(resetStorage: false);
       final restored = restarted.controller.parsers.single;
-      expect(jsonEncode(restored), jsonEncode(ruuvi));
+      expect(jsonEncode(restored), jsonEncode(climate));
       expect(restored.appliesTo(const DeviceIdentifier('AA:BB:CC:DD:EE:02')), isFalse);
 
       await restarted.controller.removeParser(restored);
