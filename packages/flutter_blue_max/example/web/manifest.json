@@ -1,11 +1,11 @@
 {
-    "name": "flutter_blue_max_example",
-    "short_name": "flutter_blue_max_example",
+    "name": "Blue Max",
+    "short_name": "Blue Max",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",
     "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "description": "Explore Bluetooth GATT services with Blue Max.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

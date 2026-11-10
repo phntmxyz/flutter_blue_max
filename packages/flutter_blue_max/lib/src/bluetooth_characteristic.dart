@@ -228,7 +228,7 @@ class BluetoothCharacteristic {
         throw FlutterBlueMaxException(_nativeError, "writeCharacteristic", response.errorCode, response.errorString);
       }
 
-      return Future.value();
+      return await Future.value();
     } finally {
       mtx.give();
     }
@@ -279,8 +279,7 @@ class BluetoothCharacteristic {
       Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      bool hasCCCD =
-          await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
+      bool hasCCCD = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
 
       // wait for CCCD descriptor to be written?
       if (hasCCCD) {

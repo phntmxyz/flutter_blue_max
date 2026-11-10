@@ -4,14 +4,15 @@ version '1.0'
 apply plugin: 'com.android.library'
 
 android {
-    compileSdkVersion = 34 // todo fix why flutter.compileSdkVersion is not working
+    namespace = 'com.lib.flutter_blue_max'
+    compileSdkVersion = 34
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_11
         targetCompatibility JavaVersion.VERSION_11
     }
 
-    lintOptions {
+    lint {
         abortOnError false
     }
 
@@ -30,10 +31,6 @@ android {
         }
     }
 
-    // Conditional for compatibility with AGP <4.2.
-    if (project.android.hasProperty("namespace")) {
-        namespace 'com.lib.flutter_blue_max'
-    }
 }
 
 dependencies {
