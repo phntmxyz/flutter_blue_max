@@ -6,7 +6,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_selection_dialog.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
 
@@ -26,10 +25,10 @@ extension ParserFilesRobot on WorkbenchRobot {
     await tapLabel('Library');
     await tapLabel('Export');
     logEvent('Deselect all parsers, then choose one');
-    await _tapInDialog('All parsers');
+    await tapInDialog('All parsers');
     spotText('Export 0 parsers', exact: true).existsOnce();
-    await _tapInDialog('FBM sensor');
-    await _tapInDialog('Export 1 parser');
+    await tapInDialog('FBM sensor');
+    await tapInDialog('Export 1 parser');
     logEvent('Verify that the share sheet received a file with only the chosen parser');
     final params = share.shared.single;
     expect(params.fileNameOverrides, [parserFileName]);
@@ -43,7 +42,7 @@ extension ParserFilesRobot on WorkbenchRobot {
     files.savePath = path;
     await tapLabel('Library');
     await tapLabel('Export');
-    await _tapInDialog('Export ${testDongleParsers.length} parsers');
+    await tapInDialog('Export ${testDongleParsers.length} parsers');
     logEvent('Wait until the file is written to where the save dialog chose');
     final exported = find.text('Exported ${testDongleParsers.length} parsers');
     for (var attempt = 0; attempt < 50 && exported.evaluate().isEmpty; attempt++) {
@@ -60,7 +59,7 @@ extension ParserFilesRobot on WorkbenchRobot {
     files.openContent = encodeParserFile([_ownParser, testDongleParsers.first]);
     await tapLabel('Library');
     await tapLabel('Import');
-    await _tapInDialog('Import 2 parsers');
+    await tapInDialog('Import 2 parsers');
     spotText('Imported 1 parser, 1 was already present', exact: true).existsOnce();
     expect(controller.parsers.map((parser) => parser.name), [...testDongleParsers.map((p) => p.name), 'Own sensor']);
     spotText('Own sensor', exact: true).existsOnce();
@@ -71,7 +70,7 @@ extension ParserFilesRobot on WorkbenchRobot {
     files.openContent = '{"services": []}';
     await tapLabel('Library');
     await tapLabel('Import');
-    spot<ParserSelectionDialog>().doesNotExist();
+    spot<Dialog>().doesNotExist();
     spotText('Import failed: The file holds no parsers.', exact: true).existsOnce();
     expect(controller.parsers, hasLength(testDongleParsers.length));
   }
@@ -80,21 +79,14 @@ extension ParserFilesRobot on WorkbenchRobot {
     files.openContent = encodeParserFile([_ownParser]);
     await tapLabel('Library');
     await tapLabel('Import');
-    await _tapInDialog('Import 1 parser');
+    await tapInDialog('Import 1 parser');
     await tapLabel('Reset parsers');
     logEvent('Cancelling keeps the own parser');
-    await _tapInDialog('Cancel');
+    await tapInDialog('Cancel');
     expect(controller.parsers, hasLength(testDongleParsers.length + 1));
     await tapLabel('Reset parsers');
-    await _tapInDialog('Reset');
+    await tapInDialog('Reset');
     expect(jsonEncode(controller.parsers), jsonEncode(testDongleParsers));
     spotText('Own sensor', exact: true).doesNotExist();
-  }
-
-  Future<void> _tapInDialog(String label) async {
-    logEvent('Tap "$label" in the dialog');
-    final target = spot<Dialog>().spotText(label, exact: true)..existsOnce();
-    await act.tap(target);
-    await idle();
   }
 }

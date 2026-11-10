@@ -62,6 +62,8 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
 - **Library → GATT catalog:** lists the built-in entries and your own services, saved locally like the parsers.
   **Add to catalog** on an unknown service in the GATT explorer starts an entry from its characteristics, User Descriptions and current properties; built-in entries can be copied and changed.
   Your entries replace built-in ones with the same UUID; checked services report missing characteristics and other properties than expected.
+  **Import** and **Export** move all or chosen own services as a JSON file, like the parsers; an imported service replaces your entry with the same UUID, which the import dialog points out.
+  **Reset catalog** removes your own services and keeps the built-in ones.
 - **L2CAP:** on supported platforms, connect to a peer, open its **L2CAP** tab and enter the remote server's PSM.
   **Local server** accepts incoming channels and displays its assigned PSM.
   Peer discovery and PSM exchange must be provided separately; starting this server does not advertise a GATT peripheral.

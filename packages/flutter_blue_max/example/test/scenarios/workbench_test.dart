@@ -8,6 +8,7 @@ import 'package:flutter_test/flutter_test.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/advertisement_robot.dart';
+import '../robot/catalog_files_robot.dart';
 import '../robot/gatt_catalog_robot.dart';
 import '../robot/parser_files_robot.dart';
 import '../robot/restored_features_robot.dart';
@@ -133,6 +134,32 @@ void main() {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.resetToBundledParsers();
+    });
+  });
+
+  group('Catalog files', () {
+    testWidgets('desktop: import replaces own entries with the same UUID and skips identical ones', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.importReplacingOwnEntries();
+    });
+
+    testWidgets('phone: export chosen own services through the share sheet', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(390, 844));
+      await robot.exportChosenServicesThroughShareSheet();
+    });
+
+    testWidgets('desktop: a parser file is rejected as catalog', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.rejectParserFileAsCatalog();
+    });
+
+    testWidgets('desktop: reset removes own services and keeps the built-in ones', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.resetOwnServices();
     });
   });
 

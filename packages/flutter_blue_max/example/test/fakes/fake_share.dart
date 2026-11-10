@@ -4,6 +4,8 @@ import 'package:share_plus_platform_interface/share_plus_platform_interface.dart
 final class FakeShare() extends SharePlatform {
   final shared = <ShareParams>[];
 
+  void reset() => shared.clear();
+
   @override
   Future<ShareResult> share(ShareParams params) async {
     shared.add(params);

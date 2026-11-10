@@ -192,6 +192,24 @@ void main() {
       expect(controller.error, startsWith('Loading GATT catalog'));
     });
 
+    test('adding catalog services replaces own entries with the same UUID and skips identical ones', () async {
+      final (:controller, platform: _) = await _setup();
+      final thermostat = KnownService(Guid('fff0'), 'Thermostat', [KnownCharacteristic(Guid('fff1'), 'Level')]);
+      final renamed = KnownService(Guid('fff0'), 'Room thermostat', thermostat.characteristics);
+      final lamp = KnownService(Guid('ffe0'), 'Lamp', []);
+      expect(await controller.addCatalogServices([thermostat]), (added: 1, replaced: 0, present: 0));
+      expect(await controller.addCatalogServices([renamed, lamp, lamp]), (added: 1, replaced: 1, present: 1));
+      expect(controller.catalog.map((service) => service.name), ['Room thermostat', 'Lamp']);
+    });
+
+    test('a catalog reset repairs an unreadable stored catalog', () async {
+      SharedPreferences.setMockInitialValues({catalogStoreKey: '[{"name": "Broken"}]'});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.error, startsWith('Loading GATT catalog'));
+      await controller.resetCatalog();
+      expect(await loadCatalog(), isEmpty);
+    });
+
     test('restoring the examples adds only missing ones', () async {
       final (:controller, platform: _) = await _setup();
       await controller.removeParser(controller.parsers.first);

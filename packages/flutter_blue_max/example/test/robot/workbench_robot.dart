@@ -13,10 +13,13 @@ import '../fakes/fake_bluetooth_platform.dart';
 import '../fakes/fake_file_selector.dart';
 import '../fakes/fake_share.dart';
 
+/// One fake for all tests: `SharePlus.instance` keeps the platform it saw first.
+final _share = FakeShare();
+
 class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform platform) {
   final controller = WorkbenchController();
   final files = FakeFileSelector();
-  final share = FakeShare();
+  FakeShare get share => _share;
 
   Future<void> launch({required Size size}) async {
     platform.reset();
@@ -25,7 +28,8 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     addTearDown(dispose);
     FlutterBlueMaxPlatform.instance = platform;
     FileSelectorPlatform.instance = files;
-    SharePlatform.instance = share;
+    _share.reset();
+    SharePlatform.instance = _share;
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
     await tester.pumpWidget(WorkbenchApp(controller: controller));
@@ -291,6 +295,13 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     logEvent('Verify that the local server only shows incoming channels');
     spotText('Outgoing · PSM 131', exact: true).doesNotExist();
     spotText('Remote PSM', exact: true).doesNotExist();
+  }
+
+  Future<void> tapInDialog(String label) async {
+    logEvent('Tap "$label" in the dialog');
+    final target = spot<Dialog>().spotText(label, exact: true)..existsOnce();
+    await act.tap(target);
+    await idle();
   }
 
   Future<void> tapLabel(String label) async {

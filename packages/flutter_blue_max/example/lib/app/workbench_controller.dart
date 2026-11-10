@@ -656,6 +656,39 @@ class WorkbenchController() extends ChangeNotifier {
     return _persistCatalog();
   }
 
+  /// The own service that adding [service] would replace: one with the same UUID that differs from it.
+  KnownService? catalogServiceReplacedBy(KnownService service) {
+    final own = _catalog.where((own) => own.uuid == service.uuid).firstOrNull;
+    return own == null || jsonEncode(own) == jsonEncode(service) ? null : own;
+  }
+
+  /// Adds [services], replacing own entries with the same UUID and skipping identical ones.
+  Future<({int added, int replaced, int present})> addCatalogServices(List<KnownService> services) async {
+    var added = 0;
+    var replaced = 0;
+    var present = 0;
+    for (final service in services) {
+      final previous = catalogServiceReplacedBy(service);
+      if (previous != null) {
+        _catalog[_catalog.indexOf(previous)] = service;
+        replaced++;
+      } else if (_catalog.any((own) => own.uuid == service.uuid)) {
+        present++;
+      } else {
+        _catalog.add(service);
+        added++;
+      }
+    }
+    await _persistCatalog();
+    return (added: added, replaced: replaced, present: present);
+  }
+
+  /// Removes every own service, which also overwrites a stored catalog that no longer loads.
+  Future<void> resetCatalog() {
+    _catalog.clear();
+    return _persistCatalog();
+  }
+
   Future<void> _persistParsers() {
     final snapshot = List.of(_parsers);
     return _persist('parsers', () => saveParsers(snapshot));
