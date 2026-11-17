@@ -50,7 +50,11 @@ class _DevicesPanelState() extends State<DevicesPanel> {
         return PopScope(
           canPop: !_showDetails || !widget.active,
           onPopInvokedWithResult: (didPop, _) {
-            if (!didPop && widget.active) {
+            if (didPop) {
+              return;
+            }
+            // Hidden destinations receive this callback when another panel blocks the pop.
+            if (widget.active) {
               setState(() => _showDetails = false);
             }
           },
