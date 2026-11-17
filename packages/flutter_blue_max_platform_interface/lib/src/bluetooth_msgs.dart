@@ -501,7 +501,8 @@ class BmCharacteristicData {
       characteristicUuid: Guid(json['characteristic_uuid']),
       primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
       instanceId: json['instance_id'],
-      value: json['value'] as Uint8List,
+      // iOS & macOS send null as the value of a failed read
+      value: (json['value'] as Uint8List?) ?? Uint8List(0),
       success: json['success'] != 0,
       errorCode: json['error_code'],
       errorString: json['error_string'],
