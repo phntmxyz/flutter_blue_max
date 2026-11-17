@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_editor.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
@@ -114,9 +116,15 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     final List<KnownService>? services;
     try {
       services = await openCatalogFile();
-    } on Exception catch (exception) {
+    } on Exception catch (exception, stackTrace) {
+      if (exception is! FormatException) {
+        developer.log('Import catalog services failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      }
       if (context.mounted) {
-        tell(context, 'Import failed: ${exception is FormatException ? exception.toString() : exception}');
+        tell(
+          context,
+          'Import failed: ${exception is FormatException ? exception.toString().replaceFirst('FormatException: ', '') : exception}',
+        );
       }
       return;
     }
@@ -157,7 +165,8 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
       if (await saveCatalogFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size) && button.mounted) {
         tell(button, 'Exported ${counted(chosen.length, serviceNoun)}');
       }
-    } on Exception catch (exception) {
+    } on Exception catch (exception, stackTrace) {
+      developer.log('Export catalog services failed', name: 'workbench', error: exception, stackTrace: stackTrace);
       if (button.mounted) {
         tell(button, 'Export failed: $exception');
       }

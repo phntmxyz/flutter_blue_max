@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor.dart';
@@ -99,9 +101,15 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
     final List<AdvertisementParser>? parsers;
     try {
       parsers = await openParserFile();
-    } on Exception catch (exception) {
+    } on Exception catch (exception, stackTrace) {
+      if (exception is! FormatException) {
+        developer.log('Import parsers failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      }
       if (context.mounted) {
-        tell(context, 'Import failed: ${exception is FormatException ? exception.toString() : exception}');
+        tell(
+          context,
+          'Import failed: ${exception is FormatException ? exception.toString().replaceFirst('FormatException: ', '') : exception}',
+        );
       }
       return;
     }
@@ -144,7 +152,8 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
       if (await saveParserFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size) && button.mounted) {
         tell(button, 'Exported ${counted(chosen.length, parserNoun)}');
       }
-    } on Exception catch (exception) {
+    } on Exception catch (exception, stackTrace) {
+      developer.log('Export parsers failed', name: 'workbench', error: exception, stackTrace: stackTrace);
       if (button.mounted) {
         tell(button, 'Export failed: $exception');
       }
