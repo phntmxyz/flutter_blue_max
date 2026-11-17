@@ -9,6 +9,7 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:provider/provider.dart';
 
+/// Characteristic row inside `GattService`.
 /// Inspects the actual characteristic instance and its descriptors.
 class const GattCharacteristic({super.key, required final BluetoothCharacteristic characteristic})
     extends StatefulWidget {

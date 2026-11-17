@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:provider/provider.dart';
 
+/// One service in the GATT explorer of `DevicesPanel`.
 /// A discovered service, named and checked against the GATT catalog when it is known.
 class const GattService({super.key, required final BluetoothService service}) extends StatelessWidget {
   @override

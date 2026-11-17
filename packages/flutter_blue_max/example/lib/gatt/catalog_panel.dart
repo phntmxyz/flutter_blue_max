@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 
 const _characteristicNoun = ('characteristic', 'characteristics');
 
+/// GATT catalog section of `LibraryPanel`.
 /// Lists the user's own GATT catalog services and the built-in ones they can extend or replace.
 class const CatalogPanel({super.key}) extends StatelessWidget {
   @override

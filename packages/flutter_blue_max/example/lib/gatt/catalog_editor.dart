@@ -4,6 +4,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:provider/provider.dart';
 
+/// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
 /// Edits one of the user's own GATT catalog services. Pops with the service, or with nothing when cancelled.
 class const CatalogEditorPage({
   super.key,
