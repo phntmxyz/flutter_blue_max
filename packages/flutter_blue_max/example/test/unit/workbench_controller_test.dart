@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
@@ -477,6 +478,25 @@ void main() {
     expect(controller.channels, isEmpty);
     expect(controller.busy('server'), isFalse);
     expect(controller.logs.last, contains('UnimplementedError'));
+  });
+
+  test('an unsupported error outside a plugin call is reported with its message', () async {
+    final (:controller, platform: _) = await _setup();
+
+    await controller.run('probe', () async => controller.catalog.clear());
+
+    expect(controller.error, startsWith('probe: Unsupported operation'));
+  });
+
+  test('the server reports unsupported on a platform without L2CAP', () async {
+    final (:controller, :platform) = await _setup();
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+    await controller.startServer(secure: true);
+
+    expect(controller.error, 'This operation is not supported on this device.');
+    expect(platform.listenRequests, isEmpty);
   });
 
   for (final failure in [

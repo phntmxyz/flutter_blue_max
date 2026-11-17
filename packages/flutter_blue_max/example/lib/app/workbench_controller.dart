@@ -471,7 +471,7 @@ class WorkbenchController({
 
   Future<void> startServer({required bool secure}) => run('server', () async {
     if (!supportsL2cap) {
-      throw UnsupportedError('L2CAP is not available on this platform.');
+      throw const _Unsupported('L2CAP is not available on this platform.');
     }
     if (serverPsm != null) {
       return;
@@ -479,7 +479,7 @@ class WorkbenchController({
     _startingServer = true;
     final int psm;
     try {
-      psm = await FlutterBlueMax.listenL2capChannel(secure: secure);
+      psm = await FlutterBlueMax.listenL2capChannel(secure: secure).orUnsupported();
     } finally {
       _startingServer = false;
     }
@@ -512,7 +512,7 @@ class WorkbenchController({
   /// Binds an outgoing channel to the inspected peer, never to later device selection.
   Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) => run('open', () async {
     if (!supportsL2cap) {
-      throw UnsupportedError('L2CAP is not available on this platform.');
+      throw const _Unsupported('L2CAP is not available on this platform.');
     }
     final key = (device.remoteId, psm);
     if (_channels[key]?.closed == false) {
@@ -521,7 +521,7 @@ class WorkbenchController({
     final disconnects = _disconnectRequests[device.remoteId] ?? 0;
     final channel = await () async {
       try {
-        return await device.openL2CapChannel(psm, secure: secure);
+        return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
       } catch (error, stackTrace) {
         // A secure handshake can drop the link transiently; a disconnect the
         // user requested meanwhile must not be undone by the retry.
@@ -534,7 +534,7 @@ class WorkbenchController({
         if (!device.isConnected) {
           await device.connect(mtu: null);
         }
-        return await device.openL2CapChannel(psm, secure: secure);
+        return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
       }
     }();
     if (_disposed || !device.isConnected) {
@@ -828,10 +828,24 @@ class WorkbenchController({
   }
 }
 
+/// A capability the platform lacks, as opposed to a failure of the operation.
+class const _Unsupported(final Object cause) implements Exception {
+  @override
+  String toString() => '$cause';
+}
+
+extension<T> on Future<T> {
+  /// The platform interface throws [UnimplementedError], an [UnsupportedError], for features a platform lacks.
+  /// Elsewhere in an action these errors are bugs, so only plugin calls are marked.
+  Future<T> orUnsupported() {
+    return onError<UnsupportedError>((error, stackTrace) => Error.throwWithStackTrace(_Unsupported(error), stackTrace));
+  }
+}
+
 // Match typed failures and the native Android capability error, not arbitrary
 // error text: permission and connection failures must remain retryable.
 bool _isUnsupported(Object exception) {
-  if (exception is UnsupportedError || exception is UnimplementedError) {
+  if (exception is _Unsupported) {
     return true;
   }
   if (exception is PlatformException) {
