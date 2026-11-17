@@ -548,7 +548,13 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       controller: draft.scale,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                       decoration: const InputDecoration(labelText: 'Scale'),
-                      validator: (value) => double.tryParse(value?.trim() ?? '') == null ? 'Enter a number.' : null,
+                      validator: (value) {
+                        final scale = double.tryParse(value?.trim() ?? '');
+                        if (scale == null || !scale.isFinite || scale == 0) {
+                          return 'Enter a non-zero number.';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                   SizedBox(
@@ -557,7 +563,13 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       controller: draft.add,
                       keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
                       decoration: const InputDecoration(labelText: 'Add'),
-                      validator: (value) => double.tryParse(value?.trim() ?? '') == null ? 'Enter a number.' : null,
+                      validator: (value) {
+                        final add = double.tryParse(value?.trim() ?? '');
+                        if (add == null || !add.isFinite) {
+                          return 'Enter a number.';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                   SizedBox(

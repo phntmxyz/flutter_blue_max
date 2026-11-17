@@ -162,8 +162,9 @@ class const AdvertisementField(
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a field.
   factory fromJson(Map<String, dynamic> json) {
+    final AdvertisementField field;
     try {
-      return AdvertisementField(
+      field = AdvertisementField(
         json['name'] as String,
         json['offset'] as int,
         AdvertisementFieldType.values.byName(json['type'] as String),
@@ -178,6 +179,13 @@ class const AdvertisementField(
     } on Object catch (error) {
       throw FormatException('Invalid parser field: $error');
     }
+    if (field.scale == 0 || !field.scale.isFinite) {
+      throw FormatException('Invalid parser field ${field.name}: scale ${field.scale}');
+    }
+    if (!field.add.isFinite) {
+      throw FormatException('Invalid parser field ${field.name}: add ${field.add}');
+    }
+    return field;
   }
 
   Map<String, dynamic> toJson() => {
@@ -245,7 +253,7 @@ class const AdvertisementField(
       value = raw;
     }
     final scaled = value * scale + add;
-    final text = value is int && scale == scale.roundToDouble() && add == add.roundToDouble()
+    final text = value is int && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()
         ? '${scaled.round()}'
         : scaled.toStringAsFixed(_decimals);
     return unit.isEmpty ? text : '$text $unit';
@@ -254,7 +262,8 @@ class const AdvertisementField(
   /// Enough decimals to show one step of the scale: 0.1 → 1, 0.005 and 1/256 → 3.
   /// Unscaled floats keep two.
   int get _decimals {
-    if (scale == 1) {
+    // A zero or non-finite scale has no step to show; validation rejects it, but a preview may still see it.
+    if (scale == 1 || scale == 0 || !scale.isFinite) {
       return 2;
     }
     // The epsilon absorbs rounding, e.g. -log10(0.001) = 2.9999999999999996.

@@ -270,6 +270,20 @@ void main() {
     );
   });
 
+  test('a zero or non-finite scale never breaks formatting and is rejected when decoded', () {
+    for (final scale in [0.0, double.nan, double.infinity]) {
+      expect(AdvertisementField('Value', 0, AdvertisementFieldType.uint8, scale: scale).format([4]), isA<String>());
+      expect(
+        AdvertisementField('Value', 0, AdvertisementFieldType.float32le, scale: scale).format([0, 0, 0, 0]),
+        isA<String>(),
+      );
+    }
+    final json = const AdvertisementField('Value', 0, AdvertisementFieldType.uint8).toJson();
+    expect(() => AdvertisementField.fromJson({...json, 'scale': 0}), throwsFormatException);
+    expect(() => AdvertisementField.fromJson({...json, 'scale': double.infinity}), throwsFormatException);
+    expect(() => AdvertisementField.fromJson({...json, 'add': double.nan}), throwsFormatException);
+  });
+
   test('parsers survive a JSON round trip unchanged', () {
     final parsers = [climate, sensor, bthome, ...testDongleParsers];
     final restored = [
