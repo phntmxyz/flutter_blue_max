@@ -401,7 +401,9 @@ class const AdvertisementField(
       if (bit < 0 || bits < 1 || bit + bits > size * 8) {
         return 'bits beyond ${size * 8}-bit value';
       }
-      value = raw.toInt() >> bit & (1 << bits) - 1;
+      final shifted = raw.toInt() >> bit;
+      final mask = (1 << bits) - 1;
+      value = shifted & mask;
     } else {
       value = raw;
     }

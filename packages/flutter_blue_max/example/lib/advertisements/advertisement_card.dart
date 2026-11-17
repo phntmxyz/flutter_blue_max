@@ -36,13 +36,13 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
     final parsers = c.parsersFor(device.remoteId);
     final tracker = c.advertisementTracker?.remoteId == device.remoteId ? c.advertisementTracker : null;
     // Global parsers for other payloads stay in the Library tab instead of crowding every device.
-    final relevant = [
-      for (final parser in parsers)
-        if (parser.device != null ||
-            (advertisement != null && parser.readsFrom(advertisement.advertisementData)) ||
-            (tracker?.history.any((entry) => parser.readsFrom(entry.data)) ?? false))
-          parser,
-    ];
+    bool isRelevant(AdvertisementParser parser) {
+      final boundToDevice = parser.device != null;
+      final readsLatest = advertisement != null && parser.readsFrom(advertisement.advertisementData);
+      final readsTracked = tracker?.history.any((entry) => parser.readsFrom(entry.data)) ?? false;
+      return boundToDevice || readsLatest || readsTracked;
+    }
+    final relevant = parsers.where(isRelevant).toList();
     final tracking = tracker != null && c.tracking;
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
     return Card(
