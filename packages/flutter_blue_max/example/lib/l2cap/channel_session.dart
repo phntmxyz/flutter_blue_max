@@ -3,23 +3,60 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 /// UI state for one L2CAP channel, retained by the workbench controller.
 /// Reopening the same remote peer and PSM reuses this session, so byte totals
 /// and [history] accumulate across reconnects until the workbench is disposed.
-class ChannelSession(var BluetoothL2capChannel channel, {required var bool incoming}) {
-  /// Retained after closure so the UI can still inspect receipts and totals.
-  bool closed = false;
-  /// Bytes whose writes completed successfully across all openings.
-  int transmitted = 0;
-  /// Streamed bytes only; buffer snapshots may repeat them and do not count twice.
-  int received = 0;
-  List<int> lastReceived = [];
-  final history = <ChannelReceipt>[];
+class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
+  BluetoothL2capChannel _channel = channel;
+  bool _incoming = incoming;
+  bool _closed = false;
+  int _transmitted = 0;
+  int _received = 0;
+  List<int> _lastReceived = [];
+  final _history = <ChannelReceipt>[];
   static const maxHistoryEntries = 200;
 
-  /// Keep bounded per-channel history; buffer reads may repeat streamed data.
-  void recordReceived(List<int> bytes, {required ReceiveSource source}) {
-    lastReceived = List.of(bytes);
-    history.insert(0, ChannelReceipt(time: DateTime.now(), source: source, bytes: List.of(bytes)));
-    if (history.length > maxHistoryEntries) {
-      history.removeLast();
+  BluetoothL2capChannel get channel => _channel;
+  bool get incoming => _incoming;
+
+  /// Retained after closure so the UI can still inspect receipts and totals.
+  bool get closed => _closed;
+
+  /// Bytes whose writes completed successfully across all openings.
+  int get transmitted => _transmitted;
+
+  /// Streamed bytes only; buffer snapshots may repeat them and do not count twice.
+  int get received => _received;
+  List<int> get lastReceived => List.unmodifiable(_lastReceived);
+  List<ChannelReceipt> get history => List.unmodifiable(_history);
+
+  void markClosed() => _closed = true;
+
+  /// Replaces the native handle without losing diagnostics from earlier openings.
+  void reopen(BluetoothL2capChannel channel, {required bool incoming}) {
+    _channel = channel;
+    _incoming = incoming;
+    _closed = false;
+  }
+
+  /// Called only after the native write completes successfully.
+  void onTransmitted(List<int> bytes) => _transmitted += bytes.length;
+
+  void onStreamed(List<int> bytes) {
+    _received += bytes.length;
+    _record(bytes, source: ReceiveSource.stream);
+  }
+
+  /// Empty buffer reads leave the most recent payload and history intact.
+  void onBufferRead(List<int> bytes) {
+    if (bytes.isEmpty) {
+      return;
+    }
+    _record(bytes, source: ReceiveSource.bufferRead);
+  }
+
+  void _record(List<int> bytes, {required ReceiveSource source}) {
+    _lastReceived = List.of(bytes);
+    _history.insert(0, ChannelReceipt(time: DateTime.now(), source: source, bytes: List.unmodifiable(bytes)));
+    if (_history.length > maxHistoryEntries) {
+      _history.removeLast();
     }
   }
 

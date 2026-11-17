@@ -248,8 +248,7 @@ class WorkbenchController({
         if (session == null || session.closed) {
           return;
         }
-        session.received += event.value.length;
-        session.recordReceived(event.value, source: ReceiveSource.stream);
+        session.onStreamed(event.value);
         log(
           'RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · '
           '${PayloadCodec.hex(event.value.take(64).toList())}',
@@ -258,7 +257,7 @@ class WorkbenchController({
     );
     _subscriptions.add(
       FlutterBlueMax.onL2capClosed.listen((event) {
-        _channels[(event.remoteId, event.psm)]?.closed = true;
+        _channels[(event.remoteId, event.psm)]?.markClosed();
         log('L2CAP closed ${event.remoteId} / PSM ${event.psm}');
       }),
     );
@@ -278,7 +277,7 @@ class WorkbenchController({
         }
         if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
           for (final session in _channels.values) {
-            session.closed = true;
+            session.markClosed();
           }
           _services.clear();
           serverPsm = null;
@@ -560,7 +559,7 @@ class WorkbenchController({
     await Future.wait(
       accepted.map((session) async {
         await session.channel.close();
-        session.closed = true;
+        session.markClosed();
       }),
     );
   });
@@ -604,7 +603,7 @@ class WorkbenchController({
 
   Future<void> send(ChannelSession session, List<int> bytes) => run(Operation.channel(session), () async {
     await session.channel.write(bytes);
-    session.transmitted += bytes.length;
+    session.onTransmitted(bytes);
     log(
       'TX ${session.channel.deviceId} / ${session.channel.psm} · ${bytes.length} B · '
       '${PayloadCodec.hex(bytes.take(64).toList())}',
@@ -615,9 +614,7 @@ class WorkbenchController({
   /// An empty read is only logged, so it neither hides the last chunk nor evicts history.
   Future<void> readChannel(ChannelSession session) => run(Operation.channel(session), () async {
     final bytes = await session.channel.read();
-    if (bytes.isNotEmpty) {
-      session.recordReceived(bytes, source: ReceiveSource.bufferRead);
-    }
+    session.onBufferRead(bytes);
     log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
   });
 
@@ -632,7 +629,7 @@ class WorkbenchController({
         await Future.wait(
           List.generate(count, (_) async {
             await session.channel.write(payload);
-            session.transmitted += payload.length;
+            session.onTransmitted(payload);
             successes++;
           }),
         ).whenComplete(() {
@@ -645,7 +642,7 @@ class WorkbenchController({
 
   Future<void> closeChannel(ChannelSession session) => run(Operation.channel(session), () async {
     await session.channel.close();
-    session.closed = true;
+    session.markClosed();
   });
 
   /// Outgoing channels belong to the GATT session that opened them. Incoming
@@ -653,7 +650,7 @@ class WorkbenchController({
   void _closeOutgoingChannels(DeviceIdentifier remoteId) {
     final outgoing = channels.where((session) => !session.incoming && session.channel.deviceId == remoteId);
     for (final session in outgoing.toList()) {
-      session.closed = true;
+      session.markClosed();
       unawaited(
         session.channel.close().catchError((Object exception, StackTrace stackTrace) {
           log('L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception');
@@ -668,9 +665,7 @@ class WorkbenchController({
       channel.deviceId,
       channel.psm,
     ), () => ChannelSession(channel, incoming: incoming));
-    session.channel = channel;
-    session.incoming = incoming;
-    session.closed = false;
+    session.reopen(channel, incoming: incoming);
   }
 
   /// Reports errors once and prevents duplicate submissions of the same action.
