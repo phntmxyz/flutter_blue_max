@@ -39,7 +39,8 @@ extension CatalogFilesRobot on WorkbenchRobot {
     logEvent('Import a renamed thermostat, a new lamp and the unchanged thermostat again');
     files.openContent = encodeCatalogFile([_roomThermostat, _lamp]);
     await tapLabel('Import');
-    spot<Dialog>().spotText('FFF0 · 1 characteristic · Replaces your Thermostat', exact: true).existsOnce();
+    spot<Dialog>().spotText('FFF0 · 1 characteristic', exact: true).existsOnce();
+    spot<Dialog>().spotText('Replaces your Thermostat', exact: true).existsOnce();
     spot<Dialog>().spotText('FFE0 · 1 characteristic', exact: true).existsOnce();
     await tapInDialog('Import 2 services');
     spotText('Imported 2 services, 1 replaced your own', exact: true).existsOnce();

@@ -187,10 +187,10 @@ Future<List<AdvertisementParser>?> _choose(
   required List<AdvertisementParser> parsers,
 }) => SelectionDialog.show(
   context,
-  title: title,
+  title: Text(title),
   action: action,
   noun: parserNoun,
   items: parsers,
-  label: (parser) => parser.name,
-  details: (parser) => parser.summary,
+  label: (parser) => Text(parser.name),
+  details: (parser) => Text(parser.summary),
 );

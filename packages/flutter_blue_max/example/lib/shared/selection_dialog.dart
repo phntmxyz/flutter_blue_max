@@ -6,7 +6,7 @@ import 'package:flutter_blue_max_example/shared/noun.dart';
 /// Pops with the chosen items, or with nothing when cancelled.
 class const SelectionDialog<T>({
   super.key,
-  required final String title,
+  required final Widget title,
 
   /// The confirm button, e.g. "Export", followed by the number of chosen items.
   required final String action,
@@ -14,17 +14,17 @@ class const SelectionDialog<T>({
   /// What is chosen.
   required final Noun noun,
   required final List<T> items,
-  required final String Function(T item) label,
-  required final String Function(T item) details,
+  required final Widget Function(T item) label,
+  required final Widget Function(T item) details,
 }) extends StatefulWidget {
   static Future<List<T>?> show<T>(
     BuildContext context, {
-    required String title,
+    required Widget title,
     required String action,
     required Noun noun,
     required List<T> items,
-    required String Function(T item) label,
-    required String Function(T item) details,
+    required Widget Function(T item) label,
+    required Widget Function(T item) details,
   }) => showDialog<List<T>>(
     context: context,
     builder: (_) {
@@ -45,7 +45,7 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
     final items = widget.items;
     final all = _chosen.length == items.length;
     return AlertDialog(
-      title: Text(widget.title),
+      title: widget.title,
       contentPadding: const EdgeInsets.symmetric(vertical: 12),
       content: SizedBox(
         width: 480,
@@ -70,8 +70,8 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
             for (final (index, item) in items.indexed)
               CheckboxListTile(
                 value: _chosen.contains(index),
-                title: Text(widget.label(item)),
-                subtitle: Text(widget.details(item)),
+                title: widget.label(item),
+                subtitle: widget.details(item),
                 onChanged: (value) => setState(() => value! ? _chosen.add(index) : _chosen.remove(index)),
               ),
           ],

@@ -197,23 +197,53 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     BuildContext context, {
     required List<KnownService> services,
     required bool importing,
-  }) => SelectionDialog.show(
-    context,
-    title: importing ? 'Import services' : 'Export services',
-    action: importing ? 'Import' : 'Export',
-    noun: serviceNoun,
-    items: services,
-    label: (s) => s.name,
-    details: (s) {
-      return [
-        s.uuid.str.toUpperCase(),
-        counted(s.characteristics.length, _characteristicNoun),
-        if (importing)
-          if (context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s) != null)
-            'Replaces your ${context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s)!.name}',
-      ].join(' · ');
-    },
-  );
+  }) {
+    Widget summary(KnownService service) =>
+        Text('${service.uuid.str.toUpperCase()} · ${counted(service.characteristics.length, _characteristicNoun)}');
+    Widget importDetails(KnownService service) {
+      final previous = context.read<GattCatalogLibrary>().catalogServiceReplacedBy(service);
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          summary(service),
+          if (previous != null)
+            Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, size: 16, color: Theme.of(context).colorScheme.error),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    'Replaces your ${previous.name}',
+                    style: TextStyle(color: Theme.of(context).colorScheme.error),
+                  ),
+                ),
+              ],
+            ),
+        ],
+      );
+    }
+
+    if (importing) {
+      return SelectionDialog.show(
+        context,
+        title: const Text('Import services'),
+        action: 'Import',
+        noun: serviceNoun,
+        items: services,
+        label: (s) => Text(s.name),
+        details: importDetails,
+      );
+    }
+    return SelectionDialog.show(
+      context,
+      title: const Text('Export services'),
+      action: 'Export',
+      noun: serviceNoun,
+      items: services,
+      label: (s) => Text(s.name),
+      details: summary,
+    );
+  }
 }
 
 class const _ServiceCard({required final KnownService service, required final List<Widget> actions, final String? note})
