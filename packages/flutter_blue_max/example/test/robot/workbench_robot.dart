@@ -224,6 +224,19 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     await idle();
   }
 
+  Future<void> keepSearchAcrossDetails() async {
+    final field = spot<TextField>()..existsOnce();
+    await act.enterText(field, 'Test');
+    await idle();
+    spot<ListTile>().withChild(spotText('Other peripheral', exact: true)).doesNotExist();
+    await selectPeripheral();
+    logEvent('Go back from the details and verify that the search still shows the filter');
+    await tester.binding.handlePopRoute();
+    await idle();
+    expect(tester.widget<TextField>(field.finder).controller?.text, 'Test');
+    spot<ListTile>().withChild(spotText('Other peripheral', exact: true)).doesNotExist();
+  }
+
   Future<void> rotateToLandscape() async {
     logEvent('Rotate the phone to landscape');
     tester.view.physicalSize = const Size(844, 390);

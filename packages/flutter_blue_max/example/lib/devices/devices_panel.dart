@@ -17,6 +17,15 @@ class const DevicesPanel({super.key, required final WorkbenchController controll
 class _DevicesPanelState() extends State<DevicesPanel> {
   bool _showDetails = false;
 
+  /// Outlives the search field, which narrow layouts drop while the details are shown.
+  late final _query = TextEditingController(text: widget.controller.query);
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return LayoutBuilder(
@@ -81,6 +90,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
                   ],
                   const SizedBox(height: 20),
                   TextField(
+                    controller: _query,
                     onChanged: c.setQuery,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),

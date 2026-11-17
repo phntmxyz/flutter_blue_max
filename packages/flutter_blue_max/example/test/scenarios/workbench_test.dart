@@ -182,6 +182,13 @@ void main() {
     await robot.reopenConnectedPeripheral();
   });
 
+  testWidgets('phone: the search text survives a visit to the device details', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.scanForPeripheral(includeSecondPeer: true);
+    await robot.keepSearchAcrossDetails();
+  });
+
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
     // Only Android lets the client choose encryption.
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
