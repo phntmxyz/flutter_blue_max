@@ -39,28 +39,6 @@ class const CatalogEditorPage({
   State<CatalogEditorPage> createState() => _CatalogEditorPageState();
 }
 
-/// Form state of one characteristic.
-class _CharacteristicDraft() {
-  final name = TextEditingController();
-  final uuid = TextEditingController();
-  final properties = <GattProperty>{};
-
-  Guid? get parsedUuid => _parse(uuid.text);
-
-  void dispose() {
-    name.dispose();
-    uuid.dispose();
-  }
-}
-
-Guid? _parse(String text) {
-  try {
-    return text.trim().isEmpty ? null : Guid(text.trim());
-  } on Object {
-    return null;
-  }
-}
-
 class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
@@ -273,5 +251,27 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
         ),
       ),
     );
+  }
+}
+
+/// Form state of one characteristic.
+class _CharacteristicDraft() {
+  final name = TextEditingController();
+  final uuid = TextEditingController();
+  final properties = <GattProperty>{};
+
+  Guid? get parsedUuid => _parse(uuid.text);
+
+  void dispose() {
+    name.dispose();
+    uuid.dispose();
+  }
+}
+
+Guid? _parse(String text) {
+  try {
+    return text.trim().isEmpty ? null : Guid(text.trim());
+  } on Object {
+    return null;
   }
 }
