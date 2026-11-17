@@ -1,5 +1,5 @@
 name: flutter_blue_max_example
-description: A Bluetooth workbench for GATT and L2CAP on Android, iOS and macOS.
+description: A Bluetooth workbench for Android, iOS, macOS, Linux and the web, with L2CAP on Android and Apple platforms.
 publish_to: 'none'
 version: 1.0.0+1
 
