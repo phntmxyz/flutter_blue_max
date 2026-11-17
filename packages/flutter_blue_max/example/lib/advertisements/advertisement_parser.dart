@@ -1,6 +1,142 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+/// Reads named values from advertisements whose source and byte pattern match.
+/// Parsers are global unless bound to [device]; the pattern keeps vendors apart.
+class const AdvertisementParser({
+  required final String name,
+  required final AdvertisementSource source,
+
+  /// Required for [AdvertisementSource.manufacturer].
+  final int? companyId,
+
+  /// Required for [AdvertisementSource.service].
+  final Guid? serviceUuid,
+
+  /// Bytes the payload must contain at [matchOffset], e.g. a frame type.
+  final List<int> match = const [],
+  final int matchOffset = 0,
+
+  /// Null when every field sits at a fixed offset of the payload.
+  final RecordFormat? records,
+  final DeviceIdentifier? device,
+  required final List<AdvertisementField> fields,
+}) {
+  /// Throws a [FormatException] for stored data that no longer describes a parser.
+  factory fromJson(Map<String, dynamic> json) {
+    final AdvertisementParser parser;
+    try {
+      final serviceUuid = json['serviceUuid'] as String?;
+      final records = json['records'] as Map<String, dynamic>?;
+      final device = json['device'] as String?;
+      parser = AdvertisementParser(
+        name: json['name'] as String,
+        source: AdvertisementSource.values.byName(json['source'] as String),
+        companyId: json['companyId'] as int?,
+        serviceUuid: serviceUuid == null ? null : Guid(serviceUuid),
+        match: List<int>.from(json['match'] as List),
+        matchOffset: json['matchOffset'] as int,
+        records: records == null ? null : RecordFormat.fromJson(records),
+        device: device == null ? null : DeviceIdentifier(device),
+        fields: [
+          for (final field in json['fields'] as List) AdvertisementField.fromJson(field as Map<String, dynamic>),
+        ],
+      );
+    } on FormatException {
+      rethrow;
+    } on Object catch (error) {
+      throw FormatException('Invalid parser: $error');
+    }
+    // The same rules as the editor, so imported and stored parsers render like hand-made ones.
+    final companyId = parser.companyId;
+    final hasSource = switch (parser.source) {
+      AdvertisementSource.manufacturer => companyId != null && companyId >= 0 && companyId <= 0xffff,
+      AdvertisementSource.service => parser.serviceUuid != null,
+    };
+    if (!hasSource) {
+      throw FormatException('Invalid parser ${parser.name}: ${parser.source.label} needs a company ID or service UUID');
+    }
+    if (parser.matchOffset < 0 || parser.match.any((byte) => byte < 0 || byte > 0xff)) {
+      throw FormatException('Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}');
+    }
+    return parser;
+  }
+
+  Map<String, dynamic> toJson() => {
+    'name': name,
+    'source': source.name,
+    'companyId': companyId,
+    'serviceUuid': serviceUuid?.str128,
+    'match': match,
+    'matchOffset': matchOffset,
+    'records': records?.toJson(),
+    'device': device?.str,
+    'fields': [for (final field in fields) field.toJson()],
+  };
+
+  /// Where and when the parser reads, for parser lists.
+  String get summary => [
+    switch (source) {
+      AdvertisementSource.manufacturer => 'Manufacturer 0x${companyId!.toRadixString(16)}',
+      AdvertisementSource.service => 'Service data $serviceUuid',
+    },
+    if (match.isNotEmpty) 'match ${PayloadCodec.hex(match)} at $matchOffset',
+    ?records?.summary,
+    '${fields.length} ${fields.length == 1 ? 'field' : 'fields'}',
+    if (device == null) 'All devices' else 'Only ${device!.str}',
+  ].join(' · ');
+
+  bool appliesTo(DeviceIdentifier remoteId) => device == null || device == remoteId;
+
+  /// Whether [data] carries this parser's source, regardless of the byte pattern.
+  bool readsFrom(AdvertisementData data) => switch (source) {
+    AdvertisementSource.manufacturer => data.manufacturerData.containsKey(companyId),
+    AdvertisementSource.service => data.serviceData.containsKey(serviceUuid),
+  };
+
+  /// Returns one line per field, or nothing if this payload is not meant for this parser.
+  List<String> read({int? companyId, Guid? serviceUuid, required List<int> bytes}) {
+    final sourceMatches = switch (source) {
+      AdvertisementSource.manufacturer => companyId != null && companyId == this.companyId,
+      AdvertisementSource.service => serviceUuid != null && serviceUuid == this.serviceUuid,
+    };
+    if (!sourceMatches || !_matches(bytes)) {
+      return [];
+    }
+    final records = this.records;
+    if (records == null) {
+      return [for (final field in fields) '$name · ${field.name}: ${field.format(bytes)}'];
+    }
+    // A record type without a length byte is as large as its fields reach.
+    final sizes = <int, int>{};
+    for (final field in fields) {
+      final record = field.record;
+      if (record != null) {
+        sizes[record] = max(sizes[record] ?? 0, field.offset + field.size);
+      }
+    }
+    final (:values, :problem) = records.split(bytes, sizes);
+    // Fields of records absent from this frame are left out: many sensors send one value per frame.
+    return [
+      for (final field in fields)
+        if (values[field.record] != null) '$name · ${field.name}: ${field.format(values[field.record]!)}',
+      if (problem != null) '$name · $problem',
+    ];
+  }
+
+  bool _matches(List<int> bytes) {
+    if (matchOffset + match.length > bytes.length) {
+      return false;
+    }
+    for (var i = 0; i < match.length; i++) {
+      if (bytes[matchOffset + i] != match[i]) {
+        return false;
+      }
+    }
+    return true;
+  }
+}
+
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
@@ -285,141 +421,5 @@ class const AdvertisementField(
     }
     // The epsilon absorbs rounding, e.g. -log10(0.001) = 2.9999999999999996.
     return (-log(scale.abs()) / ln10 - 1e-9).ceil().clamp(1, 6);
-  }
-}
-
-/// Reads named values from advertisements whose source and byte pattern match.
-/// Parsers are global unless bound to [device]; the pattern keeps vendors apart.
-class const AdvertisementParser({
-  required final String name,
-  required final AdvertisementSource source,
-
-  /// Required for [AdvertisementSource.manufacturer].
-  final int? companyId,
-
-  /// Required for [AdvertisementSource.service].
-  final Guid? serviceUuid,
-
-  /// Bytes the payload must contain at [matchOffset], e.g. a frame type.
-  final List<int> match = const [],
-  final int matchOffset = 0,
-
-  /// Null when every field sits at a fixed offset of the payload.
-  final RecordFormat? records,
-  final DeviceIdentifier? device,
-  required final List<AdvertisementField> fields,
-}) {
-  /// Throws a [FormatException] for stored data that no longer describes a parser.
-  factory fromJson(Map<String, dynamic> json) {
-    final AdvertisementParser parser;
-    try {
-      final serviceUuid = json['serviceUuid'] as String?;
-      final records = json['records'] as Map<String, dynamic>?;
-      final device = json['device'] as String?;
-      parser = AdvertisementParser(
-        name: json['name'] as String,
-        source: AdvertisementSource.values.byName(json['source'] as String),
-        companyId: json['companyId'] as int?,
-        serviceUuid: serviceUuid == null ? null : Guid(serviceUuid),
-        match: List<int>.from(json['match'] as List),
-        matchOffset: json['matchOffset'] as int,
-        records: records == null ? null : RecordFormat.fromJson(records),
-        device: device == null ? null : DeviceIdentifier(device),
-        fields: [
-          for (final field in json['fields'] as List) AdvertisementField.fromJson(field as Map<String, dynamic>),
-        ],
-      );
-    } on FormatException {
-      rethrow;
-    } on Object catch (error) {
-      throw FormatException('Invalid parser: $error');
-    }
-    // The same rules as the editor, so imported and stored parsers render like hand-made ones.
-    final companyId = parser.companyId;
-    final hasSource = switch (parser.source) {
-      AdvertisementSource.manufacturer => companyId != null && companyId >= 0 && companyId <= 0xffff,
-      AdvertisementSource.service => parser.serviceUuid != null,
-    };
-    if (!hasSource) {
-      throw FormatException('Invalid parser ${parser.name}: ${parser.source.label} needs a company ID or service UUID');
-    }
-    if (parser.matchOffset < 0 || parser.match.any((byte) => byte < 0 || byte > 0xff)) {
-      throw FormatException('Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}');
-    }
-    return parser;
-  }
-
-  Map<String, dynamic> toJson() => {
-    'name': name,
-    'source': source.name,
-    'companyId': companyId,
-    'serviceUuid': serviceUuid?.str128,
-    'match': match,
-    'matchOffset': matchOffset,
-    'records': records?.toJson(),
-    'device': device?.str,
-    'fields': [for (final field in fields) field.toJson()],
-  };
-
-  /// Where and when the parser reads, for parser lists.
-  String get summary => [
-    switch (source) {
-      AdvertisementSource.manufacturer => 'Manufacturer 0x${companyId!.toRadixString(16)}',
-      AdvertisementSource.service => 'Service data $serviceUuid',
-    },
-    if (match.isNotEmpty) 'match ${PayloadCodec.hex(match)} at $matchOffset',
-    ?records?.summary,
-    '${fields.length} ${fields.length == 1 ? 'field' : 'fields'}',
-    if (device == null) 'All devices' else 'Only ${device!.str}',
-  ].join(' · ');
-
-  bool appliesTo(DeviceIdentifier remoteId) => device == null || device == remoteId;
-
-  /// Whether [data] carries this parser's source, regardless of the byte pattern.
-  bool readsFrom(AdvertisementData data) => switch (source) {
-    AdvertisementSource.manufacturer => data.manufacturerData.containsKey(companyId),
-    AdvertisementSource.service => data.serviceData.containsKey(serviceUuid),
-  };
-
-  /// Returns one line per field, or nothing if this payload is not meant for this parser.
-  List<String> read({int? companyId, Guid? serviceUuid, required List<int> bytes}) {
-    final sourceMatches = switch (source) {
-      AdvertisementSource.manufacturer => companyId != null && companyId == this.companyId,
-      AdvertisementSource.service => serviceUuid != null && serviceUuid == this.serviceUuid,
-    };
-    if (!sourceMatches || !_matches(bytes)) {
-      return [];
-    }
-    final records = this.records;
-    if (records == null) {
-      return [for (final field in fields) '$name · ${field.name}: ${field.format(bytes)}'];
-    }
-    // A record type without a length byte is as large as its fields reach.
-    final sizes = <int, int>{};
-    for (final field in fields) {
-      final record = field.record;
-      if (record != null) {
-        sizes[record] = max(sizes[record] ?? 0, field.offset + field.size);
-      }
-    }
-    final (:values, :problem) = records.split(bytes, sizes);
-    // Fields of records absent from this frame are left out: many sensors send one value per frame.
-    return [
-      for (final field in fields)
-        if (values[field.record] != null) '$name · ${field.name}: ${field.format(values[field.record]!)}',
-      if (problem != null) '$name · $problem',
-    ];
-  }
-
-  bool _matches(List<int> bytes) {
-    if (matchOffset + match.length > bytes.length) {
-      return false;
-    }
-    for (var i = 0; i < match.length; i++) {
-      if (bytes[matchOffset + i] != match[i]) {
-        return false;
-      }
-    }
-    return true;
   }
 }
