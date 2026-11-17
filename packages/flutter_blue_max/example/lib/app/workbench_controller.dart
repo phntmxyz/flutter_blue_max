@@ -117,14 +117,8 @@ class WorkbenchController({
   List<KnownService> get catalog => catalogLibrary.items;
 
   /// The user's own entries replace built-in ones with the same UUID.
-  KnownService? knownService(Guid uuid) {
-    for (final service in catalogLibrary.items) {
-      if (service.uuid == uuid) {
-        return service;
-      }
-    }
-    return builtInService(uuid);
-  }
+  KnownService? knownService(Guid uuid) =>
+      catalogLibrary.items.where((s) => s.uuid == uuid).firstOrNull ?? builtInService(uuid);
 
   List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((s) => !s.closed));
 
@@ -132,14 +126,7 @@ class WorkbenchController({
   List<ChannelSession> get channelSessions => List.unmodifiable(_channels.values);
   List<BluetoothService> get services => _services[selected?.remoteId] ?? [];
   List<BluetoothDevice> get connectedDevices => FlutterBlueMax.connectedDevices;
-  ScanResult? get selectedAdvertisement {
-    for (final result in scanResults) {
-      if (result.device == selected) {
-        return result;
-      }
-    }
-    return null;
-  }
+  ScanResult? get selectedAdvertisement => scanResults.where((r) => r.device == selected).firstOrNull;
 
   bool get connected => selected?.isConnected ?? false;
   bool get tracking => _trackingScan && scanning;
@@ -185,12 +172,8 @@ class WorkbenchController({
     if (device.platformName.isNotEmpty) {
       return device.platformName;
     }
-    for (final result in scanResults) {
-      if (result.device == device && result.advertisementData.advName.isNotEmpty) {
-        return result.advertisementData.advName;
-      }
-    }
-    return 'Unnamed device';
+    final advertised = scanResults.where((r) => r.device == device && r.advertisementData.advName.isNotEmpty).firstOrNull;
+    return advertised?.advertisementData.advName ?? 'Unnamed device';
   }
 
   /// Starts once, subscribing to plugin events and loading the saved parser/catalog libraries.
