@@ -8,6 +8,7 @@ import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
 import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
+import 'package:reactive_forms/reactive_forms.dart';
 
 /// Devices destination of `WorkbenchApp`: discovery and details share two panes on desktop, one on phones.
 /// [active] is false on hidden destinations so this panel does not intercept their system back gesture.
@@ -281,39 +282,9 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
   }
 
   Future<void> _mtuDialog(BuildContext context) async {
-    var input = '${controller.mtu ?? controller.selected!.mtuNow}';
-    final form = GlobalKey<FormState>();
     final value = await showDialog<int>(
       context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('Request MTU'),
-          content: Form(
-            key: form,
-            child: TextFormField(
-              initialValue: input,
-              onChanged: (value) => input = value,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(labelText: 'Bytes (23–517)'),
-              validator: (value) {
-                final mtu = int.tryParse(value ?? '');
-                return mtu == null || mtu < 23 || mtu > 517 ? 'Enter a value from 23 to 517.' : null;
-              },
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            FilledButton(
-              onPressed: () {
-                if (form.currentState!.validate()) {
-                  Navigator.pop(context, int.parse(input));
-                }
-              },
-              child: const Text('Request'),
-            ),
-          ],
-        );
-      },
+      builder: (_) => MtuRequestDialog(initialMtu: controller.mtu ?? controller.selected!.mtuNow),
     );
     if (value != null) {
       await controller.requestMtu(value);
@@ -537,6 +508,59 @@ class const ScanResultTile({
         trailing: const Icon(Icons.chevron_right_rounded),
         onTap: onTap,
       ),
+    );
+  }
+}
+
+/// The dialog owns its form until the closing route has finished animating.
+class const MtuRequestDialog({super.key, required final int initialMtu}) extends StatefulWidget {
+  @override
+  State<MtuRequestDialog> createState() => _MtuRequestDialogState();
+}
+
+class _MtuRequestDialogState() extends State<MtuRequestDialog> {
+  late final form = FormGroup({
+    'mtu': FormControl<int>(
+      value: widget.initialMtu,
+      validators: [Validators.required, Validators.min(23), Validators.max(517)],
+    ),
+  });
+
+  @override
+  void dispose() {
+    form.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('Request MTU'),
+      content: ReactiveForm(
+        formGroup: form,
+        child: ReactiveTextField<int>(
+          formControlName: 'mtu',
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(labelText: 'Bytes (23–517)'),
+          validationMessages: {
+            for (final error in [ValidationMessage.required, ValidationMessage.min, ValidationMessage.max])
+              error: (_) => 'Enter a value from 23 to 517.',
+          },
+        ),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        FilledButton(
+          onPressed: () {
+            if (!form.valid) {
+              form.markAllAsTouched();
+              return;
+            }
+            Navigator.pop(context, form.value['mtu']);
+          },
+          child: const Text('Request'),
+        ),
+      ],
     );
   }
 }

@@ -3,8 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
+import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
+import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
@@ -147,13 +149,13 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   void expectConnectionRequired() {
     logEvent('Verify that the device must be connected before entering a remote PSM');
     spotText('Connect this device above to open an L2CAP channel.', exact: true).existsOnce();
-    spot<TextFormField>().doesNotExist();
+    spot<DeviceL2capPanel>().spot<TextField>().doesNotExist();
     spotText('Open channel', exact: true).doesNotExist();
   }
 
   void expectEmptyPsm() {
     logEvent('Verify that a different peer does not inherit the previous PSM');
-    final field = spot<TextFormField>()..existsOnce();
+    final field = spot<DeviceL2capPanel>().spot<TextField>()..existsOnce();
     expect(field.snapshotWidget().controller!.text, isEmpty);
   }
 
@@ -170,7 +172,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     spotText('64', exact: true).existsOnce();
     await tapLabel('Write');
     logEvent('Enter a malformed payload and verify that it is not transmitted');
-    final field = spot<TextFormField>()..existsOnce();
+    final field = spot<PayloadEditor>().spot<TextField>()..existsOnce();
     await scrollIntoView(field);
     await act.enterText(field, 'F');
     await idle();
@@ -306,7 +308,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> rejectInvalidRemotePsm() async {
     logEvent('Enter an invalid remote PSM');
-    final field = spot<TextFormField>();
+    final field = spot<DeviceL2capPanel>().spot<TextField>();
     field.existsOnce();
     await scrollIntoView(field);
     await act.enterText(field, '0');
@@ -318,7 +320,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> openRemoteChannel() async {
     logEvent('Open an L2CAP channel to the connected device');
-    final field = spot<TextFormField>()..existsOnce();
+    final field = spot<DeviceL2capPanel>().spot<TextField>()..existsOnce();
     await scrollIntoView(field);
     await act.enterText(field, '131');
     await idle();

@@ -16,6 +16,7 @@ dependencies:
   flutter_blue_max:
     path: ../
   provider: ^6.1.5+1
+  reactive_forms: ^18.2.2
   share_plus: ^13.3.1
   shared_preferences: ^2.5.6
 

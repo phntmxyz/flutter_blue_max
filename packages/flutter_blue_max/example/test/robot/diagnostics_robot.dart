@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
+import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -76,7 +77,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     controller.selected = device;
     logEvent('Reject MTU values outside 23–517 and input that is no number');
     await tapLabel('Request MTU');
-    final field = spot<Dialog>().spot<TextFormField>()..existsOnce();
+    final field = spot<Dialog>().spot<TextField>()..existsOnce();
     for (final input in ['22', '518', 'abc']) {
       await act.enterText(field, input);
       await tapInDialog('Request');
@@ -149,7 +150,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     expect(platform.characteristicReads.length, before + 2);
     logEvent('Write with response, then without response, and read the resulting value back');
     await tapLabel('Write');
-    final payload = spot<TextFormField>()..existsOnce();
+    final payload = spot<PayloadEditor>().spot<TextField>()..existsOnce();
     await scrollIntoView(payload);
     await act.enterText(payload, '02');
     await idle();
@@ -167,7 +168,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     await tapLabel('Read descriptor');
     spotText('41', exact: true).existsOnce();
     logEvent('Write an ordinary descriptor through the payload editor');
-    final field = spot<TextFormField>()..existsOnce();
+    final field = spot<PayloadEditor>().spot<TextField>()..existsOnce();
     await scrollIntoView(field);
     await act.enterText(field, '01 A2');
     await idle();

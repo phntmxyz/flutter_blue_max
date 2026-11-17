@@ -1,8 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
+import 'package:flutter_blue_max_example/shared/form_validation.dart';
 import 'package:provider/provider.dart';
+import 'package:reactive_forms/reactive_forms.dart';
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
 /// Edits one of the user's own GATT catalog services. Pops with the service, or with nothing when cancelled.
@@ -42,40 +46,74 @@ class const CatalogEditorPage({
 }
 
 class _CatalogEditorPageState() extends State<CatalogEditorPage> {
-  final _form = GlobalKey<FormState>();
-  final _name = TextEditingController();
-  final _uuid = TextEditingController();
-  final _characteristics = <CharacteristicDraft>[];
-  bool _test = true;
+  final _name = FormControl<String>(value: '');
+  final _uuid = FormControl<String>(value: '');
+  final _characteristicForms = FormArray<Map<String, dynamic>>([]);
+  final _check = FormControl<bool>(value: true);
+  late final _form = FormGroup(
+    {'name': _name, 'uuid': _uuid, 'check': _check, 'characteristics': _characteristicForms},
+    validators: [DelegateValidator(_validate)],
+  );
+  StreamSubscription<Object?>? _changes;
+  List<CharacteristicDraft> get _characteristics => _characteristicForms.controls.cast<CharacteristicDraft>();
+  bool get _test => _check.value!;
+  set _test(bool value) => _check.value = value;
+
+  Map<String, dynamic>? _validate(AbstractControl<dynamic> control) {
+    final form = control as FormGroup;
+    setInputError(form.control('name'), _required(_name.text));
+    final uuid = _parse(_uuid.text);
+    String? message;
+    if (uuid == null) {
+      message = 'Enter a 16, 32 or 128-bit UUID.';
+    } else if (widget.others.any((service) => service.uuid == uuid)) {
+      message = 'Your catalog already has this service.';
+    }
+    setInputError(form.control('uuid'), message);
+    for (final draft in _characteristics) {
+      setInputError(draft.name, _required(draft.name.text));
+      final uuid = draft.parsedUuid;
+      String? message;
+      if (uuid == null) {
+        message = 'Enter a 16, 32 or 128-bit UUID.';
+      } else if (_characteristics.where((other) => other.parsedUuid == uuid).length > 1) {
+        message = 'This service already has this characteristic.';
+      }
+      setInputError(draft.uuid, message);
+      setInputError(
+        draft.propertyControl,
+        _test && draft.properties.isEmpty ? 'Select the expected properties.' : null,
+      );
+    }
+    return null;
+  }
 
   @override
   void initState() {
     super.initState();
+    _changes = _form.valueChanges.listen((_) => setState(() {}));
     final initial = widget.initial;
     if (initial == null) {
-      _characteristics.add(CharacteristicDraft());
+      _characteristicForms.add(CharacteristicDraft());
       return;
     }
     _name.text = initial.name;
     _uuid.text = initial.uuid.str;
     _test = initial.test;
     for (final characteristic in initial.characteristics) {
-      _characteristics.add(
+      _characteristicForms.add(
         CharacteristicDraft()
           ..name.text = characteristic.name
           ..uuid.text = characteristic.uuid.str
-          ..properties.addAll(characteristic.properties ?? {}),
+          ..properties = Set.of(characteristic.properties ?? {}),
       );
     }
   }
 
   @override
   void dispose() {
-    _name.dispose();
-    _uuid.dispose();
-    for (final characteristic in _characteristics) {
-      characteristic.dispose();
-    }
+    _changes?.cancel();
+    _form.dispose();
     super.dispose();
   }
 
@@ -89,7 +127,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   ]);
 
   void _removeCharacteristic(CharacteristicDraft draft) {
-    setState(() => _characteristics.remove(draft));
+    setState(() => _characteristicForms.removeAt(_characteristics.indexOf(draft)));
     WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
   }
 
@@ -107,44 +145,38 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
             padding: const EdgeInsets.only(right: 12),
             child: FilledButton(
               onPressed: () {
-                if (_form.currentState!.validate()) {
+                if (_form.valid) {
                   Navigator.pop(context, _build());
+                  return;
                 }
+                _form.markAllAsTouched();
               },
               child: const Text('Save entry'),
             ),
           ),
         ],
       ),
-      body: Form(
-        key: _form,
-        onChanged: () => setState(() {}),
+      body: ReactiveForm(
+        formGroup: _form,
         child: ListView(
           padding: const EdgeInsets.all(20),
           children: [
-            TextFormField(
-              controller: _name,
+            ReactiveTextField<String>(
+              key: ObjectKey(_name),
+              formControl: _name,
               decoration: const InputDecoration(labelText: 'Service name', hintText: 'My sensor'),
-              validator: _required,
+              validationMessages: inputValidationMessages,
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: _uuid,
+            ReactiveTextField<String>(
+              key: ObjectKey(_uuid),
+              formControl: _uuid,
               decoration: InputDecoration(
                 labelText: 'Service UUID',
                 hintText: '180f',
                 helperText: replaced == null ? null : 'Replaces the built-in entry ${replaced.name}.',
               ),
-              validator: (value) {
-                final uuid = _parse(value ?? '');
-                if (uuid == null) {
-                  return 'Enter a 16, 32 or 128-bit UUID.';
-                }
-                if (widget.others.any((s) => s.uuid == uuid)) {
-                  return 'Your catalog already has this service.';
-                }
-                return null;
-              },
+              validationMessages: inputValidationMessages,
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
@@ -164,15 +196,12 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                 key: ObjectKey(draft),
                 draft: draft,
                 checkProperties: _test,
-                nameValidator: _required,
-                isDuplicate: (uuid) => _characteristics.where((d) => d.parsedUuid == uuid).length > 1,
-                onChanged: () => setState(() {}),
                 onRemove: () => _removeCharacteristic(draft),
               ),
             ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => setState(() => _characteristics.add(CharacteristicDraft())),
+              onPressed: () => setState(() => _characteristicForms.add(CharacteristicDraft())),
               icon: const Icon(Icons.add),
               label: const Text('Add characteristic'),
             ),
@@ -184,17 +213,19 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
 }
 
 /// Form state of one characteristic.
-class CharacteristicDraft() {
-  final name = TextEditingController();
-  final uuid = TextEditingController();
-  final properties = <GattProperty>{};
-
+class CharacteristicDraft() extends FormGroup {
+  this
+    : super({
+        'name': FormControl<String>(value: ''),
+        'uuid': FormControl<String>(value: ''),
+        'properties': FormControl<Set<GattProperty>>(value: {}),
+      });
+  FormControl<String> get name => control('name') as FormControl<String>;
+  FormControl<String> get uuid => control('uuid') as FormControl<String>;
+  FormControl<Set<GattProperty>> get propertyControl => control('properties') as FormControl<Set<GattProperty>>;
+  Set<GattProperty> get properties => propertyControl.value!;
+  set properties(Set<GattProperty> value) => propertyControl.value = value;
   Guid? get parsedUuid => _parse(uuid.text);
-
-  void dispose() {
-    name.dispose();
-    uuid.dispose();
-  }
 }
 
 Guid? _parse(String text) {
@@ -210,9 +241,6 @@ class const CatalogCharacteristicCard({
   super.key,
   required final CharacteristicDraft draft,
   required final bool checkProperties,
-  required final FormFieldValidator<String> nameValidator,
-  required final bool Function(Guid uuid) isDuplicate,
-  required final VoidCallback onChanged,
   required final VoidCallback onRemove,
 }) extends StatelessWidget {
   @override
@@ -226,10 +254,11 @@ class const CatalogCharacteristicCard({
             Row(
               children: [
                 Expanded(
-                  child: TextFormField(
-                    controller: draft.name,
+                  child: ReactiveTextField<String>(
+                    key: ObjectKey(draft.name),
+                    formControl: draft.name,
                     decoration: const InputDecoration(labelText: 'Characteristic name', hintText: 'Temperature'),
-                    validator: nameValidator,
+                    validationMessages: inputValidationMessages,
                   ),
                 ),
                 IconButton(
@@ -240,24 +269,16 @@ class const CatalogCharacteristicCard({
               ],
             ),
             const SizedBox(height: 12),
-            TextFormField(
-              controller: draft.uuid,
+            ReactiveTextField<String>(
+              key: ObjectKey(draft.uuid),
+              formControl: draft.uuid,
               decoration: const InputDecoration(labelText: 'Characteristic UUID', hintText: '2a6e'),
-              validator: (value) {
-                final uuid = _parse(value ?? '');
-                if (uuid == null) {
-                  return 'Enter a 16, 32 or 128-bit UUID.';
-                }
-                if (isDuplicate(uuid)) {
-                  return 'This service already has this characteristic.';
-                }
-                return null;
-              },
+              validationMessages: inputValidationMessages,
             ),
             if (checkProperties) ...[
               const SizedBox(height: 12),
-              FormField<void>(
-                validator: (_) => draft.properties.isEmpty ? 'Select the expected properties.' : null,
+              ReactiveFormField<Set<GattProperty>, Set<GattProperty>>(
+                formControl: draft.propertyControl,
                 builder: (field) {
                   return Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -272,20 +293,18 @@ class const CatalogCharacteristicCard({
                               selected: draft.properties.contains(property),
                               onSelected: (it) {
                                 if (it) {
-                                  draft.properties.add(property);
+                                  draft.properties = {...draft.properties, property};
                                 } else {
-                                  draft.properties.remove(property);
+                                  draft.properties = {...draft.properties}..remove(property);
                                 }
-                                onChanged();
-                                field.didChange(null);
                               },
                             ),
                         ],
                       ),
-                      if (field.errorText != null) ...[
+                      if (field.control.touched && field.control.hasError('input')) ...[
                         const SizedBox(height: 6),
                         Text(
-                          field.errorText!,
+                          field.control.getError('input')! as String,
                           style: Theme.of(context).textTheme.bodySmall!
                               .copyWith(color: Theme.of(context).colorScheme.error),
                         ),

@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/l2cap/psm.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
+import 'package:reactive_forms/reactive_forms.dart';
 
 /// L2CAP tab of the selected device inspector in `DevicesPanel`.
 /// Opens outgoing channels only for the device shown in the inspector.
@@ -15,13 +16,15 @@ class const DeviceL2capPanel({super.key, required final BluetoothDevice device})
 }
 
 class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
-  final _psm = TextEditingController();
-  final _form = GlobalKey<FormState>();
-  bool _secure = true;
+  final _form = FormGroup({
+    'psm': FormControl<int>(validators: [Validators.required]),
+    'secure': FormControl<bool>(value: true),
+  });
+  final _psmAccessor = _PsmAccessor();
 
   @override
   void dispose() {
-    _psm.dispose();
+    _form.dispose();
     super.dispose();
   }
 
@@ -35,6 +38,11 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
     final channelIdle = !c.busy(Operation.open);
     final connectionIdle = !c.busy(Operation.connection);
     final enabled = connectionReady && channelIdle && connectionIdle;
+    if (enabled && _form.disabled) {
+      _form.markAsEnabled(emitEvent: false);
+    } else if (!enabled && _form.enabled) {
+      _form.markAsDisabled(emitEvent: false);
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -45,62 +53,72 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              if (!connected)
-                const Text('Connect this device above to open an L2CAP channel.')
-              else
-                Form(
-                  key: _form,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text('The device must run an L2CAP server. Enter the PSM supplied by that server.'),
-                      const SizedBox(height: 16),
-                      TextFormField(
-                        controller: _psm,
-                        enabled: enabled,
-                        decoration: const InputDecoration(
-                          labelText: 'Remote PSM',
-                          hintText: 'Decimal or 0x hexadecimal',
+              Builder(
+                builder: (context) {
+                  if (!connected) {
+                    return const Text('Connect this device above to open an L2CAP channel.');
+                  }
+                  return ReactiveForm(
+                    formGroup: _form,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('The device must run an L2CAP server. Enter the PSM supplied by that server.'),
+                        const SizedBox(height: 16),
+                        ReactiveTextField<int>(
+                          formControlName: 'psm',
+                          valueAccessor: _psmAccessor,
+                          readOnly: !enabled,
+                          decoration: const InputDecoration(
+                            labelText: 'Remote PSM',
+                            hintText: 'Decimal or 0x hexadecimal',
+                          ),
+                          validationMessages: {
+                            ValidationMessage.required: (_) =>
+                                'Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.',
+                          },
                         ),
-                        validator: (value) {
-                          try {
-                            parsePsm(value ?? '');
-                          } on FormatException catch (error) {
-                            return error.message;
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      if (defaultTargetPlatform == TargetPlatform.android)
-                        SwitchListTile.adaptive(
-                          contentPadding: EdgeInsets.zero,
-                          title: const Text('Require encryption'),
-                          value: _secure,
-                          onChanged: enabled ? (value) => setState(() => _secure = value) : null,
-                        )
-                      else
-                        const Padding(
-                          padding: EdgeInsets.symmetric(vertical: 12),
-                          child: Text('On Apple devices, encryption is determined by the remote server.'),
+                        const SizedBox(height: 8),
+                        Builder(
+                          builder: (context) {
+                            if (defaultTargetPlatform == TargetPlatform.android) {
+                              return ReactiveSwitchListTile(
+                                formControlName: 'secure',
+                                contentPadding: EdgeInsets.zero,
+                                title: const Text('Require encryption'),
+                              );
+                            }
+                            return const Padding(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              child: Text('On Apple devices, encryption is determined by the remote server.'),
+                            );
+                          },
                         ),
-                      FilledButton.icon(
-                        onPressed: (() {
-                          if (enabled) {
-                            return () {
-                              if (_form.currentState!.validate()) {
-                                c.openChannel(parsePsm(_psm.text), device: device, secure: _secure);
-                              }
-                            };
-                          }
-                          return null;
-                        })(),
-                        icon: const Icon(Icons.link_rounded),
-                        label: Text(c.busy(Operation.open) ? 'Opening…' : 'Open channel'),
-                      ),
-                    ],
-                  ),
-                ),
+                        FilledButton.icon(
+                          onPressed: (() {
+                            if (enabled) {
+                              return () {
+                                if (!_form.valid) {
+                                  _form.markAllAsTouched();
+                                  return;
+                                }
+                                c.openChannel(
+                                  _form.value['psm']! as int,
+                                  device: device,
+                                  secure: _form.value['secure']! as bool,
+                                );
+                              };
+                            }
+                            return null;
+                          })(),
+                          icon: const Icon(Icons.link_rounded),
+                          label: Text(c.busy(Operation.open) ? 'Opening…' : 'Open channel'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
               const SizedBox(height: 16),
               const Text(
                 'GATT services do not imply L2CAP support. Discovering GATT services is optional for this channel, '
@@ -115,4 +133,19 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
       ],
     );
   }
+}
+
+/// Parses the view once; the form and submission share the validated integer.
+class _PsmAccessor() extends ControlValueAccessor<int, String> {
+  @override
+  int? viewToModelValue(String? viewValue) {
+    try {
+      return parsePsm(viewValue ?? '');
+    } on FormatException {
+      return null;
+    }
+  }
+
+  @override
+  String modelToViewValue(int? modelValue) => modelValue?.toString() ?? '';
 }
