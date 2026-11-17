@@ -24,6 +24,49 @@ final _platform = FakeBluetoothPlatform();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('dispose does not start tracking after a slow scan stop', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    await controller.scan();
+    await _until(() => controller.scanning);
+    final release = Completer<void>();
+    var stopping = false;
+    platform.overrideStopScan = (_) async {
+      stopping = true;
+      await release.future;
+      return true;
+    };
+    final before = platform.scanStarts;
+    final pending = controller.trackAdvertisements(BluetoothDevice.fromId('AA:BB:CC:DD:EE:01'));
+    await _until(() => stopping);
+    controller.dispose();
+    release.complete();
+    await pending;
+    platform.overrideStopScan = null;
+    addTearDown(FlutterBlueMax.stopScan);
+    expect(platform.scanStarts, before);
+    expect(FlutterBlueMax.isScanningNow, isFalse);
+  });
+
+  test('dispose does not start scanning after slow system discovery', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    final release = Completer<BmDevicesList>();
+    var discovering = false;
+    platform.overrideGetSystemDevices = (_) {
+      discovering = true;
+      return release.future;
+    };
+    final before = platform.scanStarts;
+    final pending = controller.scan();
+    await _until(() => discovering);
+    controller.dispose();
+    release.complete(BmDevicesList(devices: []));
+    await pending;
+    platform.overrideGetSystemDevices = null;
+    addTearDown(FlutterBlueMax.stopScan);
+    expect(platform.scanStarts, before);
+    expect(FlutterBlueMax.isScanningNow, isFalse);
+  });
+
   test('channels with the same PSM remain isolated by peer', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);

@@ -401,6 +401,9 @@ class WorkbenchController({
       if (!kIsWeb) {
         await refreshSystemDevices();
       }
+      if (_disposed) {
+        return;
+      }
       _trackingScan = false;
       await FlutterBlueMax.startScan(
         timeout: const Duration(seconds: 15),
@@ -420,6 +423,9 @@ class WorkbenchController({
   Future<void> trackAdvertisements(BluetoothDevice device) => run(Operation.scan, () async {
     if (scanning) {
       await FlutterBlueMax.stopScan();
+    }
+    if (_disposed) {
+      return;
     }
     advertisementTracker = AdvertisementTracker(device.remoteId);
     _trackingScan = true;
