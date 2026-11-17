@@ -21,13 +21,4 @@ abstract final class PayloadCodec {
 
   /// Keeps binary data readable without failing on invalid UTF-8.
   static String text(List<int> bytes) => utf8.decode(bytes, allowMalformed: true);
-
-  /// Parses the PSM supplied by the remote server, in decimal or with a 0x prefix.
-  static int psm(String input) {
-    final value = int.tryParse(input.trim());
-    if (value == null || value < 1 || value > 65535) {
-      throw const FormatException('Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.');
-    }
-    return value;
-  }
 }

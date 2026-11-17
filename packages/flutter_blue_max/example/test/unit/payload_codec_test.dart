@@ -18,12 +18,4 @@ void main() {
     expect(PayloadCodec.decode('Grüße', hex: false), [71, 114, 195, 188, 195, 159, 101]);
     expect(PayloadCodec.text([0xff, 65]), '\uFFFDA');
   });
-
-  test('PSM accepts decimal and hexadecimal and rejects invalid values', () {
-    expect(PayloadCodec.psm(' 129 '), 129);
-    expect(PayloadCodec.psm('0x81'), 129);
-    for (final value in ['', '0', '-1', '65536', '12.3', 'hello']) {
-      expect(() => PayloadCodec.psm(value), throwsFormatException);
-    }
-  });
 }

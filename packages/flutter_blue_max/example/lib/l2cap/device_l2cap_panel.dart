@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
+import 'package:flutter_blue_max_example/l2cap/psm.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
@@ -66,7 +67,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                         ),
                         validator: (value) {
                           try {
-                            PayloadCodec.psm(value ?? '');
+                            parsePsm(value ?? '');
                           } on FormatException catch (error) {
                             return error.message;
                           }
@@ -91,7 +92,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                           if (enabled) {
                             return () {
                               if (_form.currentState!.validate()) {
-                                c.openChannel(PayloadCodec.psm(_psm.text), device: device, secure: _secure);
+                                c.openChannel(parsePsm(_psm.text), device: device, secure: _secure);
                               }
                             };
                           }
