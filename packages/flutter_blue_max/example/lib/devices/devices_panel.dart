@@ -8,7 +8,8 @@ import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
 
-/// Adapts discovery and inspection from a two-pane desktop layout to a phone.
+/// Devices destination of `WorkbenchApp`: discovery and details share two panes on desktop, one on phones.
+/// [active] is false on hidden destinations so this panel does not intercept their system back gesture.
 class const DevicesPanel({super.key, final bool active = true}) extends StatefulWidget {
   @override
   State<DevicesPanel> createState() => _DevicesPanelState();
