@@ -8,6 +8,7 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
@@ -753,7 +754,7 @@ class WorkbenchController({
   }
 
   /// Adds [services], replacing own entries with the same UUID and skipping identical ones.
-  Future<({int added, int replaced, int present})> addCatalogServices(List<KnownService> services) async {
+  Future<CatalogImportResult> addCatalogServices(List<KnownService> services) async {
     var added = 0;
     var replaced = 0;
     var present = 0;
@@ -770,7 +771,7 @@ class WorkbenchController({
       }
     }
     await _persistCatalog();
-    return (added: added, replaced: replaced, present: present);
+    return CatalogImportResult(added: added, replaced: replaced, present: present);
   }
 
   /// Removes every own service, which also overwrites a stored catalog that no longer loads.

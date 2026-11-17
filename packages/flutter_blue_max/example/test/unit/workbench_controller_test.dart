@@ -236,8 +236,10 @@ void main() {
       final thermostat = KnownService(Guid('fff0'), 'Thermostat', [KnownCharacteristic(Guid('fff1'), 'Level')]);
       final renamed = KnownService(Guid('fff0'), 'Room thermostat', thermostat.characteristics);
       final lamp = KnownService(Guid('ffe0'), 'Lamp', []);
-      expect(await controller.addCatalogServices([thermostat]), (added: 1, replaced: 0, present: 0));
-      expect(await controller.addCatalogServices([renamed, lamp, lamp]), (added: 1, replaced: 1, present: 1));
+      final first = await controller.addCatalogServices([thermostat]);
+      expect([first.added, first.replaced, first.present], [1, 0, 0]);
+      final next = await controller.addCatalogServices([renamed, lamp, lamp]);
+      expect([next.added, next.replaced, next.present], [1, 1, 1]);
       expect(controller.catalog.map((service) => service.name), ['Room thermostat', 'Lamp']);
     });
 

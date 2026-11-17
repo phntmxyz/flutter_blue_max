@@ -130,7 +130,10 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     if (chosen == null) {
       return;
     }
-    final (:added, :replaced, :present) = await controller.addCatalogServices(chosen);
+    final result = await controller.addCatalogServices(chosen);
+    final added = result.added;
+    final replaced = result.replaced;
+    final present = result.present;
     if (context.mounted) {
       tell(
         context,
