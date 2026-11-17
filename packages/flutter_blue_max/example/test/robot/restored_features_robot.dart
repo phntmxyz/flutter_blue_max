@@ -4,6 +4,7 @@ import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_in
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
 
+import '../fakes/fake_android_device.dart';
 import 'workbench_robot.dart';
 
 /// Exercises restored controls through the actual app, replacing only native I/O.
@@ -59,6 +60,8 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
   }
 
   Future<void> requestMtuAndCreateBond() async {
+    final device = FakeAndroidDevice(remoteId: controller.selected!.remoteId);
+    controller.selected = device;
     logEvent('Reject MTU values outside 23–517 and input that is no number');
     await tapLabel('Request MTU');
     final field = spot<Dialog>().spot<TextFormField>()..existsOnce();
@@ -66,21 +69,24 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
       await act.enterText(field, input);
       await tapInDialog('Request');
       spotText('Enter a value from 23 to 517.', exact: true).existsOnce();
+      expect(device.mtuRequests, isEmpty);
     }
     logEvent('Cancelling sends no request');
     await tapInDialog('Cancel');
     spot<Dialog>().doesNotExist();
-    expect(controller.logs.where((line) => line.contains('requestMtu')), isEmpty);
-    // The plugin checks dart:io's Platform.isAndroid, so on a test host the request fails before the platform
-    // channel; its android-only error shows that the dialog value went to requestMtu.
-    logEvent('Request the largest MTU');
-    await tapLabel('Request MTU');
-    await act.enterText(field, '517');
-    await tapInDialog('Request');
-    spot<Dialog>().doesNotExist();
-    expect(controller.logs.last, allOf(contains('ERROR MTU request'), contains('requestMtu')));
+    expect(device.mtuRequests, isEmpty);
+    for (final mtu in [23, 517]) {
+      logEvent('Request boundary MTU $mtu');
+      await tapLabel('Request MTU');
+      await act.enterText(field, '$mtu');
+      await tapInDialog('Request');
+      spot<Dialog>().doesNotExist();
+      expect(device.mtuRequests.last, mtu);
+    }
+    expect(device.mtuRequests, [23, 517]);
+    expect(device.bondRequests, 0);
     await tapLabel('Create bond');
-    expect(controller.logs.last, allOf(contains('ERROR Bond'), contains('createBond')));
+    expect(device.bondRequests, 1);
   }
 
   Future<void> keepWebSubscriptionUntilDisconnect() async {
