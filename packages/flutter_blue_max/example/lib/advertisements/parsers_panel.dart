@@ -163,8 +163,6 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
       await controller.resetParsers();
     }
   }
-
-
 }
 
 Future<List<AdvertisementParser>?> _choose(

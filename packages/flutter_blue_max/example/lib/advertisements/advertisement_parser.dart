@@ -1,6 +1,9 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+
 /// Reads named values from advertisements whose source and byte pattern match.
 /// Parsers are global unless bound to [device]; the pattern keeps vendors apart.
 class const AdvertisementParser({
@@ -136,10 +139,6 @@ class const AdvertisementParser({
     return true;
   }
 }
-
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 enum AdvertisementSource(final String label) {
   manufacturer('Manufacturer data'),
