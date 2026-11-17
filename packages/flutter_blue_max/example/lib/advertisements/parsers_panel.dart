@@ -9,6 +9,7 @@ import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
 import 'package:provider/provider.dart';
 
+/// Parsers section of `LibraryPanel`.
 /// Manages every saved parser, including those bound to devices that are not nearby.
 class const ParsersPanel({super.key}) extends StatelessWidget {
   @override

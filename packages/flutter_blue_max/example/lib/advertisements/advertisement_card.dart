@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/advertisements/parser_editor.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:provider/provider.dart';
 
+/// Advertisement section of the selected device in `DevicesPanel`.
 /// The inspected peer's latest advertisement, its parsers and an optional live history of all of them.
 class const AdvertisementCard({super.key, required final BluetoothDevice device}) extends StatefulWidget {
   /// Enough rows to see a payload rotate without rebuilding a long list per advertisement.

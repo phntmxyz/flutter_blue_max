@@ -5,6 +5,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:provider/provider.dart';
 
+/// Opened from `AdvertisementCard` or `ParsersPanel`.
 /// Builds a parser against the device's latest advertisement, previewing every change.
 /// Pops with the parser, or with nothing when cancelled.
 class const ParserEditorPage({
