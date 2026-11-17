@@ -11,7 +11,7 @@ import '../robot/advertisement_robot.dart';
 import '../robot/catalog_files_robot.dart';
 import '../robot/gatt_catalog_robot.dart';
 import '../robot/parser_files_robot.dart';
-import '../robot/restored_features_robot.dart';
+import '../robot/diagnostics_robot.dart';
 import '../robot/workbench_robot.dart';
 
 void main() {
