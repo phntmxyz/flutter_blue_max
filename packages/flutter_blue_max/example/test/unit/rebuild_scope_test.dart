@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/activity/activity_panel.dart';
+import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_example/library/library_panel.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:spot/spot.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/workbench_robot.dart';
@@ -16,6 +18,18 @@ void main() {
   setUpAll(() async {
     FlutterBlueMaxPlatform.instance = platform;
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
+  });
+
+  testWidgets('the adapter banner updates while remaining mounted', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.off));
+    await robot.idle();
+    spot<AdapterBanner>().spotText('Bluetooth is off.').existsOnce();
+    platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.unauthorized));
+    await robot.idle();
+    spot<AdapterBanner>().spotText('Bluetooth permission is denied.').existsOnce();
+    spot<AdapterBanner>().spotText('Bluetooth is off.').doesNotExist();
   });
 
   const panels = [DevicesPanel, L2capServerPanel, LibraryPanel, ActivityPanel];

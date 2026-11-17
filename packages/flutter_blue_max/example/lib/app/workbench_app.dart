@@ -123,30 +123,8 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                 child: Column(
                   children: [
                     const Divider(height: 1),
-                    if (!c.ready) const _AdapterBanner(),
-                    if (c.error != null)
-                      Container(
-                        width: double.infinity,
-                        color: Theme.of(context).colorScheme.errorContainer,
-                        padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                c.error!,
-                                maxLines: 3,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
-                              ),
-                            ),
-                            IconButton(
-                              tooltip: 'Dismiss error',
-                              onPressed: c.dismissError,
-                              icon: const Icon(Icons.close),
-                            ),
-                          ],
-                        ),
-                      ),
+                    if (!c.ready) const AdapterBanner(),
+                    if (c.error != null) ErrorBanner(message: c.error!, onDismiss: c.dismissError),
                     Expanded(
                       child: Row(
                         children: [
@@ -208,9 +186,11 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
   }
 }
 
-class const _AdapterBanner() extends StatelessWidget {
+/// Bluetooth availability banner above every workbench destination.
+class const AdapterBanner() extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => [c.adapter, c.busy(Operation.adapter)]);
     final message = switch (context.read<WorkbenchController>().adapter) {
       BluetoothAdapterState.unknown when kIsWeb =>
         'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
@@ -285,4 +265,30 @@ ThemeData _theme(Brightness brightness) {
       expandedAlignment: Alignment.centerLeft,
     ),
   );
+}
+
+/// Session error banner above the selected destination, with an explicit dismissal action.
+class const ErrorBanner({super.key, required final String message, required final VoidCallback onDismiss})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Theme.of(context).colorScheme.errorContainer,
+      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              message,
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+            ),
+          ),
+          IconButton(tooltip: 'Dismiss error', onPressed: onDismiss, icon: const Icon(Icons.close)),
+        ],
+      ),
+    );
+  }
 }

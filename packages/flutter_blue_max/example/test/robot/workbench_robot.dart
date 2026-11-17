@@ -192,14 +192,14 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     platform.l2capFailure = UnimplementedError();
     addTearDown(() => platform.l2capFailure = null);
     await startServer();
-    spotText('This operation is not supported on this device.', exact: true).existsOnce();
+    spot<ErrorBanner>().spotText('This operation is not supported on this device.', exact: true).existsOnce();
     expect(controller.serverPsm, isNull);
     expect(controller.busy(Operation.server), isFalse);
   }
 
   Future<void> dismissUnsupportedError() async {
     logEvent('Dismiss the unsupported-operation message');
-    final close = spot<IconButton>().withTooltip('Dismiss error')..existsOnce();
+    final close = spot<ErrorBanner>().spot<IconButton>().withTooltip('Dismiss error')..existsOnce();
     await act.tap(close);
     await idle();
     spotText('This operation is not supported on this device.', exact: true).doesNotExist();
