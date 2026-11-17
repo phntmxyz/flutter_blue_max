@@ -21,6 +21,16 @@ void main() {
     expect(() => decodeCatalogFile(encodeCatalogFile([first, first])), throwsFormatException);
   });
 
+  test('catalog files use the same version contract and retain legacy support', () {
+    final encoded = jsonDecode(encodeCatalogFile([])) as Map<String, dynamic>;
+    expect(encoded['version'], 1);
+    expect(
+      () => decodeCatalogFile('{"version": 2, "services": []}'),
+      throwsA(isA<FormatException>().having((e) => e.message, 'message', contains('newer format'))),
+    );
+    expect(decodeCatalogFile('{"services": []}'), isEmpty);
+  });
+
   test('foreign files are rejected with a reason', () {
     Matcher rejected(String message) => throwsA(isA<FormatException>().having((e) => e.message, 'message', message));
 

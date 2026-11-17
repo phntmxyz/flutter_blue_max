@@ -29,6 +29,17 @@ void main() {
     );
   });
 
+  test('exports declare their version and future file versions are rejected', () {
+    final encoded = jsonDecode(encodeParserFile(testDongleParsers)) as Map<String, dynamic>;
+    expect(encoded['version'], 1);
+    expect(
+      () => decodeParserFile('{"version": 2, "parsers": []}'),
+      throwsA(isA<FormatException>().having((e) => e.message, 'message', contains('newer format'))),
+    );
+    expect(() => decodeParserFile('{"version": "1", "parsers": []}'), throwsFormatException);
+    expect(decodeParserFile('{"parsers": []}'), isEmpty);
+  });
+
   test('foreign files are rejected with a reason', () {
     Matcher rejected(String message) => throwsA(isA<FormatException>().having((e) => e.message, 'message', message));
 

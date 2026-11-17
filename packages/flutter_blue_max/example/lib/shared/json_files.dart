@@ -3,6 +3,7 @@ import 'dart:ui';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter_blue_max_example/shared/json_format.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:share_plus/share_plus.dart';
 
@@ -14,7 +15,8 @@ const _jsonFiles = XTypeGroup(
 );
 
 /// Items are wrapped in an object under [key], so other JSON files are recognised as foreign.
-String encodeJsonList(String key, List<Object?> items) => const JsonEncoder.withIndent('  ').convert({key: items});
+String encodeJsonList(String key, List<Object?> items) =>
+    const JsonEncoder.withIndent('  ').convert({'version': jsonListVersion, key: items});
 
 /// Reads what [encodeJsonList] wrote under [key].
 /// Throws a [FormatException], worded with [noun], for files that hold something else.
@@ -32,6 +34,9 @@ List<T> decodeJsonList<T>(
       FormatException('The file is not JSON: ${exception.message}', exception.source, exception.offset),
       stackTrace,
     );
+  }
+  if (json is Map<String, dynamic>) {
+    checkJsonListVersion(json, source: 'file');
   }
   final items = json is Map<String, dynamic> ? json[key] : null;
   if (items is! List) {

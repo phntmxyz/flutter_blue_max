@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter_blue_max_example/shared/json_format.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// A list loaded from the platform's preferences, which are local storage on the web.
@@ -17,7 +18,7 @@ class const StoredList<T>(
 });
 
 /// Null until the list was saved once.
-/// Throws a [FormatException] when the stored value is not a JSON list, because no entry can be kept apart then.
+/// Accepts legacy bare lists and versioned envelopes. Throws [FormatException] for malformed or newer formats.
 Future<StoredList<T>?> loadStoredList<T>(String key, T Function(Map<String, dynamic> json) fromJson) async {
   final preferences = await SharedPreferences.getInstance();
   final text = preferences.getString(key);
@@ -30,13 +31,23 @@ Future<StoredList<T>?> loadStoredList<T>(String key, T Function(Map<String, dyna
   } on FormatException catch (exception) {
     throw FormatException('The stored value is not JSON: ${exception.message}');
   }
-  if (decoded is! List) {
+  final List<Object?> entries;
+  if (decoded is List) {
+    entries = decoded;
+  } else if (decoded is Map<String, dynamic>) {
+    checkJsonListVersion(decoded, source: 'stored library');
+    final items = decoded['items'];
+    if (items is! List) {
+      throw const FormatException('The stored value holds no item list.');
+    }
+    entries = items;
+  } else {
     throw const FormatException('The stored value is not a list.');
   }
   final items = <T>[];
   final unreadable = <Object?>[];
   FormatException? problem;
-  for (final entry in decoded) {
+  for (final entry in entries) {
     if (entry is! Map<String, dynamic>) {
       unreadable.add(entry);
       problem ??= FormatException('Not an object: $entry');
@@ -55,5 +66,11 @@ Future<StoredList<T>?> loadStoredList<T>(String key, T Function(Map<String, dyna
 /// Writes [items] followed by the [unreadable] entries a previous load kept.
 Future<void> saveStoredList(String key, List<Object?> items, {List<Object?> unreadable = const []}) async {
   final preferences = await SharedPreferences.getInstance();
-  await preferences.setString(key, jsonEncode([...items, ...unreadable]));
+  await preferences.setString(
+    key,
+    jsonEncode({
+      'version': jsonListVersion,
+      'items': [...items, ...unreadable],
+    }),
+  );
 }

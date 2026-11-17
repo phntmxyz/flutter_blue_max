@@ -281,6 +281,28 @@ void main() {
   });
 
   group('Saved parsers', () {
+    test('a future stored format cannot be overwritten by an older build', () async {
+      const future = '{"version": 99, "items": [{"newer": "data"}]}';
+      SharedPreferences.setMockInitialValues({parserStoreKey: future});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.error, contains('newer format'));
+      await controller.saveParser(testDongleParsers.first);
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(parserStoreKey), future);
+    });
+
+    test('legacy bare lists migrate to a versioned store on the next save', () async {
+      SharedPreferences.setMockInitialValues({parserStoreKey: jsonEncode(testDongleParsers)});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.parsers, hasLength(testDongleParsers.length));
+      await controller.removeParser(controller.parsers.last);
+      final preferences = await SharedPreferences.getInstance();
+      final envelope = jsonDecode(preferences.getString(parserStoreKey)!) as Map<String, dynamic>;
+      expect(envelope['version'], 1);
+      expect(envelope['items'], hasLength(1));
+      expect((await loadParsers())!.items, hasLength(1));
+    });
+
     test('the first launch starts with the test dongle parsers', () async {
       final (:controller, platform: _) = await _setup();
       expect(controller.parsers.map((parser) => parser.name), ['FBM status', 'FBM sensor']);
