@@ -44,6 +44,23 @@ void main() {
     ],
   );
 
+  test('decoded parsers retain immutable payload patterns and fields', () {
+    final json = testDongleParsers.first.toJson();
+    final match = List<int>.from(json['match'] as List);
+    final fields = List<Object?>.from(json['fields'] as List);
+    json['match'] = match;
+    json['fields'] = fields;
+    final parser = AdvertisementParser.fromJson(json);
+    final expectedMatch = List.of(parser.match);
+    final expectedFields = List.of(parser.fields);
+    match.clear();
+    fields.clear();
+    expect(parser.match, expectedMatch);
+    expect(parser.fields, expectedFields);
+    expect(() => parser.match.add(1), throwsUnsupportedError);
+    expect(() => parser.fields.clear(), throwsUnsupportedError);
+  });
+
   test('numeric types honour sign, byte order and scale', () {
     String read(AdvertisementFieldType type, List<int> bytes, {double scale = 1}) =>
         AdvertisementField('Value', 0, type, scale: scale).format(bytes);

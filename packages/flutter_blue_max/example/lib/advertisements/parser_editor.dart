@@ -170,13 +170,13 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         source: _source,
         companyId: companyId,
         serviceUuid: serviceUuid,
-        match: PayloadCodec.decode(_match.text, hex: true),
+        match: List.unmodifiable(PayloadCodec.decode(_match.text, hex: true)),
         matchOffset: int.parse(_matchOffset.text.trim()),
         records: _records
             ? RecordFormat(offset: int.parse(_recordOffset.text.trim()), type: _recordType, length: _recordLength)
             : null,
         device: _deviceOnly ? _device : null,
-        fields: fields,
+        fields: List.unmodifiable(fields),
       );
     } on FormatException {
       return null;

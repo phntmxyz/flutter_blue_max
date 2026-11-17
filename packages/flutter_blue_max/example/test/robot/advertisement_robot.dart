@@ -65,7 +65,9 @@ extension AdvertisementRobot on WorkbenchRobot {
         await tapLabel('Hex');
       }
       await tapLabel('Save parser');
-      expect(controller.parsers.where((p) => p.name == name), hasLength(1));
+      final saved = controller.parsers.where((p) => p.name == name).single;
+      expect(() => saved.match.add(1), throwsUnsupportedError);
+      expect(() => saved.fields.clear(), throwsUnsupportedError);
     }
   }
 

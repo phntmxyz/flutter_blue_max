@@ -37,13 +37,13 @@ class const AdvertisementParser({
         source: AdvertisementSource.values.byName(json['source'] as String),
         companyId: json['companyId'] as int?,
         serviceUuid: serviceUuid == null ? null : Guid(serviceUuid),
-        match: List<int>.from(json['match'] as List),
+        match: List<int>.unmodifiable(json['match'] as List),
         matchOffset: json['matchOffset'] as int,
         records: records == null ? null : RecordFormat.fromJson(records),
         device: device == null ? null : DeviceIdentifier(device),
-        fields: [
+        fields: List<AdvertisementField>.unmodifiable([
           for (final field in json['fields'] as List) AdvertisementField.fromJson(field as Map<String, dynamic>),
-        ],
+        ]),
       );
     } on FormatException {
       rethrow;
