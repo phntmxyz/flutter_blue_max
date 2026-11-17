@@ -154,6 +154,7 @@ class WorkbenchController({
   bool get connected => selected?.isConnected ?? false;
   bool get tracking => _trackingScan && scanning;
   bool get ready => adapter == BluetoothAdapterState.on;
+
   /// Matches the typed operation passed to [run], including any device/channel scope.
   bool busy(Operation operation) => _busy.contains(operation);
 

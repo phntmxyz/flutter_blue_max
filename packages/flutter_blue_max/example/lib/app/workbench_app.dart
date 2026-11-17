@@ -13,6 +13,7 @@ import 'package:provider/provider.dart';
 /// A responsive diagnostic app for the plugin's native and web backends.
 class const WorkbenchApp({
   super.key,
+
   /// An injected controller remains owned by the caller; only an app-created controller is disposed here.
   final WorkbenchController? controller,
 }) extends StatefulWidget {
