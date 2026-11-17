@@ -242,7 +242,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               validator: (_) {
                 if (_source == AdvertisementSource.manufacturer) {
                   final id = _companyId;
-                  return id == null || id > 0xffff ? 'Enter a 16-bit hex company ID.' : null;
+                  return id == null || id < 0 || id > 0xffff ? 'Enter a 16-bit hex company ID.' : null;
                 }
                 return _serviceUuid == null ? 'Enter a 16, 32 or 128-bit UUID.' : null;
               },
@@ -451,7 +451,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       validator: (value) {
                         final record = _hexNumber(value ?? '');
                         final bits = _recordType.size * 8;
-                        return record == null || record >= 1 << bits ? 'Enter a $bits-bit hex type.' : null;
+                        return record == null || record < 0 || record >= 1 << bits ? 'Enter a $bits-bit hex type.' : null;
                       },
                     ),
                   ),

@@ -30,6 +30,23 @@ extension AdvertisementRobot on WorkbenchRobot {
     await tapLabel('Advertisement');
   }
 
+  Future<void> rejectNegativeHexIdentifiers() async {
+    await tapLabel('Add parser');
+    await _enter('Parser name', 'Negative IDs');
+    await _enter('Field name', 'Value');
+    final before = controller.parsers.length;
+    await _enter('Company ID (hex)', '-1');
+    await tapLabel('Save parser');
+    spotText('Enter a 16-bit hex company ID.', exact: true).existsOnce();
+    expect(controller.parsers, hasLength(before));
+    await _enter('Company ID (hex)', 'fffe');
+    await tapLabel('Records');
+    await _enter('Record type (hex)', '-1');
+    await tapLabel('Save parser');
+    spotText('Enter a 8-bit hex type.', exact: true).existsOnce();
+    expect(controller.parsers, hasLength(before));
+  }
+
   Future<void> addTemperatureParser() async {
     await tapLabel('Add parser');
     logEvent('Verify that the source is prefilled from the latest advertisement');

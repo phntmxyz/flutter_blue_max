@@ -23,6 +23,13 @@ void main() {
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
   });
 
+  testWidgets('parser editor: rejects negative hex identifiers', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 1000));
+    await robot.scanForSensor();
+    await robot.rejectNegativeHexIdentifiers();
+  });
+
   testWidgets('desktop: discover GATT, validate PSM and preserve server across navigation', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
