@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:provider/provider.dart';
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.

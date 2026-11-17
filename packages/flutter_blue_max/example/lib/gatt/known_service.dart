@@ -74,7 +74,6 @@ class KnownService(
   }
 }
 
-
 /// The characteristic properties the GATT explorer shows and the catalog compares.
 enum GattProperty(final String label) {
   read('Read'),

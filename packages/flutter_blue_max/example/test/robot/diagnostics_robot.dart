@@ -8,7 +8,7 @@ import '../fakes/fake_android_device.dart';
 import 'workbench_robot.dart';
 
 /// Exercises restored controls through the actual app, replacing only native I/O.
-extension RestoredFeaturesRobot on WorkbenchRobot {
+extension DiagnosticsRobot on WorkbenchRobot {
   Future<void> connectSystemPeer() async {
     logEvent('Find a system-connected peer that does not advertise');
     platform.systemPeers.add(
