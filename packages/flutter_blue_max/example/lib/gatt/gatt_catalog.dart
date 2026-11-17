@@ -20,7 +20,9 @@ enum GattProperty(final String label) {
 }
 
 /// A characteristic name and, for test services, the exact properties it must report.
-class const KnownCharacteristic(final Guid uuid, final String name, {final Set<GattProperty>? properties}) {
+class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>? properties}) {
+  final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
+
   /// Throws a [FormatException] for stored data that no longer describes a characteristic.
   factory fromJson(Map<String, dynamic> json) {
     try {
@@ -63,12 +65,14 @@ class const KnownCharacteristic(final Guid uuid, final String name, {final Set<G
 
 /// A service name and its known characteristics.
 /// A [test] service must contain every listed characteristic with exactly its properties.
-class const KnownService(
+class KnownService(
   final Guid uuid,
   final String name,
-  final List<KnownCharacteristic> characteristics, {
+  List<KnownCharacteristic> characteristics, {
   final bool test = false,
 }) {
+  final List<KnownCharacteristic> characteristics = List.unmodifiable(characteristics);
+
   /// Throws a [FormatException] for stored data that no longer describes a service.
   factory fromJson(Map<String, dynamic> json) {
     try {
@@ -165,7 +169,7 @@ const _n = GattProperty.notify;
 const _i = GattProperty.indicate;
 
 /// The GATT database of the FBM test dongle firmware in echo mode.
-final testDongleServices = [
+final testDongleServices = List<KnownService>.unmodifiable([
   KnownService(_fbm(0x0001), 'FBM Test', test: true, [
     KnownCharacteristic(_fbm(0x0101), 'Echo', properties: {_r, _w, _wnr, _n}),
     KnownCharacteristic(_fbm(0x0102), 'Echo Indicate', properties: {_r, _w, _wnr, _i}),
@@ -186,11 +190,11 @@ final testDongleServices = [
   KnownService(_fbm(0x0002), 'FBM Dynamic', test: true, [
     KnownCharacteristic(_fbm(0x0301), 'Dynamic Value', properties: {_r}),
   ]),
-];
+]);
 
 /// Bluetooth SIG services common enough to name, from the Assigned Numbers; their properties differ between
 /// peripherals. Only the vendor services that are de facto standards are added.
-final standardServices = [
+final standardServices = List<KnownService>.unmodifiable([
   KnownService(Guid('1800'), 'Generic Access', [
     KnownCharacteristic(Guid('2a00'), 'Device Name'),
     KnownCharacteristic(Guid('2a01'), 'Appearance'),
@@ -315,4 +319,4 @@ final standardServices = [
     KnownCharacteristic(Guid('6e400002-b5a3-f393-e0a9-e50e24dcca9e'), 'RX'),
     KnownCharacteristic(Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e'), 'TX'),
   ]),
-];
+]);

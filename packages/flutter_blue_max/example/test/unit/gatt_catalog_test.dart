@@ -6,6 +6,24 @@ import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_in
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('catalog collections are immutable snapshots', () {
+    final properties = <GattProperty>{GattProperty.read};
+    final characteristic = KnownCharacteristic(Guid('2a19'), 'Level', properties: properties);
+    final characteristics = [characteristic];
+    final service = KnownService(Guid('180f'), 'Battery', characteristics);
+    properties.clear();
+    characteristics.clear();
+    expect(characteristic.properties, {GattProperty.read});
+    expect(service.characteristics, [characteristic]);
+    expect(() => characteristic.properties!.clear(), throwsUnsupportedError);
+    expect(() => service.characteristics.clear(), throwsUnsupportedError);
+    expect(() => testDongleServices.clear(), throwsUnsupportedError);
+    expect(() => standardServices.clear(), throwsUnsupportedError);
+    final builtIn = builtInService(Guid('180f'))!;
+    expect(() => builtIn.characteristics.clear(), throwsUnsupportedError);
+    expect(builtInService(Guid('180f'))!.characteristics, isNotEmpty);
+  });
+
   test('properties must match exactly, ignoring flags the explorer does not show', () {
     final echo = KnownCharacteristic(Guid('2a19'), 'Level', properties: {GattProperty.read, GattProperty.notify});
     expect(echo.matches(const CharacteristicProperties(read: true, notify: true, broadcast: true)), isTrue);
