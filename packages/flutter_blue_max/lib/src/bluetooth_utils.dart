@@ -106,7 +106,7 @@ extension PhyExt on Phy {
       case Phy.le2m:
         return 2;
       case Phy.leCoded:
-        return 3;
+        return 4;
     }
   }
 }
