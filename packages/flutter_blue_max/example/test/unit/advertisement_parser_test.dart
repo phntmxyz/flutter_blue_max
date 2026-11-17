@@ -294,6 +294,39 @@ void main() {
     expect(() => AdvertisementParser.fromJson({'name': 'Broken'}), throwsFormatException);
   });
 
+  test('the tracker bounds its history but averages the interval over the whole session', () {
+    final tracker = AdvertisementTracker(const DeviceIdentifier('AA:BB:CC:DD:EE:01'));
+    final start = DateTime(2026);
+    // Every 100 ms, the last one 50 ms late, so the average depends on both the span and the count.
+    final times = [
+      for (var i = 0; i <= AdvertisementTracker.maxHistoryEntries; i++)
+        start.add(Duration(milliseconds: i * 100 + (i == AdvertisementTracker.maxHistoryEntries ? 50 : 0))),
+    ];
+    for (final time in times) {
+      tracker.record(
+        ScanResult(
+          device: BluetoothDevice(remoteId: tracker.remoteId),
+          advertisementData: AdvertisementData(
+            advName: 'Sensor',
+            txPowerLevel: null,
+            appearance: null,
+            connectable: true,
+            manufacturerData: const {},
+            serviceData: const {},
+            serviceUuids: const [],
+          ),
+          rssi: -60,
+          timeStamp: time,
+        ),
+      );
+    }
+    expect(tracker.count, AdvertisementTracker.maxHistoryEntries + 1);
+    expect(tracker.history, hasLength(AdvertisementTracker.maxHistoryEntries));
+    expect(tracker.history.first.time, times.last);
+    expect(tracker.history.last.time, times[1], reason: 'the oldest advertisement is evicted');
+    expect(tracker.averageInterval, const Duration(microseconds: 100250));
+  });
+
   test('decoding rejects parsers the editor would not save', () {
     final parser = climate.toJson();
     final field = {...(parser['fields'] as List).first as Map<String, dynamic>, 'type': 'uint8'};
