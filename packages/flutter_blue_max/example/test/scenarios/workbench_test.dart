@@ -1,5 +1,3 @@
-import 'dart:io';
-
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
@@ -10,6 +8,7 @@ import '../fakes/fake_bluetooth_platform.dart';
 import '../robot/advertisement_robot.dart';
 import '../robot/catalog_files_robot.dart';
 import '../robot/diagnostics_robot.dart';
+import '../robot/file_dialogs_robot.dart';
 import '../robot/gatt_catalog_robot.dart';
 import '../robot/parser_files_robot.dart';
 import '../robot/workbench_robot.dart';
@@ -130,6 +129,41 @@ void main() {
     await robot.manageGlobalParsers();
   });
 
+  group('File dialog outcomes', () {
+    for (final library in LibraryFile.values) {
+      testWidgets('$library: a failing share reports the export error', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(390, 844));
+        await robot.rejectShareFailure(library);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+      testWidgets('$library: dismissing a share does not claim an export', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(390, 844));
+        await robot.dismissShare(library);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+      testWidgets('$library: a picker failure keeps the library intact', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(1200, 850));
+        await robot.rejectPickerFailure(library);
+      });
+      testWidgets('$library: cancelling a picker leaves the library alone', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(1200, 850));
+        await robot.cancelFilePicker(library);
+      });
+    }
+    testWidgets('desktop: a failing save dialog reports the export error', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.rejectDesktopSaveFailure();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+    testWidgets('desktop: cancelling a save does not claim an export', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.cancelDesktopSave();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+  });
+
   group('Parser files', () {
     testWidgets('phone: export chosen parsers through the share sheet', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
@@ -138,15 +172,10 @@ void main() {
     });
 
     testWidgets('desktop: export all parsers to a file', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final directory = (await tester.runAsync(() => Directory.systemTemp.createTemp('parsers')))!;
-      addTearDown(() => directory.delete(recursive: true));
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
-      await robot.exportAllToFile(directory);
-      debugDefaultTargetPlatformOverride = null;
-    });
+      await robot.exportAllToFile();
+    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
     testWidgets('desktop: import adds only parsers that are not present', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
@@ -216,30 +245,22 @@ void main() {
   });
 
   testWidgets('android: request an MTU in range and create a bond', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.scanForPeripheral();
     await robot.selectPeripheral();
     await robot.connectSelected();
     await robot.requestMtuAndCreateBond();
-    debugDefaultTargetPlatformOverride = null;
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('phone: tapping outside a text field closes the keyboard', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.dismissKeyboardByTappingOutside();
-    debugDefaultTargetPlatformOverride = null;
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
     // Only Android lets the client choose encryption.
-    debugDefaultTargetPlatformOverride = TargetPlatform.android;
-    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral();
@@ -250,8 +271,7 @@ void main() {
     await robot.turnOffEncryption();
     await robot.openRemoteChannel();
     robot.expectChannelEncryption(secure: false);
-    debugDefaultTargetPlatformOverride = null;
-  });
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('desktop: channels and remote PSM input belong to the inspected device', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
@@ -277,7 +297,7 @@ void main() {
     await robot.openLocalServer();
     await robot.rejectUnsupportedServer();
     await robot.dismissUnsupportedError();
-    await robot.tapLabel('Devices');
+    await robot.openDevices();
     await robot.scanForPeripheral();
     await robot.inspectPeripheral();
     await robot.readAndWriteCharacteristic();
@@ -323,8 +343,7 @@ void main() {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
-      platform.includeGattExtras = true;
-      await robot.inspectPeripheral();
+      await robot.inspectPeripheralWithDescriptors();
       await robot.exerciseNotificationsAndDescriptors();
     });
 
@@ -370,8 +389,6 @@ void main() {
     });
 
     testWidgets('Linux exposes GATT and activity without unsupported L2CAP controls', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.linux;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -379,41 +396,42 @@ void main() {
       robot.expectGattOnlyPlatform();
       await robot.readAndWriteCharacteristic();
       await robot.openActivity();
-      await robot.tapLabel('Devices');
+      await robot.openDevices();
       robot.expectGattOnlyPlatform();
-      debugDefaultTargetPlatformOverride = null;
-    });
+    }, variant: TargetPlatformVariant.only(TargetPlatform.linux));
 
     for (final size in [const Size(1200, 850), const Size(390, 844)]) {
-      testWidgets('web: scan, GATT and navigation at $size', (tester) async {
-        debugDefaultTargetPlatformOverride = TargetPlatform.android;
-        addTearDown(() => debugDefaultTargetPlatformOverride = null);
-        final robot = WorkbenchRobot(tester, platform);
-        await robot.launch(size: size);
-        platform.includeGattExtras = true;
-        platform.emitNotifyDescriptorEvents = false;
-        await robot.scanForPeripheral();
-        await robot.inspectPeripheral();
-        robot.expectWebCapabilities();
-        await robot.exerciseNotificationsAndDescriptors();
-        await robot.openActivity();
-        await robot.tapLabel('Devices');
-        robot.expectWebCapabilities();
-        debugDefaultTargetPlatformOverride = null;
-      }, skip: !kIsWeb);
+      testWidgets(
+        'web: scan, GATT and navigation at $size',
+        (tester) async {
+          final robot = WorkbenchRobot(tester, platform);
+          await robot.launch(size: size);
+          robot.serveWebGatt();
+          await robot.scanForPeripheral();
+          await robot.inspectPeripheral();
+          robot.expectWebCapabilities();
+          await robot.exerciseNotificationsAndDescriptors();
+          await robot.openActivity();
+          await robot.openDevices();
+          robot.expectWebCapabilities();
+        },
+        variant: TargetPlatformVariant.only(TargetPlatform.android),
+        skip: !kIsWeb,
+      );
     }
 
-    testWidgets('web: a subscription survives rebuilding its tile until the link drops', (tester) async {
-      debugDefaultTargetPlatformOverride = TargetPlatform.android;
-      addTearDown(() => debugDefaultTargetPlatformOverride = null);
-      final robot = WorkbenchRobot(tester, platform);
-      await robot.launch(size: const Size(1200, 850));
-      platform.includeGattExtras = true;
-      platform.emitNotifyDescriptorEvents = false;
-      await robot.scanForPeripheral(includeSecondPeer: true);
-      await robot.inspectPeripheral();
-      await robot.keepWebSubscriptionUntilDisconnect();
-      debugDefaultTargetPlatformOverride = null;
-    }, skip: !kIsWeb);
+    testWidgets(
+      'web: a subscription survives rebuilding its tile until the link drops',
+      (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(1200, 850));
+        robot.serveWebGatt();
+        await robot.scanForPeripheral(includeSecondPeer: true);
+        await robot.inspectPeripheral();
+        await robot.keepWebSubscriptionUntilDisconnect();
+      },
+      variant: TargetPlatformVariant.only(TargetPlatform.android),
+      skip: !kIsWeb,
+    );
   });
 }

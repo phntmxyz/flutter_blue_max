@@ -11,6 +11,16 @@ import 'workbench_robot.dart';
 
 /// Exercises restored controls through the actual app, replacing only native I/O.
 extension DiagnosticsRobot on WorkbenchRobot {
+  Future<void> inspectPeripheralWithDescriptors() async {
+    platform.includeGattExtras = true;
+    await inspectPeripheral();
+  }
+
+  void serveWebGatt() {
+    platform.includeGattExtras = true;
+    platform.emitNotifyDescriptorEvents = false;
+  }
+
   Future<void> selectAdvertisedPeerAlsoConnectedToTheSystem() async {
     logEvent('Show the same peer in discovery and the expanded system-connected list');
     platform.systemPeers.add(
@@ -39,7 +49,10 @@ extension DiagnosticsRobot on WorkbenchRobot {
 
   Future<void> cancelPendingConnection() async {
     logEvent('Cancel a connection while the real plugin is waiting for a native callback');
-    platform.holdConnections = true;
+    platform.overrideConnect = (request) async {
+      platform.connectRequests.add(request);
+      return true;
+    };
     await connectSelected();
     expect(controller.connectingDevice, controller.selected);
     await tapLabel('Cancel connection');

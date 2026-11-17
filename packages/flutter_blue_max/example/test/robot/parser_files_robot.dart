@@ -36,7 +36,9 @@ extension ParserFilesRobot on WorkbenchRobot {
     spotText('Exported 1 parser', exact: true).existsOnce();
   }
 
-  Future<void> exportAllToFile(Directory directory) async {
+  Future<void> exportAllToFile() async {
+    final directory = (await tester.runAsync(() => Directory.systemTemp.createTemp('parsers')))!;
+    addTearDown(() => directory.delete(recursive: true));
     final path = '${directory.path}/$parserFileName';
     files.savePath = path;
     await tapLabel('Library');

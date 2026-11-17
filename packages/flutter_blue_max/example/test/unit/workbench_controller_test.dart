@@ -564,7 +564,10 @@ void main() {
     await controller.startServer(secure: false);
     platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
     final session = controller.channels.single;
-    platform.failNextWrite = true;
+    platform.overrideWriteL2CapChannel = (_) {
+      platform.overrideWriteL2CapChannel = null;
+      return Future<void>.error(StateError('Peer rejected the write'));
+    };
     await controller.send(session, [1]);
     expect(controller.error, 'L2CAP channel: Bad state: Peer rejected the write');
     expect(session.transmitted, 0);
@@ -596,8 +599,11 @@ void main() {
 
   test('an unimplemented server reports unsupported without leaving a pending session', () async {
     final (:controller, :platform) = await _setup();
-    platform.l2capFailure = UnimplementedError();
-    addTearDown(() => platform.l2capFailure = null);
+    platform.overrideListenL2CapChannel = (request) {
+      platform.serverStarts++;
+      platform.listenRequests.add(request);
+      return Future<int>.error(UnimplementedError());
+    };
 
     await controller.startServer(secure: true);
 
@@ -638,8 +644,10 @@ void main() {
       controller.select(peer);
       await controller.connect();
       final before = platform.openRequests.length;
-      platform.l2capFailure = failure;
-      addTearDown(() => platform.l2capFailure = null);
+      platform.overrideOpenL2CapChannel = (request) {
+        platform.openRequests.add(request);
+        return Future<void>.error(failure);
+      };
 
       await controller.openChannel(131, device: peer, secure: true);
 
@@ -673,7 +681,10 @@ void main() {
       final platform = fixture.platform;
       final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:51');
       c.select(peer);
-      platform.holdConnections = true;
+      platform.overrideConnect = (request) async {
+        platform.connectRequests.add(request);
+        return true;
+      };
       final opening = c.connect();
       await _until(() => platform.connectRequests.any((r) => r.remoteId == peer.remoteId));
       expect(c.connectingDevice, peer);
@@ -692,8 +703,12 @@ void main() {
       final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:52');
       c.select(peer);
       await c.connect();
-      platform.failNextOpen = true;
-      platform.disconnectOnOpenFailure = true;
+      platform.overrideOpenL2CapChannel = (request) async {
+        platform.overrideOpenL2CapChannel = null;
+        platform.openRequests.add(request);
+        await platform.disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(request.remoteId)));
+        throw StateError('Temporary channel failure');
+      };
       final attempts = platform.openRequests.length;
       final connections = platform.connectRequests.length;
       await c.openChannel(131, device: peer, secure: true);
@@ -801,7 +816,10 @@ void main() {
       await c.startServer(secure: true);
       platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('burst-failure'), psm: 129));
       final session = c.channels.single;
-      platform.failNextWrite = true;
+      platform.overrideWriteL2CapChannel = (_) {
+        platform.overrideWriteL2CapChannel = null;
+        return Future<void>.error(StateError('Peer rejected the write'));
+      };
       await c.sendTestTraffic(session, size: 1024, count: 20);
       expect(session.transmitted, 19 * 1024);
       expect(c.error, contains('Peer rejected'));

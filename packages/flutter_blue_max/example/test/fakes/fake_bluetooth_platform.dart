@@ -19,14 +19,9 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final stoppedServers = <int>[];
   final connected = <DeviceIdentifier>{};
   Completer<int>? pendingServer;
-  bool failNextWrite = false;
   int serverStarts = 0;
-  bool holdConnections = false;
   bool includeGattExtras = false;
   bool emitNotifyDescriptorEvents = true;
-  bool failNextOpen = false;
-  bool disconnectOnOpenFailure = false;
-  Object? l2capFailure;
   final connectRequests = <BmConnectRequest>[];
   final systemDeviceRequests = <BmSystemDevicesRequest>[];
   final scanRequests = <BmScanSettings>[];
@@ -97,14 +92,9 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     notifyRequests.clear();
     systemPeers.clear();
     pendingServer = null;
-    failNextWrite = false;
     serverStarts = 0;
-    holdConnections = false;
     includeGattExtras = false;
     emitNotifyDescriptorEvents = true;
-    failNextOpen = false;
-    disconnectOnOpenFailure = false;
-    l2capFailure = null;
     bufferedBytes = [];
     pendingWrites = null;
     turnOnRequests = 0;
@@ -397,9 +387,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
       return await override(request);
     }
     connectRequests.add(request);
-    if (holdConnections) {
-      return true;
-    }
     connected.add(request.remoteId);
     connections.add(
       BmConnectionStateResponse(
@@ -528,10 +515,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     }
     serverStarts++;
     listenRequests.add(request);
-    final failure = l2capFailure;
-    if (failure != null) {
-      throw failure;
-    }
     final pending = pendingServer;
     if (pending != null) {
       return await pending.future;
@@ -609,17 +592,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
       return await override(request);
     }
     openRequests.add(request);
-    final failure = l2capFailure;
-    if (failure != null) {
-      throw failure;
-    }
-    if (failNextOpen) {
-      failNextOpen = false;
-      if (disconnectOnOpenFailure) {
-        await disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(request.remoteId)));
-      }
-      throw StateError('Temporary channel failure');
-    }
   }
 
   Future<void> Function(CloseL2CapChannelRequest request)? overrideCloseL2CapChannel;
@@ -641,10 +613,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     final override = overrideWriteL2CapChannel;
     if (override != null) {
       return await override(request);
-    }
-    if (failNextWrite) {
-      failNextWrite = false;
-      throw StateError('Peer rejected the write');
     }
     writes.add(request);
     await pendingWrites?.future;

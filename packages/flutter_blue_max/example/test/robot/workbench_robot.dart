@@ -44,7 +44,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> dispose() async {
     logEvent('Close the workbench');
-    platform.holdConnections = false;
+    platform.overrideConnect = null;
     platform.includeGattExtras = false;
     platform.emitNotifyDescriptorEvents = true;
     platform.systemPeers.clear();
@@ -203,11 +203,15 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   }
 
   Future<void> openActivity() => tapLabel('Activity');
+  Future<void> openDevices() => tapLabel('Devices');
 
   Future<void> rejectUnsupportedServer() async {
     logEvent('Report an unsupported server from the platform boundary');
-    platform.l2capFailure = UnimplementedError();
-    addTearDown(() => platform.l2capFailure = null);
+    platform.overrideListenL2CapChannel = (request) {
+      platform.serverStarts++;
+      platform.listenRequests.add(request);
+      return Future<int>.error(UnimplementedError());
+    };
     await startServer();
     spot<ErrorBanner>().spotText('This operation is not supported on this device.', exact: true).existsOnce();
     expect(controller.serverPsm, isNull);
