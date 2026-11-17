@@ -43,34 +43,23 @@ class KnownService(
     'characteristics': [for (final characteristic in characteristics) characteristic.toJson()],
   };
 
-  KnownCharacteristic? characteristic(Guid uuid) {
-    for (final characteristic in characteristics) {
-      if (characteristic.uuid == uuid) {
-        return characteristic;
-      }
-    }
-    return null;
-  }
+  KnownCharacteristic? characteristic(Guid uuid) => characteristics.where((c) => c.uuid == uuid).firstOrNull;
 
   /// Names of characteristics [discovered] lacks or reports with other properties; empty unless [test].
   ({List<String> missing, List<String> different}) compare(BluetoothService discovered) {
     if (!test) {
       return (missing: const [], different: const []);
     }
-    final missing = <String>[];
-    final different = <String>[];
-    for (final known in characteristics) {
-      final matching = [
-        for (final characteristic in discovered.characteristics)
-          if (characteristic.uuid == known.uuid) characteristic,
-      ];
-      if (matching.isEmpty) {
-        missing.add(known.name);
-      } else if (!matching.every((c) => known.matches(c.properties))) {
-        different.add(known.name);
-      }
+    List<BluetoothCharacteristic> matching(KnownCharacteristic known) =>
+        discovered.characteristics.where((c) => c.uuid == known.uuid).toList();
+    bool differs(KnownCharacteristic known) {
+      final actual = matching(known);
+      return actual.isNotEmpty && !actual.every((c) => known.matches(c.properties));
     }
-    return (missing: missing, different: different);
+    return (
+      missing: [for (final known in characteristics) if (matching(known).isEmpty) known.name],
+      different: [for (final known in characteristics) if (differs(known)) known.name],
+    );
   }
 }
 
@@ -140,24 +129,17 @@ final userDescriptionUuid = Guid('2901');
 
 /// The last read User Description, or null before it was read or if there is none.
 String? userDescription(BluetoothCharacteristic characteristic) {
-  for (final descriptor in characteristic.descriptors) {
-    if (descriptor.uuid == userDescriptionUuid) {
-      final text = utf8.decode(descriptor.lastValue, allowMalformed: true).trim();
-      return text.isEmpty ? null : text;
-    }
+  final descriptor = characteristic.descriptors.where((d) => d.uuid == userDescriptionUuid).firstOrNull;
+  if (descriptor == null) {
+    return null;
   }
-  return null;
+  final text = utf8.decode(descriptor.lastValue, allowMalformed: true).trim();
+  return text.isEmpty ? null : text;
 }
 
 /// The built-in entry for [uuid]; the controller looks up the user's own entries first.
-KnownService? builtInService(Guid uuid) {
-  for (final service in [...testDongleServices, ...standardServices]) {
-    if (service.uuid == uuid) {
-      return service;
-    }
-  }
-  return null;
-}
+KnownService? builtInService(Guid uuid) =>
+    [...testDongleServices, ...standardServices].where((s) => s.uuid == uuid).firstOrNull;
 
 /// UUIDs of the FBM test dongle firmware share one base; [shortId] is its `xxxx` part.
 Guid _fbm(int shortId) => Guid('7e57${shortId.toRadixString(16).padLeft(4, '0')}-85d8-4594-ac4f-b32fc01e9a49');
