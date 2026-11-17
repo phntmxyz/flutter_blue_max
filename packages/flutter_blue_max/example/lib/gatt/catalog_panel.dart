@@ -46,11 +46,13 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
             ),
             Builder(
               // The share sheet on iPad anchors to this button.
-              builder: (button) => OutlinedButton.icon(
-                onPressed: c.catalog.isEmpty ? null : () => _export(button),
-                icon: const Icon(Icons.save_alt),
-                label: const Text('Export'),
-              ),
+              builder: (button) {
+                return OutlinedButton.icon(
+                  onPressed: c.catalog.isEmpty ? null : () => _export(button),
+                  icon: const Icon(Icons.save_alt),
+                  label: const Text('Export'),
+                );
+              },
             ),
             TextButton.icon(
               onPressed: () => _reset(context),
@@ -198,13 +200,15 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     noun: serviceNoun,
     items: services,
     label: (s) => s.name,
-    details: (s) => [
-      s.uuid.str.toUpperCase(),
-      counted(s.characteristics.length, _characteristicNoun),
-      if (importing)
-        if (context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s) != null)
-          'Replaces your ${context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s)!.name}',
-    ].join(' · '),
+    details: (s) {
+      return [
+        s.uuid.str.toUpperCase(),
+        counted(s.characteristics.length, _characteristicNoun),
+        if (importing)
+          if (context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s) != null)
+            'Replaces your ${context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s)!.name}',
+      ].join(' · ');
+    },
   );
 }
 

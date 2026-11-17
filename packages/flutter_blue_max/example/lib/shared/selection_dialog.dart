@@ -27,8 +27,9 @@ class const SelectionDialog<T>({
     required String Function(T item) details,
   }) => showDialog<List<T>>(
     context: context,
-    builder: (_) =>
-        SelectionDialog(title: title, action: action, noun: noun, items: items, label: label, details: details),
+    builder: (_) {
+      return SelectionDialog(title: title, action: action, noun: noun, items: items, label: label, details: details);
+    },
   );
 
   @override
@@ -55,13 +56,15 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
               tristate: true,
               value: all ? true : (_chosen.isEmpty ? false : null),
               title: Text('All ${widget.noun.$2}'),
-              onChanged: (_) => setState(() {
-                if (all) {
-                  _chosen.clear();
-                } else {
-                  _chosen.addAll([for (var i = 0; i < items.length; i++) i]);
-                }
-              }),
+              onChanged: (_) {
+                return setState(() {
+                  if (all) {
+                    _chosen.clear();
+                  } else {
+                    _chosen.addAll([for (var i = 0; i < items.length; i++) i]);
+                  }
+                });
+              },
             ),
             const Divider(),
             for (final (index, item) in items.indexed)
@@ -79,10 +82,12 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
         FilledButton(
           onPressed: _chosen.isEmpty
               ? null
-              : () => Navigator.pop(context, [
-                  for (final (index, item) in items.indexed)
-                    if (_chosen.contains(index)) item,
-                ]),
+              : () {
+                  return Navigator.pop(context, [
+                    for (final (index, item) in items.indexed)
+                      if (_chosen.contains(index)) item,
+                  ]);
+                },
           child: Text('${widget.action} ${counted(_chosen.length, widget.noun)}'),
         ),
       ],

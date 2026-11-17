@@ -20,14 +20,16 @@ class const CatalogEditorPage({
     final controller = context.read<GattCatalogLibrary>();
     final service = await Navigator.of(context).push(
       MaterialPageRoute<KnownService>(
-        builder: (_) => CatalogEditorPage(
-          initial: initial ?? previous,
-          editing: previous != null,
-          others: [
-            for (final service in controller.catalog)
-              if (service != previous) service,
-          ],
-        ),
+        builder: (_) {
+          return CatalogEditorPage(
+            initial: initial ?? previous,
+            editing: previous != null,
+            others: [
+              for (final service in controller.catalog)
+                if (service != previous) service,
+            ],
+          );
+        },
       ),
     );
     if (service != null) {
@@ -184,10 +186,12 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                 ),
                 IconButton(
                   tooltip: 'Remove characteristic',
-                  onPressed: () => setState(() {
-                    _characteristics.remove(draft);
-                    draft.dispose();
-                  }),
+                  onPressed: () {
+                    return setState(() {
+                      _characteristics.remove(draft);
+                      draft.dispose();
+                    });
+                  },
                   icon: const Icon(Icons.delete_outline),
                 ),
               ],
@@ -211,40 +215,42 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
               const SizedBox(height: 12),
               FormField<void>(
                 validator: (_) => draft.properties.isEmpty ? 'Select the expected properties.' : null,
-                builder: (field) => Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 8,
-                      children: [
-                        for (final property in GattProperty.values)
-                          FilterChip(
-                            label: Text(property.label),
-                            selected: draft.properties.contains(property),
-                            onSelected: (it) {
-                              setState(() {
-                                if (it) {
-                                  draft.properties.add(property);
-                                } else {
-                                  draft.properties.remove(property);
-                                }
-                              });
-                              field.didChange(null);
-                            },
-                          ),
-                      ],
-                    ),
-                    if (field.errorText != null) ...[
-                      const SizedBox(height: 6),
-                      Text(
-                        field.errorText!,
-                        style: Theme.of(context).textTheme.bodySmall!
-                            .copyWith(color: Theme.of(context).colorScheme.error),
+                builder: (field) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: [
+                          for (final property in GattProperty.values)
+                            FilterChip(
+                              label: Text(property.label),
+                              selected: draft.properties.contains(property),
+                              onSelected: (it) {
+                                setState(() {
+                                  if (it) {
+                                    draft.properties.add(property);
+                                  } else {
+                                    draft.properties.remove(property);
+                                  }
+                                });
+                                field.didChange(null);
+                              },
+                            ),
+                        ],
                       ),
+                      if (field.errorText != null) ...[
+                        const SizedBox(height: 6),
+                        Text(
+                          field.errorText!,
+                          style: Theme.of(context).textTheme.bodySmall!
+                              .copyWith(color: Theme.of(context).colorScheme.error),
+                        ),
+                      ],
                     ],
-                  ],
-                ),
+                  );
+                },
               ),
             ],
           ],

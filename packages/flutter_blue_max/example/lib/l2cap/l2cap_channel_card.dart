@@ -79,8 +79,9 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
                     if (!idle) {
                       return null;
                     }
-                    return () =>
-                        context.read<WorkbenchController>().sendTestTraffic(session, size: 10 * 1024, count: 1);
+                    return () {
+                      return context.read<WorkbenchController>().sendTestTraffic(session, size: 10 * 1024, count: 1);
+                    };
                   })(),
                   icon: const Icon(Icons.data_usage),
                   label: const Text('Send 10 KB'),

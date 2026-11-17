@@ -42,11 +42,13 @@ class const GattService({super.key, required final BluetoothService service}) ex
           Align(
             alignment: Alignment.centerLeft,
             child: TextButton.icon(
-              onPressed: () => CatalogEditorPage.open(
-                context,
-                initial: known ?? KnownService.fromDiscovered(service),
-                previous: own ? known : null,
-              ),
+              onPressed: () async {
+                await CatalogEditorPage.open(
+                  context,
+                  initial: known ?? KnownService.fromDiscovered(service),
+                  previous: own ? known : null,
+                );
+              },
               icon: Icon(own ? Icons.edit_outlined : Icons.bookmark_add_outlined, size: 18),
               label: Text(own ? 'Edit catalog entry' : 'Add to catalog'),
             ),

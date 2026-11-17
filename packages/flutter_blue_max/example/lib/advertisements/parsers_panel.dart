@@ -49,11 +49,13 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
             ),
             Builder(
               // The share sheet on iPad anchors to this button.
-              builder: (button) => OutlinedButton.icon(
-                onPressed: c.parsers.isEmpty ? null : () => _export(button),
-                icon: const Icon(Icons.save_alt),
-                label: const Text('Export'),
-              ),
+              builder: (button) {
+                return OutlinedButton.icon(
+                  onPressed: c.parsers.isEmpty ? null : () => _export(button),
+                  icon: const Icon(Icons.save_alt),
+                  label: const Text('Export'),
+                );
+              },
             ),
             TextButton.icon(
               onPressed: () => _reset(context),

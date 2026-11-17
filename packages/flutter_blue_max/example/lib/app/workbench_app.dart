@@ -55,11 +55,13 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
         darkTheme: _theme(Brightness.dark),
         themeMode: _themeMode,
         // Touch platforms keep the keyboard open on taps outside a field; this closes it for every field and dialog.
-        builder: (context, child) => GestureDetector(
-          behavior: HitTestBehavior.translucent,
-          onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
-          child: child,
-        ),
+        builder: (context, child) {
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: child,
+          );
+        },
         home: Selector<WorkbenchController, List<Object?>>(
           child: IndexedStack(
             index: _destination,

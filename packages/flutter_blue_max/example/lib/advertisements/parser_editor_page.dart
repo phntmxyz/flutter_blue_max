@@ -228,10 +228,12 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                   ButtonSegment(value: source, label: Text(source.label)),
               ],
               selected: {_source},
-              onSelectionChanged: (value) => setState(() {
-                _source = value.single;
-                _key.clear();
-              }),
+              onSelectionChanged: (value) {
+                return setState(() {
+                  _source = value.single;
+                  _key.clear();
+                });
+              },
             ),
             const SizedBox(height: 16),
             TextFormField(
@@ -429,10 +431,12 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                 IconButton(
                   tooltip: 'Remove field',
                   onPressed: _fields.length > 1
-                      ? () => setState(() {
-                          _fields.remove(draft);
-                          draft.dispose();
-                        })
+                      ? () {
+                          return setState(() {
+                            _fields.remove(draft);
+                            draft.dispose();
+                          });
+                        }
                       : null,
                   icon: const Icon(Icons.delete_outline),
                 ),
