@@ -23,8 +23,7 @@ class const GattService({super.key, required final BluetoothService service}) ex
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: EdgeInsets.zero,
       title: GattTitle(
-        known?.name ?? uuid,
-        style: known == null ? const TextStyle(fontFamily: 'monospace', fontSize: 14) : null,
+        title: Text(known?.name ?? uuid, style: known == null ? const TextStyle(fontFamily: 'monospace', fontSize: 14) : null),
         expected: expected,
       ),
       subtitle: Column(

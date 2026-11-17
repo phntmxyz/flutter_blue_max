@@ -73,8 +73,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
       title: GattTitle(
-        name ?? uuid,
-        style: name == null ? const TextStyle(fontFamily: 'monospace', fontSize: 13) : null,
+        title: Text(name ?? uuid, style: name == null ? const TextStyle(fontFamily: 'monospace', fontSize: 13) : null),
         expected: expected,
       ),
       subtitle: Column(
@@ -224,8 +223,8 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   }
 }
 
-/// A catalog or peripheral name, or a UUID in [style], marked when a test entry is or is not as [expected].
-class const GattTitle(final String text, {super.key, final TextStyle? style, final bool? expected})
+/// Styled title shared by discovered service and characteristic tiles, with an optional test verdict.
+class const GattTitle({super.key, required final Widget title, final bool? expected})
     extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -240,7 +239,7 @@ class const GattTitle(final String text, {super.key, final TextStyle? style, fin
           ),
           const SizedBox(width: 6),
         ],
-        Flexible(child: Text(text, style: style)),
+        Flexible(child: title),
       ],
     );
   }
