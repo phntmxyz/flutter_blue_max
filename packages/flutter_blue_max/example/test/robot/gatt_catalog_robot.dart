@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -35,7 +36,9 @@ extension GattCatalogRobot on WorkbenchRobot {
     await tapLabel('Save entry');
     spotText('Enter a name.', exact: true).existsOnce();
     spotText('Select the expected properties.', exact: true).existsOnce();
-    final remove = spot<IconButton>().withTooltip('Remove characteristic').atIndex(0)..existsOnce();
+    spot<CatalogCharacteristicCard>().existsExactlyNTimes(2);
+    final remove = spot<CatalogCharacteristicCard>().atIndex(0).spot<IconButton>().withTooltip('Remove characteristic')
+      ..existsOnce();
     await scrollIntoView(remove);
     await act.tap(remove);
     await idle();

@@ -55,6 +55,28 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     super.dispose();
   }
 
+  Future<void> _readCharacteristic() async {
+    final c = widget.characteristic;
+    await context.read<WorkbenchController>().run(Operation.characteristic(c), () async {
+      await c.read();
+    });
+  }
+
+  Future<void> _toggleNotifications() async {
+    final c = widget.characteristic;
+    final controller = context.read<WorkbenchController>();
+    await controller.run(Operation.characteristic(c), () async {
+      final notify = !_notifying;
+      await c.setNotifyValue(notify);
+      // Web Bluetooth does not publish a CCCD event, so keep its subscription in the session.
+      if (kIsWeb) {
+        controller.setSubscribedOnWeb(c, subscribed: notify);
+        if (mounted) setState(() => _notifying = notify);
+      }
+      if (c.properties.read) await c.read();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final c = widget.characteristic;
@@ -68,7 +90,14 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final expected = checked ? known.matches(p) : null;
     final description = userDescription(c);
     final uuid = c.uuid.str.toUpperCase();
-    final name = known == null ? description : '${expected ?? false ? 'Test · ' : ''}${known.name}';
+    final String? name;
+    if (known == null) {
+      name = description;
+    } else if (expected == true) {
+      name = 'Test · ${known.name}';
+    } else {
+      name = known.name;
+    }
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -134,16 +163,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                 children: [
                   if (p.read)
                     OutlinedButton.icon(
-                      onPressed: (() {
-                        if (enabled) {
-                          return () async {
-                            await context.read<WorkbenchController>().run(operation, () async {
-                              await c.read();
-                            });
-                          };
-                        }
-                        return null;
-                      })(),
+                      onPressed: enabled ? _readCharacteristic : null,
                       icon: const Icon(Icons.download_rounded, size: 16),
                       label: const Text('Read'),
                     ),
@@ -154,42 +174,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       label: const Text('Write'),
                     ),
                   if (p.notify || p.indicate)
-                    () {
-                      final VoidCallback? toggleNotifications;
-                      if (enabled) {
-                        toggleNotifications = () async {
-                          final controller = context.read<WorkbenchController>();
-                          await controller.run(operation, () async {
-                            final notify = !_notifying;
-                            await c.setNotifyValue(notify);
-                            // Web Bluetooth does not publish a CCCD write event.
-                            if (kIsWeb) {
-                              controller.setSubscribedOnWeb(c, subscribed: notify);
-                              if (mounted) {
-                                setState(() => _notifying = notify);
-                              }
-                            }
-                            if (p.read) {
-                              await c.read();
-                            }
-                          });
-                        };
-                      } else {
-                        toggleNotifications = null;
-                      }
-                      if (_notifying) {
-                        return OutlinedButton.icon(
-                          onPressed: toggleNotifications,
-                          icon: const Icon(Icons.notifications_active_outlined, size: 16),
-                          label: const Text('Unsubscribe'),
-                        );
-                      }
-                      return OutlinedButton.icon(
-                        onPressed: toggleNotifications,
-                        icon: const Icon(Icons.notifications_none, size: 16),
-                        label: const Text('Subscribe'),
-                      );
-                    }(),
+                    SubscribeButton(notifying: _notifying, onPressed: enabled ? _toggleNotifications : null),
                 ],
               ),
               if (_writing) ...[
@@ -214,7 +199,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                   },
                 ),
               ],
-              for (final descriptor in c.descriptors) _Descriptor(descriptor: descriptor),
+              for (final descriptor in c.descriptors) GattDescriptorTile(descriptor: descriptor),
             ],
           ),
         ),
@@ -244,13 +229,21 @@ class const GattTitle({super.key, required final Widget title, final bool? expec
   }
 }
 
-class const _Descriptor({required final BluetoothDescriptor descriptor}) extends StatefulWidget {
+/// Descriptor section of an expanded GattCharacteristic.
+class const GattDescriptorTile({required final BluetoothDescriptor descriptor}) extends StatefulWidget {
   @override
-  State<_Descriptor> createState() => _DescriptorState();
+  State<GattDescriptorTile> createState() => _DescriptorState();
 }
 
-class _DescriptorState() extends State<_Descriptor> {
+class _DescriptorState() extends State<GattDescriptorTile> {
   late final Stream<List<int>> _values = widget.descriptor.lastValueStream;
+
+  Future<void> _readDescriptor() async {
+    final d = widget.descriptor;
+    await context.read<WorkbenchController>().run(Operation.descriptor(d), () async {
+      await d.read();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -267,19 +260,7 @@ class _DescriptorState() extends State<_Descriptor> {
         ),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton(
-            onPressed: (() {
-              if (enabled) {
-                return () async {
-                  await context.read<WorkbenchController>().run(operation, () async {
-                    await d.read();
-                  });
-                };
-              }
-              return null;
-            })(),
-            child: const Text('Read descriptor'),
-          ),
+          child: TextButton(onPressed: enabled ? _readDescriptor : null, child: const Text('Read descriptor')),
         ),
         PayloadEditor(
           enabled: enabled,
@@ -296,6 +277,26 @@ class _DescriptorState() extends State<_Descriptor> {
             child: Text('Subscribe configures this descriptor. Direct CCCD writes may be rejected by the platform.'),
           ),
       ],
+    );
+  }
+}
+
+/// Notification toggle within a GATT characteristic, with behavior owned by the characteristic state.
+class const SubscribeButton({super.key, required final bool notifying, required final VoidCallback? onPressed})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    if (notifying) {
+      return OutlinedButton.icon(
+        onPressed: onPressed,
+        icon: const Icon(Icons.notifications_active_outlined, size: 16),
+        label: const Text('Unsubscribe'),
+      );
+    }
+    return OutlinedButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(Icons.notifications_none, size: 16),
+      label: const Text('Subscribe'),
     );
   }
 }

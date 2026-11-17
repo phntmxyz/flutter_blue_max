@@ -45,7 +45,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
   final _uuid = TextEditingController();
-  final _characteristics = <_CharacteristicDraft>[];
+  final _characteristics = <CharacteristicDraft>[];
   bool _test = true;
 
   @override
@@ -53,7 +53,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
     super.initState();
     final initial = widget.initial;
     if (initial == null) {
-      _characteristics.add(_CharacteristicDraft());
+      _characteristics.add(CharacteristicDraft());
       return;
     }
     _name.text = initial.name;
@@ -61,7 +61,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
     _test = initial.test;
     for (final characteristic in initial.characteristics) {
       _characteristics.add(
-        _CharacteristicDraft()
+        CharacteristicDraft()
           ..name.text = characteristic.name
           ..uuid.text = characteristic.uuid.str
           ..properties.addAll(characteristic.properties ?? {}),
@@ -88,7 +88,10 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
       ),
   ]);
 
-  String? _required(String? value) => (value ?? '').trim().isEmpty ? 'Enter a name.' : null;
+  void _removeCharacteristic(CharacteristicDraft draft) {
+    setState(() => _characteristics.remove(draft));
+    WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -155,10 +158,21 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
             ),
             const SizedBox(height: 12),
             Text('Characteristics', style: Theme.of(context).textTheme.titleSmall),
-            for (final draft in _characteristics) ...[const SizedBox(height: 12), _characteristicCard(draft)],
+            for (final draft in _characteristics) ...[
+              const SizedBox(height: 12),
+              CatalogCharacteristicCard(
+                key: ObjectKey(draft),
+                draft: draft,
+                checkProperties: _test,
+                nameValidator: _required,
+                isDuplicate: (uuid) => _characteristics.where((d) => d.parsedUuid == uuid).length > 1,
+                onChanged: () => setState(() {}),
+                onRemove: () => _removeCharacteristic(draft),
+              ),
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => setState(() => _characteristics.add(_CharacteristicDraft())),
+              onPressed: () => setState(() => _characteristics.add(CharacteristicDraft())),
               icon: const Icon(Icons.add),
               label: const Text('Add characteristic'),
             ),
@@ -167,10 +181,43 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
       ),
     );
   }
+}
 
-  Widget _characteristicCard(_CharacteristicDraft draft) {
+/// Form state of one characteristic.
+class CharacteristicDraft() {
+  final name = TextEditingController();
+  final uuid = TextEditingController();
+  final properties = <GattProperty>{};
+
+  Guid? get parsedUuid => _parse(uuid.text);
+
+  void dispose() {
+    name.dispose();
+    uuid.dispose();
+  }
+}
+
+Guid? _parse(String text) {
+  try {
+    return text.trim().isEmpty ? null : Guid(text.trim());
+  } on Object {
+    return null;
+  }
+}
+
+/// One keyed characteristic form within CatalogEditorPage; the page owns its draft lifecycle.
+class const CatalogCharacteristicCard({
+  super.key,
+  required final CharacteristicDraft draft,
+  required final bool checkProperties,
+  required final FormFieldValidator<String> nameValidator,
+  required final bool Function(Guid uuid) isDuplicate,
+  required final VoidCallback onChanged,
+  required final VoidCallback onRemove,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
     return Card(
-      key: ObjectKey(draft),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -182,17 +229,12 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                   child: TextFormField(
                     controller: draft.name,
                     decoration: const InputDecoration(labelText: 'Characteristic name', hintText: 'Temperature'),
-                    validator: _required,
+                    validator: nameValidator,
                   ),
                 ),
                 IconButton(
                   tooltip: 'Remove characteristic',
-                  onPressed: () {
-                    return setState(() {
-                      _characteristics.remove(draft);
-                      WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
-                    });
-                  },
+                  onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline),
                 ),
               ],
@@ -206,13 +248,13 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                 if (uuid == null) {
                   return 'Enter a 16, 32 or 128-bit UUID.';
                 }
-                if (_characteristics.where((other) => other.parsedUuid == uuid).length > 1) {
+                if (isDuplicate(uuid)) {
                   return 'This service already has this characteristic.';
                 }
                 return null;
               },
             ),
-            if (_test) ...[
+            if (checkProperties) ...[
               const SizedBox(height: 12),
               FormField<void>(
                 validator: (_) => draft.properties.isEmpty ? 'Select the expected properties.' : null,
@@ -229,13 +271,12 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                               label: Text(property.label),
                               selected: draft.properties.contains(property),
                               onSelected: (it) {
-                                setState(() {
-                                  if (it) {
-                                    draft.properties.add(property);
-                                  } else {
-                                    draft.properties.remove(property);
-                                  }
-                                });
+                                if (it) {
+                                  draft.properties.add(property);
+                                } else {
+                                  draft.properties.remove(property);
+                                }
+                                onChanged();
                                 field.didChange(null);
                               },
                             ),
@@ -261,24 +302,4 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   }
 }
 
-/// Form state of one characteristic.
-class _CharacteristicDraft() {
-  final name = TextEditingController();
-  final uuid = TextEditingController();
-  final properties = <GattProperty>{};
-
-  Guid? get parsedUuid => _parse(uuid.text);
-
-  void dispose() {
-    name.dispose();
-    uuid.dispose();
-  }
-}
-
-Guid? _parse(String text) {
-  try {
-    return text.trim().isEmpty ? null : Guid(text.trim());
-  } on Object {
-    return null;
-  }
-}
+String? _required(String? value) => (value ?? '').trim().isEmpty ? 'Enter a name.' : null;

@@ -70,7 +70,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
             style: Theme.of(context).textTheme.bodySmall,
           ),
         for (final service in c.catalog)
-          _ServiceCard(
+          CatalogServiceCard(
             service: service,
             note: switch (builtInService(service.uuid)) {
               final replaced? => 'Replaces the built-in ${replaced.name}',
@@ -97,7 +97,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
           Text(title, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           for (final service in services)
-            _ServiceCard(
+            CatalogServiceCard(
               service: service,
               note: c.catalog.any((own) => own.uuid == service.uuid) ? 'Replaced by your entry' : null,
               actions: [
@@ -246,8 +246,12 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
   }
 }
 
-class const _ServiceCard({required final KnownService service, required final List<Widget> actions, final String? note})
-    extends StatelessWidget {
+/// A catalog service and its actions in the Library catalog section.
+class const CatalogServiceCard({
+  required final KnownService service,
+  required final List<Widget> actions,
+  final String? note,
+}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 11);

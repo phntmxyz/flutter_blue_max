@@ -1,5 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -161,6 +162,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     expect(platform.characteristicWrites.last.writeType, BmWriteType.withoutResponse);
     expect(platform.characteristicReads.length, readsBeforeWrite + 2);
     await tapLabel('Write');
+    spot<GattDescriptorTile>().withChild(spotText('Descriptor 2901', exact: true)).existsOnce();
     await tapLabel('Descriptor 2901');
     await tapLabel('Read descriptor');
     spotText('41', exact: true).existsOnce();
