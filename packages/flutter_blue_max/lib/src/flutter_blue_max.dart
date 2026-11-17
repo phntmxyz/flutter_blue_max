@@ -430,7 +430,7 @@ class FlutterBlueMax {
       if (isScanningNow) {
         await _stopScan();
       } else if (_logLevel.index >= LogLevel.info.index) {
-        FlutterBlueMaxPlatform.log("[FBP] stopScan: already stopped");
+        FlutterBlueMaxPlatform.log("[FBM] stopScan: already stopped");
       }
     } finally {
       mtx.give();
@@ -605,7 +605,7 @@ class FlutterBlueMax {
           for (DeviceIdentifier d in _autoConnect) {
             BluetoothDevice(remoteId: d).connect(autoConnect: true, mtu: null).onError((e, s) {
               if (logLevel != LogLevel.none) {
-                FlutterBlueMaxPlatform.log("[FBP] [AutoConnect] connection failed: $e");
+                FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
               }
             });
           }
@@ -644,7 +644,7 @@ class FlutterBlueMax {
                 var d = BluetoothDevice(remoteId: r.remoteId);
                 d.connect(autoConnect: true, mtu: null).onError((e, s) {
                   if (logLevel != LogLevel.none) {
-                    FlutterBlueMaxPlatform.log("[FBP] [AutoConnect] connection failed: $e");
+                    FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
                   }
                 });
               }
