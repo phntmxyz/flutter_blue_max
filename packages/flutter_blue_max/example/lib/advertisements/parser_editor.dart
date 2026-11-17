@@ -86,7 +86,8 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       };
       _match.text = PayloadCodec.hex(initial.match);
       _matchOffset.text = '${initial.matchOffset}';
-      if (initial.records case final records?) {
+      final records = initial.records;
+      if (records != null) {
         _records = true;
         _recordOffset.text = '${records.offset}';
         _recordType = records.type;

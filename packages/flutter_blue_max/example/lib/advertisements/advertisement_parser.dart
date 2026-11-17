@@ -257,7 +257,8 @@ class const AdvertisementField(
       AdvertisementFieldType.float32be => data.getFloat32(0),
     };
     final num value;
-    if (bits case final bits?) {
+    final bits = this.bits;
+    if (bits != null) {
       if (!type.unsigned) {
         return 'bits need an unsigned type';
       }
@@ -396,7 +397,8 @@ class const AdvertisementParser({
     // A record type without a length byte is as large as its fields reach.
     final sizes = <int, int>{};
     for (final field in fields) {
-      if (field.record case final record?) {
+      final record = field.record;
+      if (record != null) {
         sizes[record] = max(sizes[record] ?? 0, field.offset + field.size);
       }
     }
@@ -404,7 +406,7 @@ class const AdvertisementParser({
     // Fields of records absent from this frame are left out: many sensors send one value per frame.
     return [
       for (final field in fields)
-        if (values[field.record] case final value?) '$name · ${field.name}: ${field.format(value)}',
+        if (values[field.record] != null) '$name · ${field.name}: ${field.format(values[field.record]!)}',
       if (problem != null) '$name · $problem',
     ];
   }
