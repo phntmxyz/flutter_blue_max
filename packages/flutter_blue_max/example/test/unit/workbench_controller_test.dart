@@ -11,6 +11,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
+import 'package:flutter_blue_max_example/shared/stored_list.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -314,6 +315,48 @@ void main() {
       expect((await loadCatalog())?.items, isEmpty);
     });
 
+    test('a failed save is reported and later saves still run', () async {
+      var fail = true;
+      final saved = <String, List<Object?>>{};
+      final (:controller, platform: _) = await _setup(
+        saveList: (key, items, {unreadable = const []}) async {
+          if (fail) {
+            throw StateError('disk full');
+          }
+          saved[key] = items;
+        },
+      );
+
+      await controller.removeParser(controller.parsers.first);
+      expect(controller.error, 'Saving parsers: Bad state: disk full');
+      expect(controller.logs.last, contains('ERROR saving parsers'));
+
+      fail = false;
+      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
+      expect(saved[catalogStoreKey], hasLength(1));
+    });
+
+    test('a slow save never overwrites a newer one', () async {
+      final slow = Completer<void>();
+      final saved = <List<Object?>>[];
+      var saves = 0;
+      final (:controller, platform: _) = await _setup(
+        saveList: (key, items, {unreadable = const []}) async {
+          if (saves++ == 0) {
+            await slow.future;
+          }
+          saved.add(items);
+        },
+      );
+
+      final first = controller.removeParser(controller.parsers.first);
+      final second = controller.removeParser(controller.parsers.first);
+      slow.complete();
+      await Future.wait([first, second]);
+
+      expect(saved.map((items) => items.length), [1, 0]);
+    });
+
     test('unreadable stored parsers are reported instead of crashing the app', () async {
       SharedPreferences.setMockInitialValues({parserStoreKey: '{"not": "a list"}'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
@@ -349,6 +392,42 @@ void main() {
     platform.pendingServer = null;
     expect(platform.stoppedServers, contains(135));
     expect(controller.serverPsm, isNull);
+  });
+
+  test('a peer accepted before the server reports its PSM is kept', () async {
+    final (:controller, :platform) = await _setup();
+    final pending = Completer<int>();
+    platform.pendingServer = pending;
+    final starting = controller.startServer(secure: true);
+    await Future<void>.delayed(Duration.zero);
+
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('early'), psm: 135));
+    pending.complete(135);
+    await starting;
+
+    expect(controller.serverPsm, 135);
+    expect(controller.channels.single.incoming, isTrue);
+    expect(controller.channels.single.channel.deviceId, const DeviceIdentifier('early'));
+  });
+
+  test('disposal stops the scan, closes channels, stops the server and disconnects peers', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:07');
+    controller.select(peer);
+    await controller.connect();
+    await controller.openChannel(131, device: peer, secure: true);
+    await controller.startServer(secure: true);
+    await controller.scan();
+    expect(controller.scanning, isTrue);
+    final stops = platform.scanStops;
+
+    controller.dispose();
+    await _until(() => platform.connected.isEmpty);
+
+    expect(platform.scanStops, stops + 1);
+    expect(platform.closeRequests.single.psm, 131);
+    expect(platform.stoppedServers, [129]);
+    expect(peer.isConnected, isFalse);
   });
 
   test('failed write exposes an error, releases busy state and does not count bytes', () async {
@@ -686,6 +765,7 @@ Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setu
   bool dispose = true,
   bool resetStorage = true,
   void Function(FakeBluetoothPlatform platform)? configure,
+  Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) saveList = saveStoredList,
 }) async {
   _platform.reset();
   if (resetStorage) {
@@ -693,7 +773,7 @@ Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setu
   }
   configure?.call(_platform);
   FlutterBlueMaxPlatform.instance = _platform;
-  final controller = WorkbenchController();
+  final controller = WorkbenchController(saveList: saveList);
   await controller.start();
   await Future<void>.delayed(Duration.zero);
   _platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));

@@ -54,6 +54,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   Completer<void>? pendingWrites;
   int turnOnRequests = 0;
   int scanStarts = 0;
+  int scanStops = 0;
 
   static BmCharacteristicProperties properties({
     bool read = false,
@@ -108,6 +109,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     pendingWrites = null;
     turnOnRequests = 0;
     scanStarts = 0;
+    scanStops = 0;
     overrideGetAdapterName = null;
     overrideGetSystemDevices = null;
     overrideTurnOn = null;
@@ -350,6 +352,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     if (override != null) {
       return await override(request);
     }
+    scanStops++;
     return true;
   }
 

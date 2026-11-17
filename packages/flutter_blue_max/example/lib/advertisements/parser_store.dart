@@ -6,7 +6,3 @@ const parserStoreKey = 'advertisement_parsers';
 
 /// Null until parsers were saved once, so first launches can start with examples.
 Future<StoredList<AdvertisementParser>?> loadParsers() => loadStoredList(parserStoreKey, AdvertisementParser.fromJson);
-
-/// Keeps the [unreadable] entries of the last load, so saving never drops them.
-Future<void> saveParsers(List<AdvertisementParser> parsers, {List<Object?> unreadable = const []}) =>
-    saveStoredList(parserStoreKey, parsers, unreadable: unreadable);

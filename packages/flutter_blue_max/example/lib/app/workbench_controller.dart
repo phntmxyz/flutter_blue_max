@@ -12,10 +12,14 @@ import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/stored_list.dart';
 
 /// Owns the example's Bluetooth session across navigation and device selection.
 /// The package remains responsible for platform I/O and operation serialization.
-class WorkbenchController() extends ChangeNotifier {
+class WorkbenchController({
+  /// Writes a stored list. Tests replace it to delay or fail a save.
+  final Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) saveList = saveStoredList,
+}) extends ChangeNotifier {
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _watched = <DeviceIdentifier>{};
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
@@ -731,7 +735,7 @@ class WorkbenchController() extends ChangeNotifier {
     }
     final snapshot = List.of(_parsers);
     final unreadable = _unreadableParsers;
-    return _persist('parsers', () => saveParsers(snapshot, unreadable: unreadable));
+    return _persist('parsers', () => saveList(parserStoreKey, snapshot, unreadable: unreadable));
   }
 
   Future<void> _persistCatalog() {
@@ -740,7 +744,7 @@ class WorkbenchController() extends ChangeNotifier {
     }
     final snapshot = List.of(_catalog);
     final unreadable = _unreadableCatalog;
-    return _persist('GATT catalog', () => saveCatalog(snapshot, unreadable: unreadable));
+    return _persist('GATT catalog', () => saveList(catalogStoreKey, snapshot, unreadable: unreadable));
   }
 
   /// The stored value could not be read at all, so saving over it would lose it without the user asking.
