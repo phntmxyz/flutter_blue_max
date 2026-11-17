@@ -111,6 +111,48 @@ void main() {
     expect(platform.closeRequests.single.psm, 131);
   });
 
+  test('a late accept from a stopped server is closed instead of orphaned', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.startServer(secure: true);
+    await controller.stopServer();
+    final before = platform.closeRequests.length;
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('late'), psm: 129));
+    await Future<void>.delayed(Duration.zero);
+    expect(platform.closeRequests.skip(before).map((r) => r.psm), [129]);
+    expect(controller.channels, isEmpty);
+  });
+
+  test('a restarted server closes provisional accepts with a different PSM', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.startServer(secure: true);
+    await controller.stopServer();
+    final pending = Completer<int>();
+    platform.pendingServer = pending;
+    final starting = controller.startServer(secure: true);
+    await Future<void>.delayed(Duration.zero);
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('stale'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('current'), psm: 131));
+    pending.complete(131);
+    await starting;
+    platform.pendingServer = null;
+    expect(controller.channels.map((s) => s.channel.psm), [131]);
+    expect(platform.closeRequests.any((r) => r.remoteId == 'stale' && r.psm == 129), isTrue);
+    await controller.stopServer();
+    expect(controller.channels, isEmpty);
+  });
+
+  test('a failed late-accept close remains visible for a manual retry', () async {
+    final (:controller, :platform) = await _setup();
+    platform.overrideCloseL2CapChannel = (_) async => throw StateError('late close failed');
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('retry'), psm: 129));
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.channels, hasLength(1));
+    expect(controller.error, contains('late close failed'));
+    platform.overrideCloseL2CapChannel = null;
+    await controller.closeChannel(controller.channels.single);
+    expect(controller.channels, isEmpty);
+  });
+
   test('stopping the server keeps an accepted channel whose close fails open for a retry', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);

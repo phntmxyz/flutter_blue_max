@@ -232,6 +232,8 @@ class WorkbenchController({
           final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
           _trackChannel(channel, incoming: true);
           log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
+        } else {
+          unawaited(_closeUnownedChannel(BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm)));
         }
       }),
     );
@@ -508,6 +510,9 @@ class WorkbenchController({
     final int psm;
     try {
       psm = await FlutterBlueMax.listenL2capChannel(secure: secure).orUnsupported();
+    } catch (_) {
+      await Future.wait(channels.where((s) => s.incoming).map((s) => _closeUnownedChannel(s.channel)));
+      rethrow;
     } finally {
       _startingServer = false;
     }
@@ -516,8 +521,28 @@ class WorkbenchController({
       return;
     }
     serverPsm = psm;
+    await Future.wait(
+      channels.where((s) => s.incoming && s.channel.psm != psm).map((s) => _closeUnownedChannel(s.channel)),
+    );
     log('Server listening on PSM $psm (${secure ? 'secure' : 'insecure'})');
   });
+
+  Future<void> _closeUnownedChannel(BluetoothL2capChannel channel) async {
+    try {
+      await channel.close();
+      _channels[(channel.deviceId, channel.psm)]?.markClosed();
+      _update();
+    } catch (exception, stackTrace) {
+      if (_disposed) {
+        return;
+      }
+      // Keep a failed native close reachable through the card's Close action.
+      _trackChannel(channel, incoming: true);
+      error = 'Closing late L2CAP accept: $exception';
+      log('ERROR $error');
+      debugPrintStack(stackTrace: stackTrace);
+    }
+  }
 
   Future<void> stopServer() => run(Operation.server, () async {
     final psm = serverPsm;
