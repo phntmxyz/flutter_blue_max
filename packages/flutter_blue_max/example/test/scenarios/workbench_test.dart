@@ -189,6 +189,15 @@ void main() {
     await robot.keepSearchAcrossDetails();
   });
 
+  testWidgets('phone: tapping outside a text field closes the keyboard', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.dismissKeyboardByTappingOutside();
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
     // Only Android lets the client choose encryption.
     debugDefaultTargetPlatformOverride = TargetPlatform.android;

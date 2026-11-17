@@ -237,6 +237,15 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     spot<ListTile>().withChild(spotText('Other peripheral', exact: true)).doesNotExist();
   }
 
+  Future<void> dismissKeyboardByTappingOutside() async {
+    logEvent('Focus the search field, then tap the page beside it');
+    await act.tap(spot<TextField>()..existsOnce());
+    await idle();
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tapLabel('Nearby devices');
+    expect(tester.testTextInput.isVisible, isFalse);
+  }
+
   Future<void> rotateToLandscape() async {
     logEvent('Rotate the phone to landscape');
     tester.view.physicalSize = const Size(844, 390);
