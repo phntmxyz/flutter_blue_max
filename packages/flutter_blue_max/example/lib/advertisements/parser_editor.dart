@@ -147,6 +147,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         if (_records && record == null) {
           return null;
         }
+        final variable = draft.type.size == null;
         final bits = draft.bits.text.trim();
         final ranged = draft.type.unsigned && bits.isNotEmpty;
         fields.add(
@@ -154,9 +155,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             draft.name.text.trim().isEmpty ? 'Field' : draft.name.text.trim(),
             int.parse(draft.offset.text.trim()),
             draft.type,
-            length: int.parse(draft.length.text.trim()),
-            scale: double.parse(draft.scale.text.trim()),
-            add: double.parse(draft.add.text.trim()),
+            length: variable ? int.parse(draft.length.text.trim()) : 1,
+            scale: variable ? 1 : double.parse(draft.scale.text.trim()),
+            add: variable ? 0 : double.parse(draft.add.text.trim()),
             unit: draft.unit.text.trim(),
             record: _records ? record : null,
             bit: ranged ? int.parse(draft.bit.text.trim()) : 0,

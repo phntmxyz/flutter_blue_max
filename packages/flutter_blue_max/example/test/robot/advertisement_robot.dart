@@ -47,6 +47,28 @@ extension AdvertisementRobot on WorkbenchRobot {
     expect(controller.parsers, hasLength(before));
   }
 
+  Future<void> saveAfterChangingFieldType() async {
+    for (final variableFirst in [false, true]) {
+      await tapLabel('Add parser');
+      final name = variableFirst ? 'Variable to fixed' : 'Fixed to variable';
+      await _enter('Parser name', name);
+      await _enter('Field name', 'Value');
+      if (variableFirst) {
+        await tapLabel('uint8');
+        await tapLabel('Hex');
+        await _enter('Bytes', '');
+        await tapLabel('Hex');
+        await tapLabel('uint8');
+      } else {
+        await _enter('Scale', '');
+        await tapLabel('uint8');
+        await tapLabel('Hex');
+      }
+      await tapLabel('Save parser');
+      expect(controller.parsers.where((p) => p.name == name), hasLength(1));
+    }
+  }
+
   Future<void> addTemperatureParser() async {
     await tapLabel('Add parser');
     logEvent('Verify that the source is prefilled from the latest advertisement');
