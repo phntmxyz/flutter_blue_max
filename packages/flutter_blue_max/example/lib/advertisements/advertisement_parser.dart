@@ -1,6 +1,7 @@
 import 'dart:math';
 import 'dart:typed_data';
 
+import 'package:deep_pick/deep_pick.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
@@ -26,24 +27,25 @@ class const AdvertisementParser({
   required final List<AdvertisementField> fields,
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a parser.
-  factory fromJson(Map<String, dynamic> json) {
+  factory fromJson(Map<String, dynamic> json) => AdvertisementParser.fromPick(pick(json).required());
+
+  /// Reads typed JSON values while retaining defaults for absent optional settings.
+  factory fromPick(RequiredPick data) {
     final AdvertisementParser parser;
     try {
-      final serviceUuid = json['serviceUuid'] as String?;
-      final records = json['records'] as Map<String, dynamic>?;
-      final device = json['device'] as String?;
+      final serviceUuid = _nullableString(data('serviceUuid'));
+      final records = data('records');
+      final device = _nullableString(data('device'));
       parser = AdvertisementParser(
-        name: json['name'] as String,
-        source: AdvertisementSource.values.byName(json['source'] as String),
-        companyId: json['companyId'] as int?,
+        name: data('name').asStringOrThrow(),
+        source: AdvertisementSource.values.byName(data('source').asStringOrThrow()),
+        companyId: _nullableInt(data('companyId')),
         serviceUuid: serviceUuid == null ? null : Guid(serviceUuid),
-        match: List<int>.unmodifiable(json['match'] as List),
-        matchOffset: json['matchOffset'] as int,
-        records: records == null ? null : RecordFormat.fromJson(records),
+        match: List<int>.unmodifiable(_intListOrEmpty(data('match'))),
+        matchOffset: _intOrDefault(data('matchOffset'), 0),
+        records: records.value == null ? null : RecordFormat.fromPick(records.required()),
         device: device == null ? null : DeviceIdentifier(device),
-        fields: List<AdvertisementField>.unmodifiable([
-          for (final field in json['fields'] as List) AdvertisementField.fromJson(field as Map<String, dynamic>),
-        ]),
+        fields: List<AdvertisementField>.unmodifiable(data('fields').asListOrThrow(AdvertisementField.fromPick)),
       );
     } on FormatException {
       rethrow;
@@ -208,13 +210,16 @@ class const RecordFormat({
   final RecordLength length = RecordLength.afterType,
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a record format.
-  factory fromJson(Map<String, dynamic> json) {
+  factory fromJson(Map<String, dynamic> json) => RecordFormat.fromPick(pick(json).required());
+
+  /// Reads typed JSON values while retaining defaults for absent optional settings.
+  factory fromPick(RequiredPick data) {
     final RecordFormat format;
     try {
       format = RecordFormat(
-        offset: json['offset'] as int,
-        type: RecordTypeFormat.values.byName(json['type'] as String),
-        length: RecordLength.values.byName(json['length'] as String),
+        offset: _intOrDefault(data('offset'), 0),
+        type: _enumOrDefault(data('type'), RecordTypeFormat.values, RecordTypeFormat.uint8),
+        length: _enumOrDefault(data('length'), RecordLength.values, RecordLength.afterType),
       );
     } on Object catch (error, stackTrace) {
       Error.throwWithStackTrace(FormatException('Invalid record format: $error'), stackTrace);
@@ -302,20 +307,23 @@ class const AdvertisementField(
   final int? bits,
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a field.
-  factory fromJson(Map<String, dynamic> json) {
+  factory fromJson(Map<String, dynamic> json) => AdvertisementField.fromPick(pick(json).required());
+
+  /// Reads typed JSON values while retaining defaults for absent optional settings.
+  factory fromPick(RequiredPick data) {
     final AdvertisementField field;
     try {
       field = AdvertisementField(
-        json['name'] as String,
-        json['offset'] as int,
-        AdvertisementFieldType.values.byName(json['type'] as String),
-        length: json['length'] as int,
-        scale: (json['scale'] as num).toDouble(),
-        add: (json['add'] as num).toDouble(),
-        unit: json['unit'] as String,
-        record: json['record'] as int?,
-        bit: json['bit'] as int,
-        bits: json['bits'] as int?,
+        data('name').asStringOrThrow(),
+        data('offset').asIntOrThrow(),
+        AdvertisementFieldType.values.byName(data('type').asStringOrThrow()),
+        length: _intOrDefault(data('length'), 1),
+        scale: _doubleOrDefault(data('scale'), 1),
+        add: _doubleOrDefault(data('add'), 0),
+        unit: _stringOrDefault(data('unit'), ''),
+        record: _nullableInt(data('record')),
+        bit: _intOrDefault(data('bit'), 0),
+        bits: _nullableInt(data('bits')),
       );
     } on Object catch (error, stackTrace) {
       Error.throwWithStackTrace(FormatException('Invalid parser field: $error'), stackTrace);
@@ -453,3 +461,18 @@ List<String> parsedValues(AdvertisementData data, List<AdvertisementParser> pars
     for (final entry in data.serviceData.entries) ...parser.read(serviceUuid: entry.key, bytes: entry.value),
   ],
 ];
+
+int? _nullableInt(Pick value) => value.value == null ? null : value.asIntOrThrow();
+String? _nullableString(Pick value) => value.value == null ? null : value.asStringOrThrow();
+int _intOrDefault(Pick value, int fallback) => _nullableInt(value) ?? fallback;
+double _doubleOrDefault(Pick value, double fallback) => value.value == null ? fallback : value.asDoubleOrThrow();
+String _stringOrDefault(Pick value, String fallback) => _nullableString(value) ?? fallback;
+List<int> _intListOrEmpty(Pick value) {
+  if (value.value == null) return const [];
+  return value.asListOrThrow((it) => it.asIntOrThrow());
+}
+
+T _enumOrDefault<T extends Enum>(Pick value, List<T> values, T fallback) {
+  if (value.value == null) return fallback;
+  return values.byName(value.asStringOrThrow());
+}

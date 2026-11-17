@@ -44,6 +44,26 @@ void main() {
     ],
   );
 
+  test('legacy parser fields default later optional settings without accepting malformed values', () {
+    final parser = AdvertisementParser.fromJson({
+      'name': 'Legacy',
+      'source': 'manufacturer',
+      'companyId': 0x59,
+      'fields': [
+        {'name': 'Counter', 'offset': 0, 'type': 'uint8'},
+      ],
+    });
+    final field = parser.fields.single;
+    expect([field.scale, field.add, field.bit, field.length, field.unit], [1, 0, 0, 1, '']);
+    expect(field.format([42]), '42');
+    expect(parser.match, isEmpty);
+    expect(parser.matchOffset, 0);
+    expect(
+      () => AdvertisementField.fromJson({'name': 'Counter', 'offset': 0, 'type': 'uint8', 'bit': 'wrong'}),
+      throwsFormatException,
+    );
+  });
+
   test('decoded parsers retain immutable payload patterns and fields', () {
     final json = testDongleParsers.first.toJson();
     final match = List<int>.from(json['match'] as List);

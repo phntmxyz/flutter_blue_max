@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:deep_pick/deep_pick.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 /// A service name and its known characteristics.
@@ -13,12 +14,17 @@ class KnownService(
   final List<KnownCharacteristic> characteristics = List.unmodifiable(characteristics);
 
   /// Throws a [FormatException] for stored data that no longer describes a service.
-  factory fromJson(Map<String, dynamic> json) {
+  factory fromJson(Map<String, dynamic> json) => KnownService.fromPick(pick(json).required());
+
+  /// Reads typed JSON values and defaults absent optional settings.
+  factory fromPick(RequiredPick data) {
     try {
-      return KnownService(Guid(json['uuid'] as String), json['name'] as String, [
-        for (final characteristic in json['characteristics'] as List)
-          KnownCharacteristic.fromJson(characteristic as Map<String, dynamic>),
-      ], test: json['test'] as bool);
+      return KnownService(
+        Guid(data('uuid').asStringOrThrow()),
+        data('name').asStringOrThrow(),
+        data('characteristics').asListOrThrow(KnownCharacteristic.fromPick),
+        test: data('test').value != null && data('test').asBoolOrThrow(),
+      );
     } on FormatException {
       rethrow;
     } on Object catch (error, stackTrace) {
@@ -92,15 +98,15 @@ class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>
   final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
 
   /// Throws a [FormatException] for stored data that no longer describes a characteristic.
-  factory fromJson(Map<String, dynamic> json) {
+  factory fromJson(Map<String, dynamic> json) => KnownCharacteristic.fromPick(pick(json).required());
+
+  /// Reads typed JSON values and defaults absent optional settings.
+  factory fromPick(RequiredPick data) {
     try {
-      final properties = json['properties'] as List?;
       return KnownCharacteristic(
-        Guid(json['uuid'] as String),
-        json['name'] as String,
-        properties: properties == null
-            ? null
-            : {for (final property in properties) GattProperty.values.byName(property as String)},
+        Guid(data('uuid').asStringOrThrow()),
+        data('name').asStringOrThrow(),
+        properties: _propertiesOrNull(data('properties')),
       );
     } on FormatException {
       rethrow;
@@ -309,3 +315,8 @@ final standardServices = List<KnownService>.unmodifiable([
     KnownCharacteristic(Guid('6e400003-b5a3-f393-e0a9-e50e24dcca9e'), 'TX'),
   ]),
 ]);
+
+Set<GattProperty>? _propertiesOrNull(Pick value) {
+  if (value.value == null) return null;
+  return value.asListOrThrow((it) => GattProperty.values.byName(it.asStringOrThrow())).toSet();
+}

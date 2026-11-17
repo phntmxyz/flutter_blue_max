@@ -145,6 +145,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.7.11"
+  deep_pick:
+    dependency: "direct main"
+    description:
+      name: deep_pick
+      sha256: "5138dc1a9f5f9f1996bf66aded162794d9e47a7a0d7566810d926021f89a5f7b"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.4.0"
   fake_async:
     dependency: transitive
     description:

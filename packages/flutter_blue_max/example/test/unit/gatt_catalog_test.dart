@@ -6,6 +6,22 @@ import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_in
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('legacy catalog services default the optional test flag', () {
+    final service = KnownService.fromJson({
+      'uuid': 'fff0',
+      'name': 'Legacy',
+      'characteristics': [
+        {'uuid': 'fff1', 'name': 'Value'},
+      ],
+    });
+    expect(service.test, isFalse);
+    expect(service.characteristics.single.properties, isNull);
+    expect(
+      () => KnownService.fromJson({'uuid': 'fff0', 'name': 'Bad', 'characteristics': [], 'test': 'wrong'}),
+      throwsFormatException,
+    );
+  });
+
   test('catalog collections are immutable snapshots', () {
     final properties = <GattProperty>{GattProperty.read};
     final characteristic = KnownCharacteristic(Guid('2a19'), 'Level', properties: properties);
