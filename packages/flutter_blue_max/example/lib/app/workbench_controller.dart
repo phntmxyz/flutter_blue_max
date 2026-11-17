@@ -644,6 +644,7 @@ class WorkbenchController({
             await session.channel.write(payload);
             session.onTransmitted(payload);
             successes++;
+            _update();
           }),
         ).whenComplete(() {
           log(

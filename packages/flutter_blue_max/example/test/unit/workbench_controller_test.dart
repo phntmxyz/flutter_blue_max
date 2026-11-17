@@ -684,6 +684,32 @@ void main() {
       expect(c.busy(Operation.channel(session)), isFalse);
     });
 
+    test('burst listeners see successful bytes before the final write completes', () async {
+      final (:controller, :platform) = await _setup();
+      await controller.startServer(secure: true);
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('progress'), psm: 129));
+      final session = controller.channels.single;
+      final release = Completer<void>();
+      var writes = 0;
+      platform.overrideWriteL2CapChannel = (_) async {
+        if (++writes == 2) {
+          await release.future;
+        }
+      };
+      final observed = <int>[];
+      controller.addListener(() => observed.add(session.transmitted));
+      final pending = controller.sendTestTraffic(session, size: 1024, count: 2);
+      await _until(() => writes == 2 && session.transmitted == 1024);
+      try {
+        expect(controller.busy(Operation.channel(session)), isTrue);
+        expect(observed, contains(1024));
+      } finally {
+        release.complete();
+        await pending;
+      }
+      expect(session.transmitted, 2048);
+    });
+
     test('a failed burst write preserves successful byte counts and releases the channel controls', () async {
       final fixture = await _setup();
       final c = fixture.controller;
