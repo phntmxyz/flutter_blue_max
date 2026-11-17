@@ -67,6 +67,26 @@ void main() {
     expect(FlutterBlueMax.isScanningNow, isFalse);
   });
 
+  test('automatic RSSI refresh preserves the error banner while explicit reads report errors', () async {
+    final (:controller, :platform) = await _setup();
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:57');
+    controller.select(device);
+    await controller.connect();
+    await _until(() => controller.rssi != null);
+    controller.error = 'Unread parser data';
+    final before = platform.rssiRequests.length;
+    controller.select(device);
+    await _until(() => platform.rssiRequests.length > before);
+    expect(controller.error, 'Unread parser data');
+    platform.overrideReadRssi = (_) async => throw StateError('RSSI unavailable');
+    controller.select(device);
+    await Future<void>.delayed(Duration.zero);
+    expect(controller.error, 'Unread parser data');
+    expect(controller.logs.any((l) => l.contains('Automatic RSSI') && l.contains('RSSI unavailable')), isTrue);
+    await controller.readRssi();
+    expect(controller.error, contains('RSSI unavailable'));
+  });
+
   test('channels with the same PSM remain isolated by peer', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);

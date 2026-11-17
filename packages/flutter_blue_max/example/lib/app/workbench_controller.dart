@@ -337,7 +337,7 @@ class WorkbenchController({
             '${state == BluetoothConnectionState.disconnected ? ' · ${device.disconnectReason}' : ''}',
           );
           if (state == BluetoothConnectionState.connected && selected == device) {
-            unawaited(readRssi());
+            unawaited(_readRssiAutomatically(device));
           }
         }),
       );
@@ -351,7 +351,7 @@ class WorkbenchController({
       );
     }
     if (device.isConnected) {
-      unawaited(readRssi());
+      unawaited(_readRssiAutomatically(device));
     }
     _update();
   }
@@ -484,17 +484,32 @@ class WorkbenchController({
     }
   }
 
+  Future<void> _readRssiAutomatically(BluetoothDevice device) async {
+    if (kIsWeb) {
+      return;
+    }
+    try {
+      await _refreshRssi(device);
+    } catch (exception, stackTrace) {
+      log('Automatic RSSI read failed: $exception');
+      developer.log('Automatic RSSI read failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+    }
+  }
+
+  Future<void> _refreshRssi(BluetoothDevice device) async {
+    final value = await device.readRssi();
+    if (selected == device) {
+      rssi = value;
+      _update();
+    }
+  }
+
   Future<void> readRssi() async {
     if (kIsWeb) {
       return;
     }
     final device = selected!;
-    await run(Operation.rssi(device), () async {
-      final value = await device.readRssi();
-      if (selected == device) {
-        rssi = value;
-      }
-    });
+    await run(Operation.rssi(device), () => _refreshRssi(device));
   }
 
   Future<void> requestMtu(int value) => run(Operation.mtu, () async {
