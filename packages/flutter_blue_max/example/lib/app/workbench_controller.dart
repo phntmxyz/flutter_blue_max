@@ -249,7 +249,7 @@ class WorkbenchController({
           return;
         }
         session.received += event.value.length;
-        session.recordReceived(event.value, source: 'Stream');
+        session.recordReceived(event.value, source: ReceiveSource.stream);
         log(
           'RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · '
           '${PayloadCodec.hex(event.value.take(64).toList())}',
@@ -616,7 +616,7 @@ class WorkbenchController({
   Future<void> readChannel(ChannelSession session) => run(Operation.channel(session), () async {
     final bytes = await session.channel.read();
     if (bytes.isNotEmpty) {
-      session.recordReceived(bytes, source: 'Buffer read');
+      session.recordReceived(bytes, source: ReceiveSource.bufferRead);
     }
     log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
   });

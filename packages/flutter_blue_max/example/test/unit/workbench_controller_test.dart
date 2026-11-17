@@ -668,11 +668,14 @@ void main() {
       platform.bufferedBytes = [65, 66];
       await c.readChannel(session);
       expect(platform.readRequests.last.remoteId, peer.str);
-      expect(session.history.map((e) => e.source), ['Buffer read', 'Stream']);
+      expect(session.history.map((e) => e.source), [ReceiveSource.bufferRead, ReceiveSource.stream]);
       expect(session.received, 2);
       expect(c.channels.last.history, isEmpty);
       await c.readChannel(session);
-      expect(session.history.map((e) => e.source), ['Buffer read', 'Stream'], reason: 'An empty read adds no entry');
+      expect(session.history.map((e) => e.source), [
+        ReceiveSource.bufferRead,
+        ReceiveSource.stream,
+      ], reason: 'An empty read adds no entry');
       expect(session.lastReceived, [65, 66]);
       expect(c.logs.last, endsWith(': 0 B'));
       for (var i = 0; i < ChannelSession.maxHistoryEntries + 1; i++) {

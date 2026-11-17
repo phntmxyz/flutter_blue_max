@@ -53,7 +53,7 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
             children: [
               for (final entry in session.history)
                 ListTile(
-                  title: Text('${entry.source} · ${entry.time.toIso8601String()} · ${entry.bytes.length} B'),
+                  title: Text('${entry.source.label} · ${entry.time.toIso8601String()} · ${entry.bytes.length} B'),
                   subtitle: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [

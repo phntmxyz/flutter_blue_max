@@ -10,7 +10,7 @@ class ChannelSession(var BluetoothL2capChannel channel, {required var bool incom
   static const maxHistoryEntries = 200;
 
   /// Keep bounded per-channel history; buffer reads may repeat streamed data.
-  void recordReceived(List<int> bytes, {required String source}) {
+  void recordReceived(List<int> bytes, {required ReceiveSource source}) {
     lastReceived = List.of(bytes);
     history.insert(0, ChannelReceipt(time: DateTime.now(), source: source, bytes: List.of(bytes)));
     if (history.length > maxHistoryEntries) {
@@ -24,6 +24,12 @@ class ChannelSession(var BluetoothL2capChannel channel, {required var bool incom
 /// A timestamped payload displayed in a channel card's receive history.
 class const ChannelReceipt({
   required final DateTime time,
-  required final String source,
+  required final ReceiveSource source,
   required final List<int> bytes,
 });
+
+/// Distinguishes pushed data from buffer snapshots, which may repeat streamed bytes.
+enum ReceiveSource(final String label) {
+  stream('Stream'),
+  bufferRead('Buffer read'),
+}
