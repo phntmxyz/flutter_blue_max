@@ -24,19 +24,20 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
             children: [
               Chip(label: Text('TX ${session.transmitted} B')),
               Chip(label: Text('RX ${session.received} B')),
-              if (session.closed) const Chip(label: Text('Closed')),
-              if (!session.closed)
+              if (session.closed)
+                const Chip(label: Text('Closed'))
+              else ...[
                 OutlinedButton.icon(
                   onPressed: idle ? () => context.read<WorkbenchController>().readChannel(session) : null,
                   icon: const Icon(Icons.download_outlined),
                   label: const Text('Read buffered data'),
                 ),
-              if (!session.closed)
                 TextButton.icon(
                   onPressed: idle ? () => context.read<WorkbenchController>().closeChannel(session) : null,
                   icon: const Icon(Icons.close),
                   label: const Text('Close channel'),
                 ),
+              ],
             ],
           ),
           if (session.lastReceived.isNotEmpty) ...[
