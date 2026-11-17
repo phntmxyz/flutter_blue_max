@@ -126,7 +126,7 @@ class WorkbenchController({
     return builtInService(uuid);
   }
 
-  List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((session) => !session.closed));
+  List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((s) => !s.closed));
 
   /// Closed channels keep their diagnostics available until the device session resets.
   List<ChannelSession> get channelSessions => List.unmodifiable(_channels.values);
@@ -202,13 +202,13 @@ class WorkbenchController({
     final libraries = Future.wait([parserLibrary.load(), catalogLibrary.load()]);
     _subscriptions.add(FlutterBlueMax.logs.listen(log));
     _subscriptions.add(
-      FlutterBlueMax.scanResults.listen((results) {
+      FlutterBlueMax.scanResults.listen((r) {
         final tracker = _trackingScan ? advertisementTracker : null;
         if (tracker == null) {
-          scanResults = results;
+          scanResults = r;
         } else {
           // A tracking scan delivers single advertisements; keep the rest of the device list.
-          for (final result in results) {
+          for (final result in r) {
             if (result.device.remoteId == tracker.remoteId) {
               tracker.record(result);
             }
@@ -571,11 +571,11 @@ class WorkbenchController({
     serverPsm = null;
     // Unpublishing on Apple stops accepting peers but leaves accepted streams open.
     // Close them explicitly, retaining any failed close in the UI for retry.
-    final accepted = channels.where((session) => session.incoming && session.channel.psm == psm).toList();
+    final accepted = channels.where((s) => s.incoming && s.channel.psm == psm).toList();
     await Future.wait(
-      accepted.map((session) async {
-        await session.channel.close();
-        session.markClosed();
+      accepted.map((s) async {
+        await s.channel.close();
+        s.markClosed();
       }),
     );
   });
@@ -665,7 +665,7 @@ class WorkbenchController({
   /// Outgoing channels belong to the GATT session that opened them. Incoming
   /// channels belong to the local server and stay untouched.
   void _closeOutgoingChannels(DeviceIdentifier remoteId) {
-    final outgoing = channels.where((session) => !session.incoming && session.channel.deviceId == remoteId);
+    final outgoing = channels.where((s) => !s.incoming && s.channel.deviceId == remoteId);
     for (final session in outgoing.toList()) {
       session.markClosed();
       unawaited(

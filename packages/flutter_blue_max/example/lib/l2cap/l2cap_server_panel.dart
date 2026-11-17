@@ -19,8 +19,8 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
   Widget build(BuildContext context) {
     context.select<WorkbenchController, Object?>((c) => c.serverState);
     final c = context.read<WorkbenchController>();
-    final incoming = c.channelSessions.where((session) => session.incoming).toList();
-    final connectedCount = incoming.where((session) => !session.closed).length;
+    final incoming = c.channelSessions.where((s) => s.incoming).toList();
+    final connectedCount = incoming.where((s) => !s.closed).length;
     final listenerControls = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [

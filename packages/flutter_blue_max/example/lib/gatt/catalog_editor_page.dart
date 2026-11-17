@@ -135,7 +135,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                 if (uuid == null) {
                   return 'Enter a 16, 32 or 128-bit UUID.';
                 }
-                if (widget.others.any((service) => service.uuid == uuid)) {
+                if (widget.others.any((s) => s.uuid == uuid)) {
                   return 'Your catalog already has this service.';
                 }
                 return null;
@@ -222,9 +222,9 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                           FilterChip(
                             label: Text(property.label),
                             selected: draft.properties.contains(property),
-                            onSelected: (selected) {
+                            onSelected: (it) {
                               setState(() {
-                                if (selected) {
+                                if (it) {
                                   draft.properties.add(property);
                                 } else {
                                   draft.properties.remove(property);

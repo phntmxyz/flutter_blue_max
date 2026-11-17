@@ -126,7 +126,7 @@ void main() {
     expect(controller.services, isEmpty);
     expect(controller.channels.single.incoming, isTrue);
     expect(controller.serverPsm, 129);
-    final outgoing = controller.channelSessions.singleWhere((session) => !session.incoming);
+    final outgoing = controller.channelSessions.singleWhere((s) => !s.incoming);
     expect(outgoing.closed, isTrue, reason: 'Link loss keeps the closed session for its diagnostics');
     expect(platform.closeRequests.single.psm, 131);
   });
@@ -180,8 +180,8 @@ void main() {
     const failing = DeviceIdentifier('AA:BB:CC:DD:EE:62');
     platform.accepted.add(L2CapChannelConnected(remoteId: closing, psm: 129));
     platform.accepted.add(L2CapChannelConnected(remoteId: failing, psm: 129));
-    platform.overrideCloseL2CapChannel = (request) async {
-      if (request.remoteId == failing.str) {
+    platform.overrideCloseL2CapChannel = (r) async {
+      if (r.remoteId == failing.str) {
         throw StateError('close rejected');
       }
     };
@@ -344,7 +344,7 @@ void main() {
       expect([first.added, first.replaced, first.present], [1, 0, 0]);
       final next = await controller.addCatalogServices([renamed, lamp, lamp]);
       expect([next.added, next.replaced, next.present], [1, 1, 1]);
-      expect(controller.catalog.map((service) => service.name), ['Room thermostat', 'Lamp']);
+      expect(controller.catalog.map((s) => s.name), ['Room thermostat', 'Lamp']);
     });
 
     test('a catalog reset repairs an unreadable stored catalog', () async {
@@ -403,7 +403,7 @@ void main() {
       await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
       await controller.removeParser(controller.parsers.single);
       final catalog = await loadCatalog();
-      expect(catalog?.items.map((service) => service.name), ['Own', 'Lamp']);
+      expect(catalog?.items.map((s) => s.name), ['Own', 'Lamp']);
       expect(catalog?.unreadable, [broken]);
       final parsers = await loadParsers();
       expect(parsers?.items, isEmpty);
@@ -475,8 +475,8 @@ void main() {
 
   test('a failed log level still subscribes to the adapter state', () async {
     final (:controller, :platform) = await _setup(
-      configure: (platform) {
-        platform.overrideSetLogLevel = (_) async => throw PlatformException(code: 'bluez', message: 'No bluetoothd');
+      configure: (it) {
+        it.overrideSetLogLevel = (_) async => throw PlatformException(code: 'bluez', message: 'No bluetoothd');
       },
     );
 
@@ -690,8 +690,8 @@ void main() {
       c.select(peer);
       await c.connect();
       final gate = Completer<void>();
-      platform.overrideOpenL2CapChannel = (request) async {
-        platform.openRequests.add(request);
+      platform.overrideOpenL2CapChannel = (r) async {
+        platform.openRequests.add(r);
         await gate.future;
         throw StateError('Temporary channel failure');
       };

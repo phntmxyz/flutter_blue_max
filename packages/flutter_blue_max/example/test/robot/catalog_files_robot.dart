@@ -26,7 +26,7 @@ extension CatalogFilesRobot on WorkbenchRobot {
   }
 
   Future<void> importServices(List<KnownService> services, {required String confirm}) async {
-    logEvent('Pick a catalog file with ${services.map((service) => service.name).join(', ')}');
+    logEvent('Pick a catalog file with ${services.map((s) => s.name).join(', ')}');
     files.openContent = encodeCatalogFile(services);
     await tapLabel('Import');
     await tapInDialog(confirm);
@@ -43,7 +43,7 @@ extension CatalogFilesRobot on WorkbenchRobot {
     spot<Dialog>().spotText('FFE0 · 1 characteristic', exact: true).existsOnce();
     await tapInDialog('Import 2 services');
     spotText('Imported 2 services, 1 replaced your own', exact: true).existsOnce();
-    expect(controller.catalog.map((service) => service.name), ['Room thermostat', 'Lamp']);
+    expect(controller.catalog.map((s) => s.name), ['Room thermostat', 'Lamp']);
     await importServices([_lamp], confirm: 'Import 1 service');
     spotText('Imported 0 services, 1 was already present', exact: true).existsOnce();
     expect(controller.catalog, hasLength(2));

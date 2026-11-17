@@ -30,9 +30,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
     final c = context.read<WorkbenchController>();
     final device = widget.device;
     final connected = device.isConnected;
-    final sessions = c.channelSessions.where(
-      (session) => !session.incoming && session.channel.deviceId == device.remoteId,
-    );
+    final sessions = c.channelSessions.where((s) => !s.incoming && s.channel.deviceId == device.remoteId);
     final connectionReady = connected && c.ready;
     final channelIdle = !c.busy(Operation.open);
     final connectionIdle = !c.busy(Operation.connection);
@@ -111,7 +109,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
             ],
           ),
         ),
-        if (!sessions.any((session) => !session.closed) && connected)
+        if (!sessions.any((s) => !s.closed) && connected)
           const Padding(padding: EdgeInsets.only(bottom: 16), child: Text('No L2CAP channel open to this device yet.')),
         for (final session in sessions) L2capChannelCard(key: ValueKey(session.key), session: session),
       ],

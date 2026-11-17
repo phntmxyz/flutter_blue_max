@@ -66,7 +66,7 @@ class KnownService(
       ];
       if (matching.isEmpty) {
         missing.add(known.name);
-      } else if (!matching.every((characteristic) => known.matches(characteristic.properties))) {
+      } else if (!matching.every((c) => known.matches(c.properties))) {
         different.add(known.name);
       }
     }

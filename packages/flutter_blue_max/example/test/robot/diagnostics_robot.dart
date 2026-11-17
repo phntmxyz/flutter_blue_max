@@ -112,7 +112,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     await tapLabel('Discover services');
     await openBatteryLevel();
     spotText('Subscribe', exact: true).existsOnce();
-    expect(platform.notifyRequests.where((request) => !request.enable), isEmpty);
+    expect(platform.notifyRequests.where((r) => !r.enable), isEmpty);
   }
 
   Future<void> exerciseNotificationsAndDescriptors() async {

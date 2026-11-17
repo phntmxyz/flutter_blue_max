@@ -88,7 +88,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
           ),
           if (expected == false)
             Text(
-              'Expected ${GattProperty.values.where(known!.properties!.contains).map((property) => property.label).join(' · ')}',
+              'Expected ${GattProperty.values.where(known!.properties!.contains).map((p) => p.label).join(' · ')}',
               style: TextStyle(color: Theme.of(context).colorScheme.error),
             ),
         ],

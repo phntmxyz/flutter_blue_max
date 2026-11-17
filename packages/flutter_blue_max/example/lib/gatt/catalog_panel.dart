@@ -197,13 +197,13 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     action: importing ? 'Import' : 'Export',
     noun: serviceNoun,
     items: services,
-    label: (service) => service.name,
-    details: (service) => [
-      service.uuid.str.toUpperCase(),
-      counted(service.characteristics.length, _characteristicNoun),
+    label: (s) => s.name,
+    details: (s) => [
+      s.uuid.str.toUpperCase(),
+      counted(s.characteristics.length, _characteristicNoun),
       if (importing)
-        if (context.read<GattCatalogLibrary>().catalogServiceReplacedBy(service) != null)
-          'Replaces your ${context.read<GattCatalogLibrary>().catalogServiceReplacedBy(service)!.name}',
+        if (context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s) != null)
+          'Replaces your ${context.read<GattCatalogLibrary>().catalogServiceReplacedBy(s)!.name}',
     ].join(' · '),
   );
 }
@@ -243,10 +243,7 @@ class const _ServiceCard({required final KnownService service, required final Li
                   Text(characteristic.uuid.str.toUpperCase(), style: mono),
                   if (characteristic.properties != null)
                     Text(
-                      GattProperty.values
-                          .where(characteristic.properties!.contains)
-                          .map((property) => property.label)
-                          .join(' · '),
+                      GattProperty.values.where(characteristic.properties!.contains).map((p) => p.label).join(' · '),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                 ],

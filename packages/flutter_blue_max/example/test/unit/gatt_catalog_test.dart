@@ -56,10 +56,10 @@ void main() {
 
   test('every service and characteristic appears once', () {
     final services = [...testDongleServices, ...standardServices];
-    expect(services.map((service) => service.uuid).toSet(), hasLength(services.length));
+    expect(services.map((s) => s.uuid).toSet(), hasLength(services.length));
     for (final service in services) {
       expect(
-        service.characteristics.map((characteristic) => characteristic.uuid).toSet(),
+        service.characteristics.map((c) => c.uuid).toSet(),
         hasLength(service.characteristics.length),
         reason: service.name,
       );
