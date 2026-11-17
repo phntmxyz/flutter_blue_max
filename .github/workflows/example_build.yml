@@ -139,3 +139,29 @@ jobs:
         run: |
           printf '### Blue Max: %s\n\n[Download build](%s)\n' \
             "$BUILD_PLATFORM" "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  darwin-compatibility:
+    name: Darwin ${{ matrix.integration }} on Flutter ${{ matrix.flutter }} (${{ matrix.platform }})
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {flutter: '3.38.5', integration: spm, platform: macos}
+          - {flutter: '3.38.5', integration: spm, platform: ios}
+          - {flutter: '3.47.7', integration: pods, platform: macos}
+          - {flutter: '3.47.7', integration: pods, platform: ios}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          channel: stable
+          cache: true
+      - name: Build isolated Darwin consumer
+        working-directory: .
+        env:
+          INTEGRATION: ${{ matrix.integration }}
+          PLATFORM: ${{ matrix.platform }}
+        run: bash .github/scripts/build_darwin_smoke.sh "$FLUTTER_ROOT" "$INTEGRATION" "$PLATFORM"
