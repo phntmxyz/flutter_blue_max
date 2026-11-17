@@ -164,7 +164,11 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     }
     final box = button.findRenderObject()! as RenderBox;
     try {
-      if (await saveCatalogFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size) && button.mounted) {
+      final saved = await saveCatalogFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size);
+      if (!saved) {
+        return;
+      }
+      if (button.mounted) {
         tell(button, 'Exported ${counted(chosen.length, serviceNoun)}');
       }
     } on Exception catch (exception, stackTrace) {

@@ -151,7 +151,11 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
     }
     final box = button.findRenderObject()! as RenderBox;
     try {
-      if (await saveParserFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size) && button.mounted) {
+      final saved = await saveParserFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size);
+      if (!saved) {
+        return;
+      }
+      if (button.mounted) {
         tell(button, 'Exported ${counted(chosen.length, parserNoun)}');
       }
     } on Exception catch (exception, stackTrace) {
