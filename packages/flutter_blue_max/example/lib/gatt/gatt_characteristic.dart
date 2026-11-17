@@ -115,7 +115,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                         Text('${bytes.length} bytes', style: Theme.of(context).textTheme.labelSmall),
                         const SizedBox(height: 6),
                         SelectableText(
-                          bytes.isEmpty ? 'No value received yet' : PayloadCodec.hex(bytes),
+                          bytes.isEmpty ? 'Empty' : PayloadCodec.hex(bytes),
                           style: const TextStyle(fontFamily: 'monospace'),
                         ),
                         if (bytes.isNotEmpty)
