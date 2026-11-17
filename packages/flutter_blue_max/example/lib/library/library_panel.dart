@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/parsers_panel.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
 
 /// What the app knows about payloads and GATT databases, saved on this device.
-class const LibraryPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
+class const LibraryPanel({super.key}) extends StatefulWidget {
   @override
   State<LibraryPanel> createState() => _LibraryPanelState();
 }
@@ -30,9 +29,7 @@ class _LibraryPanelState() extends State<LibraryPanel> {
             ),
           ),
         ),
-        Expanded(
-          child: _catalog ? CatalogPanel(controller: widget.controller) : ParsersPanel(controller: widget.controller),
-        ),
+        Expanded(child: _catalog ? const CatalogPanel() : const ParsersPanel()),
       ],
     );
   }

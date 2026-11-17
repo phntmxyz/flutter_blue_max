@@ -4,13 +4,10 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:provider/provider.dart';
 
 /// The inspected peer's latest advertisement, its parsers and an optional live history of all of them.
-class const AdvertisementCard({
-  super.key,
-  required final BluetoothDevice device,
-  required final WorkbenchController controller,
-}) extends StatefulWidget {
+class const AdvertisementCard({super.key, required final BluetoothDevice device}) extends StatefulWidget {
   /// Enough rows to see a payload rotate without rebuilding a long list per advertisement.
   static const visibleEntries = 25;
 
@@ -23,12 +20,11 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
   bool _changesOnly = false;
   bool _parsedOnly = false;
 
-  WorkbenchController get c => widget.controller;
+  WorkbenchController get c => context.read<WorkbenchController>();
   BluetoothDevice get device => widget.device;
 
   Future<void> _editParser({AdvertisementParser? previous}) => ParserEditorPage.open(
     context,
-    c,
     previous: previous,
     device: device.remoteId,
     advertisement: c.selectedAdvertisement?.advertisementData,

@@ -11,11 +11,11 @@ import 'package:provider/provider.dart';
 const _characteristicNoun = ('characteristic', 'characteristics');
 
 /// Lists the user's own GATT catalog services and the built-in ones they can extend or replace.
-class const CatalogPanel({super.key, required final WorkbenchController controller}) extends StatelessWidget {
+class const CatalogPanel({super.key}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<WorkbenchController, Object?>((c) => c.catalog);
-    final c = controller;
+    final c = context.read<WorkbenchController>();
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -32,7 +32,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
           runSpacing: 8,
           children: [
             FilledButton.icon(
-              onPressed: () => CatalogEditorPage.open(context, c),
+              onPressed: () => CatalogEditorPage.open(context),
               icon: const Icon(Icons.add),
               label: const Text('Add service'),
             ),
@@ -73,7 +73,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
             },
             actions: [
               TextButton.icon(
-                onPressed: () => CatalogEditorPage.open(context, c, previous: service),
+                onPressed: () => CatalogEditorPage.open(context, previous: service),
                 icon: const Icon(Icons.edit_outlined, size: 18),
                 label: const Text('Edit'),
               ),
@@ -97,7 +97,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
               note: c.catalog.any((own) => own.uuid == service.uuid) ? 'Replaced by your entry' : null,
               actions: [
                 TextButton.icon(
-                  onPressed: () => CatalogEditorPage.open(context, c, initial: service),
+                  onPressed: () => CatalogEditorPage.open(context, initial: service),
                   icon: const Icon(Icons.copy_outlined, size: 18),
                   label: const Text('Copy to your services'),
                 ),
@@ -109,6 +109,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _import(BuildContext context) async {
+    final controller = context.read<WorkbenchController>();
     final List<KnownService>? services;
     try {
       services = await openCatalogFile();
@@ -143,7 +144,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _export(BuildContext button) async {
-    final chosen = await _choose(button, services: controller.catalog, importing: false);
+    final chosen = await _choose(button, services: button.read<WorkbenchController>().catalog, importing: false);
     if (chosen == null || !button.mounted) {
       return;
     }
@@ -160,6 +161,7 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _reset(BuildContext context) async {
+    final controller = context.read<WorkbenchController>();
     final confirmed = await confirm(
       context,
       title: 'Reset catalog?',
@@ -187,7 +189,8 @@ class const CatalogPanel({super.key, required final WorkbenchController controll
       service.uuid.str.toUpperCase(),
       counted(service.characteristics.length, _characteristicNoun),
       if (importing)
-        if (controller.catalogServiceReplacedBy(service) case final own?) 'Replaces your ${own.name}',
+        if (context.read<WorkbenchController>().catalogServiceReplacedBy(service) case final own?)
+          'Replaces your ${own.name}',
     ].join(' · '),
   );
 }

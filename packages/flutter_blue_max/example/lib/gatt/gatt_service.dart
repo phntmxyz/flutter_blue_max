@@ -4,17 +4,14 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_editor.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
+import 'package:provider/provider.dart';
 
 /// A discovered service, named and checked against the GATT catalog when it is known.
-class const GattService({
-  super.key,
-  required final BluetoothService service,
-  required final WorkbenchController controller,
-}) extends StatelessWidget {
+class const GattService({super.key, required final BluetoothService service}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final known = controller.knownService(service.uuid);
-    final own = known != null && controller.catalog.contains(known);
+    final known = context.read<WorkbenchController>().knownService(service.uuid);
+    final own = known != null && context.read<WorkbenchController>().catalog.contains(known);
     final (:missing, :different) = known?.compare(service) ?? (missing: const <String>[], different: const <String>[]);
     final uuid = service.uuid.str.toUpperCase();
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
@@ -46,7 +43,6 @@ class const GattService({
             child: TextButton.icon(
               onPressed: () => CatalogEditorPage.open(
                 context,
-                controller,
                 initial: known ?? KnownService.fromDiscovered(service),
                 previous: own ? known : null,
               ),
@@ -55,7 +51,7 @@ class const GattService({
             ),
           ),
         for (final characteristic in service.characteristics)
-          GattCharacteristic(key: ObjectKey(characteristic), characteristic: characteristic, controller: controller),
+          GattCharacteristic(key: ObjectKey(characteristic), characteristic: characteristic),
       ],
     );
   }

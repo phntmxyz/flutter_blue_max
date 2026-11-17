@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:provider/provider.dart';
 
 /// Edits one of the user's own GATT catalog services. Pops with the service, or with nothing when cancelled.
 class const CatalogEditorPage({
@@ -14,12 +15,8 @@ class const CatalogEditorPage({
 }) extends StatefulWidget {
   /// Opens the editor and saves the result, replacing [previous] when editing.
   /// [initial] prefills a new entry, e.g. from a discovered service.
-  static Future<void> open(
-    BuildContext context,
-    WorkbenchController controller, {
-    KnownService? initial,
-    KnownService? previous,
-  }) async {
+  static Future<void> open(BuildContext context, {KnownService? initial, KnownService? previous}) async {
+    final controller = context.read<WorkbenchController>();
     final service = await Navigator.of(context).push(
       MaterialPageRoute<KnownService>(
         builder: (_) => CatalogEditorPage(

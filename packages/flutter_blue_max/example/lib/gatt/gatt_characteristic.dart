@@ -7,13 +7,11 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
+import 'package:provider/provider.dart';
 
 /// Inspects the actual characteristic instance and its descriptors.
-class const GattCharacteristic({
-  super.key,
-  required final BluetoothCharacteristic characteristic,
-  required final WorkbenchController controller,
-}) extends StatefulWidget {
+class const GattCharacteristic({super.key, required final BluetoothCharacteristic characteristic})
+    extends StatefulWidget {
   @override
   State<GattCharacteristic> createState() => _GattCharacteristicState();
 }
@@ -31,7 +29,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     super.initState();
     if (kIsWeb) {
       // Web Bluetooth reports no CCCD writes, so the cached descriptor value would only reset the flag.
-      _notifying = widget.controller.subscribedOnWeb(widget.characteristic);
+      _notifying = context.read<WorkbenchController>().subscribedOnWeb(widget.characteristic);
       return;
     }
     _notifying = widget.characteristic.isNotifying;
@@ -61,8 +59,8 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final c = widget.characteristic;
     final p = c.properties;
     final operation = Operation.characteristic(c);
-    final enabled = !widget.controller.busy(operation) && c.device.isConnected;
-    final service = widget.controller.knownService(c.serviceUuid);
+    final enabled = !context.read<WorkbenchController>().busy(operation) && c.device.isConnected;
+    final service = context.read<WorkbenchController>().knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
     final expected = (service?.test ?? false) && known != null ? known.matches(p) : null;
     final description = userDescription(c);
@@ -137,7 +135,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       onPressed: (() {
                         if (enabled) {
                           return () async {
-                            await widget.controller.run(operation, () async {
+                            await context.read<WorkbenchController>().run(operation, () async {
                               await c.read();
                             });
                           };
@@ -158,12 +156,13 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       final VoidCallback? toggleNotifications;
                       if (enabled) {
                         toggleNotifications = () async {
-                          await widget.controller.run(operation, () async {
+                          final controller = context.read<WorkbenchController>();
+                          await controller.run(operation, () async {
                             final notify = !_notifying;
                             await c.setNotifyValue(notify);
                             // Web Bluetooth does not publish a CCCD write event.
                             if (kIsWeb) {
-                              widget.controller.setSubscribedOnWeb(c, subscribed: notify);
+                              controller.setSubscribedOnWeb(c, subscribed: notify);
                               if (mounted) {
                                 setState(() => _notifying = notify);
                               }
@@ -204,7 +203,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                   enabled: enabled,
                   label: const Text('Write characteristic'),
                   onSend: (value) {
-                    return widget.controller.run(operation, () async {
+                    return context.read<WorkbenchController>().run(operation, () async {
                       await c.write(value, withoutResponse: !p.write || _withoutResponse);
                       if (p.read) {
                         await c.read();
@@ -213,8 +212,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                   },
                 ),
               ],
-              for (final descriptor in c.descriptors)
-                _Descriptor(descriptor: descriptor, controller: widget.controller),
+              for (final descriptor in c.descriptors) _Descriptor(descriptor: descriptor),
             ],
           ),
         ),
@@ -245,8 +243,7 @@ class const GattTitle(final String text, {super.key, final TextStyle? style, fin
   }
 }
 
-class const _Descriptor({required final BluetoothDescriptor descriptor, required final WorkbenchController controller})
-    extends StatefulWidget {
+class const _Descriptor({required final BluetoothDescriptor descriptor}) extends StatefulWidget {
   @override
   State<_Descriptor> createState() => _DescriptorState();
 }
@@ -258,7 +255,7 @@ class _DescriptorState() extends State<_Descriptor> {
   Widget build(BuildContext context) {
     final d = widget.descriptor;
     final operation = Operation.descriptor(d);
-    final enabled = !widget.controller.busy(operation) && d.device.isConnected;
+    final enabled = !context.read<WorkbenchController>().busy(operation) && d.device.isConnected;
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),
@@ -273,7 +270,7 @@ class _DescriptorState() extends State<_Descriptor> {
             onPressed: (() {
               if (enabled) {
                 return () async {
-                  await widget.controller.run(operation, () async {
+                  await context.read<WorkbenchController>().run(operation, () async {
                     await d.read();
                   });
                 };
@@ -287,7 +284,7 @@ class _DescriptorState() extends State<_Descriptor> {
           enabled: enabled,
           label: const Text('Write descriptor'),
           onSend: (value) {
-            return widget.controller.run(operation, () async {
+            return context.read<WorkbenchController>().run(operation, () async {
               await d.write(value);
             });
           },

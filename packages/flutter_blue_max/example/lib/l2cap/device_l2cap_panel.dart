@@ -5,13 +5,10 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
+import 'package:provider/provider.dart';
 
 /// Opens outgoing channels only for the device shown in the inspector.
-class const DeviceL2capPanel({
-  super.key,
-  required final BluetoothDevice device,
-  required final WorkbenchController controller,
-}) extends StatefulWidget {
+class const DeviceL2capPanel({super.key, required final BluetoothDevice device}) extends StatefulWidget {
   @override
   State<DeviceL2capPanel> createState() => _DeviceL2capPanelState();
 }
@@ -29,7 +26,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final c = widget.controller;
+    final c = context.read<WorkbenchController>();
     final device = widget.device;
     final connected = device.isConnected;
     final sessions = c.channelSessions.where(
@@ -115,7 +112,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
         ),
         if (!sessions.any((session) => !session.closed) && connected)
           const Padding(padding: EdgeInsets.only(bottom: 16), child: Text('No L2CAP channel open to this device yet.')),
-        for (final session in sessions) L2capChannelCard(key: ValueKey(session.key), session: session, controller: c),
+        for (final session in sessions) L2capChannelCard(key: ValueKey(session.key), session: session),
       ],
     );
   }

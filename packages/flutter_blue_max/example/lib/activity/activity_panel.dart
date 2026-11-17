@@ -4,7 +4,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:provider/provider.dart';
 
 /// Searchable session output includes native diagnostics and payload previews.
-class const ActivityPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
+class const ActivityPanel({super.key}) extends StatefulWidget {
   @override
   State<ActivityPanel> createState() => _ActivityPanelState();
 }
@@ -15,7 +15,10 @@ class _ActivityPanelState() extends State<ActivityPanel> {
   @override
   Widget build(BuildContext context) {
     context.select<WorkbenchController, Object?>((c) => c.logs);
-    final lines = widget.controller.logs.reversed
+    final lines = context
+        .read<WorkbenchController>()
+        .logs
+        .reversed
         .where((line) => line.toLowerCase().contains(_query.toLowerCase()))
         .toList();
     return CustomScrollView(
@@ -41,7 +44,9 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: () async {
-                        await Clipboard.setData(ClipboardData(text: widget.controller.logs.join('\n')));
+                        await Clipboard.setData(
+                          ClipboardData(text: context.read<WorkbenchController>().logs.join('\n')),
+                        );
                         if (context.mounted) {
                           ScaffoldMessenger.of(context)
                               .showSnackBar(const SnackBar(content: Text('Session log copied')));
@@ -51,7 +56,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                       label: const Text('Copy session'),
                     ),
                     TextButton.icon(
-                      onPressed: widget.controller.clearLogs,
+                      onPressed: context.read<WorkbenchController>().clearLogs,
                       icon: const Icon(Icons.delete_outline, size: 18),
                       label: const Text('Clear'),
                     ),

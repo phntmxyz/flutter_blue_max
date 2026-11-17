@@ -9,8 +9,7 @@ import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
 
 /// Adapts discovery and inspection from a two-pane desktop layout to a phone.
-class const DevicesPanel({super.key, required final WorkbenchController controller, final bool active = true})
-    extends StatefulWidget {
+class const DevicesPanel({super.key, final bool active = true}) extends StatefulWidget {
   @override
   State<DevicesPanel> createState() => _DevicesPanelState();
 }
@@ -19,7 +18,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
   bool _showDetails = false;
 
   /// Outlives the search field, which narrow layouts drop while the details are shown.
-  late final _query = TextEditingController(text: widget.controller.query);
+  late final _query = TextEditingController(text: context.read<WorkbenchController>().query);
 
   @override
   void dispose() {
@@ -35,8 +34,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
         final wide = constraints.maxWidth >= 850;
         final list = _discovery(context);
         final detail = _DeviceDetails(
-          key: ValueKey(widget.controller.selected?.remoteId),
-          controller: widget.controller,
+          key: ValueKey(context.read<WorkbenchController>().selected?.remoteId),
           onBack: wide ? null : () => setState(() => _showDetails = false),
         );
         if (wide) {
@@ -55,14 +53,14 @@ class _DevicesPanelState() extends State<DevicesPanel> {
               setState(() => _showDetails = false);
             }
           },
-          child: _showDetails && widget.controller.selected != null ? detail : list,
+          child: _showDetails && context.read<WorkbenchController>().selected != null ? detail : list,
         );
       },
     );
   }
 
   Widget _discovery(BuildContext context) {
-    final c = widget.controller;
+    final c = context.read<WorkbenchController>();
     final results = c.visibleDevices;
     return RefreshIndicator(
       onRefresh: c.refreshScan,
@@ -264,15 +262,14 @@ class _DevicesPanelState() extends State<DevicesPanel> {
   }
 }
 
-class const _DeviceDetails({super.key, required final WorkbenchController controller, final VoidCallback? onBack})
-    extends StatefulWidget {
+class const _DeviceDetails({super.key, final VoidCallback? onBack}) extends StatefulWidget {
   @override
   State<_DeviceDetails> createState() => _DeviceDetailsState();
 }
 
 class _DeviceDetailsState() extends State<_DeviceDetails> {
   bool _l2cap = false;
-  WorkbenchController get controller => widget.controller;
+  WorkbenchController get controller => context.read<WorkbenchController>();
   VoidCallback? get onBack => widget.onBack;
 
   @override
@@ -410,7 +407,7 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
               const SizedBox(height: 28),
               if (!kIsWeb) ...[
                 if (advertisement != null || c.advertisementTracker?.remoteId == device.remoteId)
-                  AdvertisementCard(device: device, controller: c),
+                  AdvertisementCard(device: device),
               ],
             ],
           ),
@@ -437,7 +434,7 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
           sliver: SliverToBoxAdapter(
             child: (() {
               if (_l2cap && c.supportsL2cap) {
-                return DeviceL2capPanel(key: ValueKey(device.remoteId), device: device, controller: c);
+                return DeviceL2capPanel(key: ValueKey(device.remoteId), device: device);
               }
               return WorkbenchCard(
                 title: const Text('GATT explorer'),
@@ -463,7 +460,6 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                       GattService(
                         key: ValueKey('${device.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
                         service: service,
-                        controller: c,
                       ),
                   ],
                 ),

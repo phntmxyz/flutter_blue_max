@@ -3,6 +3,7 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:provider/provider.dart';
 
 /// Builds a parser against the device's latest advertisement, previewing every change.
 /// Pops with the parser, or with nothing when cancelled.
@@ -16,12 +17,12 @@ class const ParserEditorPage({
 }) extends StatefulWidget {
   /// Opens the editor and saves the result, replacing [previous] when editing.
   static Future<void> open(
-    BuildContext context,
-    WorkbenchController controller, {
+    BuildContext context, {
     AdvertisementParser? previous,
     DeviceIdentifier? device,
     AdvertisementData? advertisement,
   }) async {
+    final controller = context.read<WorkbenchController>();
     final parser = await Navigator.of(context).push(
       MaterialPageRoute<AdvertisementParser>(
         builder: (_) => ParserEditorPage(device: device, advertisement: advertisement, initial: previous),

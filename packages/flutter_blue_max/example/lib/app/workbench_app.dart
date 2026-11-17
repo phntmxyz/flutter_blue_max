@@ -97,10 +97,10 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
           child: IndexedStack(
             index: _destination,
             children: [
-              DevicesPanel(controller: _controller, active: _destination == 0),
-              if (_controller.supportsL2cap) L2capServerPanel(controller: _controller),
-              LibraryPanel(controller: _controller),
-              ActivityPanel(controller: _controller),
+              DevicesPanel(active: _destination == 0),
+              if (_controller.supportsL2cap) const L2capServerPanel(),
+              const LibraryPanel(),
+              const ActivityPanel(),
             ],
           ),
           selector: (_, c) => [c.adapter, c.error, c.busy(Operation.adapter)],
@@ -154,7 +154,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                 child: Column(
                   children: [
                     const Divider(height: 1),
-                    if (!c.ready) _AdapterBanner(controller: c),
+                    if (!c.ready) const _AdapterBanner(),
                     if (c.error != null)
                       Container(
                         width: double.infinity,
@@ -239,10 +239,10 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
   }
 }
 
-class const _AdapterBanner({required final WorkbenchController controller}) extends StatelessWidget {
+class const _AdapterBanner() extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final message = switch (controller.adapter) {
+    final message = switch (context.read<WorkbenchController>().adapter) {
       BluetoothAdapterState.unknown when kIsWeb =>
         'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
       BluetoothAdapterState.unauthorized =>
@@ -262,9 +262,11 @@ class const _AdapterBanner({required final WorkbenchController controller}) exte
           Expanded(child: Text(message)),
           if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
             // Only an off adapter needs the Android enable request.
-            if (controller.adapter == BluetoothAdapterState.off)
+            if (context.read<WorkbenchController>().adapter == BluetoothAdapterState.off)
               TextButton(
-                onPressed: controller.busy(Operation.adapter) ? null : controller.turnOn,
+                onPressed: context.read<WorkbenchController>().busy(Operation.adapter)
+                    ? null
+                    : context.read<WorkbenchController>().turnOn,
                 child: const Text('Turn on Bluetooth'),
               ),
           ],

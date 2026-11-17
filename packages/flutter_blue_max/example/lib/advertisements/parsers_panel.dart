@@ -10,11 +10,11 @@ import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
 import 'package:provider/provider.dart';
 
 /// Manages every saved parser, including those bound to devices that are not nearby.
-class const ParsersPanel({super.key, required final WorkbenchController controller}) extends StatelessWidget {
+class const ParsersPanel({super.key}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<WorkbenchController, Object?>((c) => c.parsers);
-    final c = controller;
+    final c = context.read<WorkbenchController>();
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -30,7 +30,7 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
           runSpacing: 8,
           children: [
             FilledButton.icon(
-              onPressed: () => ParserEditorPage.open(context, c),
+              onPressed: () => ParserEditorPage.open(context),
               icon: const Icon(Icons.add),
               label: const Text('Add parser'),
             ),
@@ -77,7 +77,7 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
                 children: [
                   IconButton(
                     tooltip: 'Edit parser',
-                    onPressed: () => ParserEditorPage.open(context, c, previous: parser),
+                    onPressed: () => ParserEditorPage.open(context, previous: parser),
                     icon: const Icon(Icons.edit_outlined),
                   ),
                   IconButton(
@@ -94,6 +94,7 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _import(BuildContext context) async {
+    final controller = context.read<WorkbenchController>();
     final List<AdvertisementParser>? parsers;
     try {
       parsers = await openParserFile();
@@ -128,7 +129,12 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _export(BuildContext button) async {
-    final chosen = await _choose(button, title: 'Export parsers', action: 'Export', parsers: controller.parsers);
+    final chosen = await _choose(
+      button,
+      title: 'Export parsers',
+      action: 'Export',
+      parsers: button.read<WorkbenchController>().parsers,
+    );
     if (chosen == null || !button.mounted) {
       return;
     }
@@ -145,6 +151,7 @@ class const ParsersPanel({super.key, required final WorkbenchController controll
   }
 
   Future<void> _reset(BuildContext context) async {
+    final controller = context.read<WorkbenchController>();
     final confirmed = await confirm(
       context,
       title: 'Reset parsers?',
