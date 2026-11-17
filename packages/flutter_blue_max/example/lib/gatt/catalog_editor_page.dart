@@ -170,6 +170,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
 
   Widget _characteristicCard(_CharacteristicDraft draft) {
     return Card(
+      key: ObjectKey(draft),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(
@@ -189,7 +190,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
                   onPressed: () {
                     return setState(() {
                       _characteristics.remove(draft);
-                      draft.dispose();
+                      WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
                     });
                   },
                   icon: const Icon(Icons.delete_outline),

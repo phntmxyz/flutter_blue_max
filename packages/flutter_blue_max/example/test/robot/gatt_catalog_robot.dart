@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -20,6 +21,30 @@ final _dynamicValue = _fbm('0301');
 
 /// The GATT catalog and User Descriptions, checked against a partial FBM test dongle database.
 extension GattCatalogRobot on WorkbenchRobot {
+  Future<void> removeInvalidCharacteristicWithoutMovingErrors() async {
+    logEvent('Open a catalog entry with an invalid first and valid second characteristic');
+    final service = KnownService(Guid('fff0'), 'Two characteristics', test: true, [
+      KnownCharacteristic(Guid('fff1'), '', properties: {}),
+      KnownCharacteristic(Guid('fff2'), 'Valid', properties: {GattProperty.read}),
+    ]);
+    await controller.saveCatalogService(service);
+    await tapLabel('Library');
+    await tapLabel('GATT catalog');
+    await tapLabel('Two characteristics');
+    await tapLabel('Edit');
+    await tapLabel('Save entry');
+    spotText('Enter a name.', exact: true).existsOnce();
+    spotText('Select the expected properties.', exact: true).existsOnce();
+    final remove = spot<IconButton>().withTooltip('Remove characteristic').atIndex(0)..existsOnce();
+    await scrollIntoView(remove);
+    await act.tap(remove);
+    await idle();
+    spotText('Enter a name.', exact: true).doesNotExist();
+    spotText('Select the expected properties.', exact: true).doesNotExist();
+    await tapLabel('Save entry');
+    expect(controller.catalog.single.characteristics.single.name, 'Valid');
+  }
+
   Future<void> discoverPartialTestDongle() async {
     logEvent('Serve a test service with a wrong Status, an unlisted characteristic and most others missing');
     platform.extraServices[_testService] = {

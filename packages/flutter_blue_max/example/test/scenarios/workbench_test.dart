@@ -23,6 +23,12 @@ void main() {
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
   });
 
+  testWidgets('catalog editor: removing a field keeps validation with its own characteristic', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 1000));
+    await robot.removeInvalidCharacteristicWithoutMovingErrors();
+  });
+
   testWidgets('parser editor: hidden inputs do not prevent saving after a type change', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
