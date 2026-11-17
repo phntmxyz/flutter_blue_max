@@ -195,7 +195,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     await startServer();
     spotText('This operation is not supported on this device.', exact: true).existsOnce();
     expect(controller.serverPsm, isNull);
-    expect(controller.busy('server'), isFalse);
+    expect(controller.busy(Operation.server), isFalse);
   }
 
   Future<void> dismissUnsupportedError() async {

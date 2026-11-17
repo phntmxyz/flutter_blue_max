@@ -252,7 +252,7 @@ class const _AdapterBanner({required final WorkbenchController controller}) exte
             // Only an off adapter needs the Android enable request.
             if (controller.adapter == BluetoothAdapterState.off)
               TextButton(
-                onPressed: controller.busy('adapter') ? null : controller.turnOn,
+                onPressed: controller.busy(Operation.adapter) ? null : controller.turnOn,
                 child: const Text('Turn on Bluetooth'),
               ),
           ],

@@ -36,8 +36,8 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
       (session) => !session.incoming && session.channel.deviceId == device.remoteId,
     );
     final connectionReady = connected && c.ready;
-    final channelIdle = !c.busy('open');
-    final connectionIdle = !c.busy('connection');
+    final channelIdle = !c.busy(Operation.open);
+    final connectionIdle = !c.busy(Operation.connection);
     final enabled = connectionReady && channelIdle && connectionIdle;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -100,7 +100,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                           return null;
                         })(),
                         icon: const Icon(Icons.link_rounded),
-                        label: Text(c.busy('open') ? 'Opening…' : 'Open channel'),
+                        label: Text(c.busy(Operation.open) ? 'Opening…' : 'Open channel'),
                       ),
                     ],
                   ),

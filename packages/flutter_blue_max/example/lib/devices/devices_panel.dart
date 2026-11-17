@@ -91,7 +91,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
                   SizedBox(
                     width: double.infinity,
                     child: () {
-                      final canScan = c.ready && !c.busy('scan');
+                      final canScan = c.ready && !c.busy(Operation.scan);
                       if (c.scanning) {
                         return FilledButton.icon(
                           onPressed: canScan ? c.scan : null,
@@ -291,7 +291,7 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
         ),
       );
     }
-    final available = c.connected && c.ready && !c.busy('connection');
+    final available = c.connected && c.ready && !c.busy(Operation.connection);
     final advertisement = c.selectedAdvertisement;
     return CustomScrollView(
       key: ValueKey(device.remoteId),
@@ -343,14 +343,14 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                 children: [
                   () {
                     final isConnectingThisPeer = c.connectingDevice == device;
-                    final connectionIdle = !c.busy('connection');
+                    final connectionIdle = !c.busy(Operation.connection);
                     final canConnect =
                         c.ready &&
                         connectionIdle &&
                         (c.connected || (advertisement?.advertisementData.connectable ?? true));
                     if (isConnectingThisPeer) {
                       return FilledButton.icon(
-                        onPressed: c.busy('cancelConnection') ? null : c.cancelConnect,
+                        onPressed: c.busy(Operation.cancelConnection) ? null : c.cancelConnect,
                         icon: Icon(c.connected ? Icons.link_off : Icons.link),
                         label: const Text('Cancel connection'),
                       );
@@ -377,7 +377,7 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                   }(),
                   if (!kIsWeb)
                     OutlinedButton.icon(
-                      onPressed: available && !c.busy('rssi:${device.remoteId}') ? c.readRssi : null,
+                      onPressed: available && !c.busy(Operation.rssi(device)) ? c.readRssi : null,
                       icon: const Icon(Icons.signal_cellular_alt),
                       label: const Text('Read RSSI'),
                     ),
@@ -387,7 +387,9 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                       child: const Text('Request MTU'),
                     ),
                     OutlinedButton(
-                      onPressed: available && !c.busy('bond') ? () => c.run('bond', device.createBond) : null,
+                      onPressed: available && !c.busy(Operation.bond)
+                          ? () => c.run(Operation.bond, device.createBond)
+                          : null,
                       child: const Text('Create bond'),
                     ),
                   ],
@@ -436,9 +438,9 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     OutlinedButton.icon(
-                      onPressed: available && !c.busy('discover') ? c.discover : null,
+                      onPressed: available && !c.busy(Operation.discover) ? c.discover : null,
                       icon: const Icon(Icons.refresh_rounded),
-                      label: Text(c.busy('discover') ? 'Discovering…' : 'Discover services'),
+                      label: Text(c.busy(Operation.discover) ? 'Discovering…' : 'Discover services'),
                     ),
                     if (c.services.isEmpty)
                       const Padding(

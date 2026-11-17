@@ -88,7 +88,7 @@ void main() {
     expect(controller.channelSessions.singleWhere((s) => s.channel.deviceId == closing).closed, isTrue);
     expect(controller.serverPsm, isNull);
     expect(controller.error, contains('close rejected'));
-    expect(controller.busy('server'), isFalse);
+    expect(controller.busy(Operation.server), isFalse);
   });
 
   test('a failed channel close keeps the channel open and releases its controls', () async {
@@ -103,7 +103,7 @@ void main() {
     expect(session.closed, isFalse);
     expect(controller.channels, [session]);
     expect(controller.error, contains('close rejected'));
-    expect(controller.busy('channel:${session.key}'), isFalse);
+    expect(controller.busy(Operation.channel(session)), isFalse);
   });
 
   test('selecting a peer keeps the channel it opened to the local server', () async {
@@ -438,9 +438,9 @@ void main() {
     final session = controller.channels.single;
     platform.failNextWrite = true;
     await controller.send(session, [1]);
-    expect(controller.error, contains('Peer rejected'));
+    expect(controller.error, 'L2CAP channel: Bad state: Peer rejected the write');
     expect(session.transmitted, 0);
-    expect(controller.busy('channel:${session.key}'), isFalse);
+    expect(controller.busy(Operation.channel(session)), isFalse);
     await controller.send(session, [2, 3]);
     expect(controller.error, isNull);
     expect(session.transmitted, 2);
@@ -476,16 +476,16 @@ void main() {
     expect(controller.error, 'This operation is not supported on this device.');
     expect(controller.serverPsm, isNull);
     expect(controller.channels, isEmpty);
-    expect(controller.busy('server'), isFalse);
+    expect(controller.busy(Operation.server), isFalse);
     expect(controller.logs.last, contains('UnimplementedError'));
   });
 
   test('an unsupported error outside a plugin call is reported with its message', () async {
     final (:controller, platform: _) = await _setup();
 
-    await controller.run('probe', () async => controller.catalog.clear());
+    await controller.run(Operation.bond, () async => controller.catalog.clear());
 
-    expect(controller.error, startsWith('probe: Unsupported operation'));
+    expect(controller.error, startsWith('Bond: Unsupported operation'));
   });
 
   test('the server reports unsupported on a platform without L2CAP', () async {
@@ -518,7 +518,7 @@ void main() {
       expect(platform.openRequests, hasLength(before + 1));
       expect(controller.error, 'This operation is not supported on this device.');
       expect(controller.channels, isEmpty);
-      expect(controller.busy('open'), isFalse);
+      expect(controller.busy(Operation.open), isFalse);
       expect(peer.isConnected, isTrue);
       expect(controller.logs.last, contains(failure.toString()));
     });
@@ -554,7 +554,7 @@ void main() {
       expect(c.error, isNull);
       expect(peer.isConnected, isFalse);
       expect(c.connectingDevice, isNull);
-      expect(c.busy('connection'), isFalse);
+      expect(c.busy(Operation.connection), isFalse);
     });
 
     test('channel open reconnects its original peer and retries once after a transient drop', () async {
@@ -630,14 +630,14 @@ void main() {
       final before = platform.writes.length;
       final burst = c.sendTestTraffic(session, size: 1024, count: 20);
       await _until(() => platform.writes.length == before + 1);
-      expect(c.busy('channel:${session.key}'), isTrue);
+      expect(c.busy(Operation.channel(session)), isTrue);
       expect(session.transmitted, 10240);
       gate.complete();
       await burst;
       expect(platform.writes.length, before + 20);
       expect(platform.writes.skip(before).every((r) => r.value.length == 1024 && r.psm == 129), isTrue);
       expect(session.transmitted, 30720);
-      expect(c.busy('channel:${session.key}'), isFalse);
+      expect(c.busy(Operation.channel(session)), isFalse);
     });
 
     test('a failed burst write preserves successful byte counts and releases the channel controls', () async {
@@ -651,7 +651,7 @@ void main() {
       await c.sendTestTraffic(session, size: 1024, count: 20);
       expect(session.transmitted, 19 * 1024);
       expect(c.error, contains('Peer rejected'));
-      expect(c.busy('channel:${session.key}'), isFalse);
+      expect(c.busy(Operation.channel(session)), isFalse);
       expect(c.logs.any((line) => line.contains('19/20 writes')), isTrue);
     });
 

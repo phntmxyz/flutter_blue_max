@@ -55,8 +55,8 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   Widget build(BuildContext context) {
     final c = widget.characteristic;
     final p = c.properties;
-    final key = 'gatt:${c.remoteId}:${c.serviceUuid}:${c.uuid}:${c.instanceId}';
-    final enabled = !widget.controller.busy(key) && c.device.isConnected;
+    final operation = Operation.characteristic(c);
+    final enabled = !widget.controller.busy(operation) && c.device.isConnected;
     final service = widget.controller.knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
     final expected = (service?.test ?? false) && known != null ? known.matches(p) : null;
@@ -132,7 +132,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       onPressed: (() {
                         if (enabled) {
                           return () async {
-                            await widget.controller.run(key, () async {
+                            await widget.controller.run(operation, () async {
                               await c.read();
                             });
                           };
@@ -153,7 +153,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       final VoidCallback? toggleNotifications;
                       if (enabled) {
                         toggleNotifications = () async {
-                          await widget.controller.run(key, () async {
+                          await widget.controller.run(operation, () async {
                             final notify = !_notifying;
                             await c.setNotifyValue(notify);
                             // Web Bluetooth does not publish a CCCD write event.
@@ -199,7 +199,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                   enabled: enabled,
                   label: const Text('Write characteristic'),
                   onSend: (value) {
-                    return widget.controller.run(key, () async {
+                    return widget.controller.run(operation, () async {
                       await c.write(value, withoutResponse: !p.write || _withoutResponse);
                       if (p.read) {
                         await c.read();
@@ -252,8 +252,8 @@ class _DescriptorState() extends State<_Descriptor> {
   @override
   Widget build(BuildContext context) {
     final d = widget.descriptor;
-    final key = 'descriptor:${d.remoteId}:${d.serviceUuid}:${d.characteristicUuid}:${d.uuid}:${d.instanceId}';
-    final enabled = !widget.controller.busy(key) && d.device.isConnected;
+    final operation = Operation.descriptor(d);
+    final enabled = !widget.controller.busy(operation) && d.device.isConnected;
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),
@@ -268,7 +268,7 @@ class _DescriptorState() extends State<_Descriptor> {
             onPressed: (() {
               if (enabled) {
                 return () async {
-                  await widget.controller.run(key, () async {
+                  await widget.controller.run(operation, () async {
                     await d.read();
                   });
                 };
@@ -282,7 +282,7 @@ class _DescriptorState() extends State<_Descriptor> {
           enabled: enabled,
           label: const Text('Write descriptor'),
           onSend: (value) {
-            return widget.controller.run(key, () async {
+            return widget.controller.run(operation, () async {
               await d.write(value);
             });
           },

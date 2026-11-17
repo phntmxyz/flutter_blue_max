@@ -24,7 +24,7 @@ class WorkbenchController({
   final _watched = <DeviceIdentifier>{};
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
-  final _busy = <String>{};
+  final _busy = <Operation>{};
   final _logs = <String>[];
   final _parsers = <AdvertisementParser>[];
   final _catalog = <KnownService>[];
@@ -111,7 +111,7 @@ class WorkbenchController({
   bool get connected => selected?.isConnected ?? false;
   bool get tracking => _trackingScan && scanning;
   bool get ready => adapter == BluetoothAdapterState.on;
-  bool busy(String operation) => _busy.contains(operation);
+  bool busy(Operation operation) => _busy.contains(operation);
 
   /// The current web and Linux backends do not implement L2CAP.
   bool get supportsL2cap =>
@@ -207,7 +207,7 @@ class WorkbenchController({
         log('L2CAP closed ${event.remoteId} / PSM ${event.psm}');
       }),
     );
-    await run('initialize', () async {
+    await run(Operation.initialize, () async {
       await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
     });
     // A failed log level (e.g. Linux without bluetoothd) is reported above, but
@@ -333,7 +333,7 @@ class WorkbenchController({
     _update();
   }
 
-  Future<void> scan() => run('scan', () async {
+  Future<void> scan() => run(Operation.scan, () async {
     if (scanning) {
       await FlutterBlueMax.stopScan();
     } else {
@@ -356,7 +356,7 @@ class WorkbenchController({
   }
 
   /// Reports every advertisement of one peer until stopped, replacing any running scan.
-  Future<void> trackAdvertisements(BluetoothDevice device) => run('scan', () async {
+  Future<void> trackAdvertisements(BluetoothDevice device) => run(Operation.scan, () async {
     if (scanning) {
       await FlutterBlueMax.stopScan();
     }
@@ -366,17 +366,17 @@ class WorkbenchController({
     log('Tracking advertisements of ${nameOf(device)}');
   });
 
-  Future<void> stopTracking() => run('scan', () async {
+  Future<void> stopTracking() => run(Operation.scan, () async {
     if (tracking) {
       await FlutterBlueMax.stopScan();
     }
   });
 
-  Future<void> refreshSystemDevices() => run('systemDevices', () async {
+  Future<void> refreshSystemDevices() => run(Operation.systemDevices, () async {
     systemDevices = await FlutterBlueMax.systemDevices([Guid('180f')]);
   });
 
-  Future<void> connect() => run('connection', () async {
+  Future<void> connect() => run(Operation.connection, () async {
     final device = selected!;
     connectingDevice = device;
     _cancelConnection = false;
@@ -400,7 +400,7 @@ class WorkbenchController({
   });
 
   /// Cancellation bypasses both the sample's connection lock and the plugin queue.
-  Future<void> cancelConnect() => run('cancelConnection', () async {
+  Future<void> cancelConnect() => run(Operation.cancelConnection, () async {
     final device = connectingDevice;
     if (device == null) {
       return;
@@ -409,17 +409,17 @@ class WorkbenchController({
     await device.disconnect(queue: false);
   });
 
-  Future<void> disconnect() => run('connection', () async {
+  Future<void> disconnect() => run(Operation.connection, () async {
     final device = selected!;
     _disconnectRequests.update(device.remoteId, (count) => count + 1, ifAbsent: () => 1);
     await device.disconnect();
   });
 
-  Future<void> turnOn() => run('adapter', () async {
+  Future<void> turnOn() => run(Operation.adapter, () async {
     await FlutterBlueMax.turnOn();
   });
 
-  Future<void> discover() => run('discover', () async {
+  Future<void> discover() => run(Operation.discover, () async {
     final device = selected!;
     final result = await device.discoverServices();
     if (device.isConnected) {
@@ -457,7 +457,7 @@ class WorkbenchController({
       return;
     }
     final device = selected!;
-    await run('rssi:${device.remoteId}', () async {
+    await run(Operation.rssi(device), () async {
       final value = await device.readRssi();
       if (selected == device) {
         rssi = value;
@@ -465,11 +465,11 @@ class WorkbenchController({
     });
   }
 
-  Future<void> requestMtu(int value) => run('mtu', () async {
+  Future<void> requestMtu(int value) => run(Operation.mtu, () async {
     await selected!.requestMtu(value);
   });
 
-  Future<void> startServer({required bool secure}) => run('server', () async {
+  Future<void> startServer({required bool secure}) => run(Operation.server, () async {
     if (!supportsL2cap) {
       throw const _Unsupported('L2CAP is not available on this platform.');
     }
@@ -491,7 +491,7 @@ class WorkbenchController({
     log('Server listening on PSM $psm (${secure ? 'secure' : 'insecure'})');
   });
 
-  Future<void> stopServer() => run('server', () async {
+  Future<void> stopServer() => run(Operation.server, () async {
     final psm = serverPsm;
     if (psm == null) {
       return;
@@ -510,42 +510,43 @@ class WorkbenchController({
   });
 
   /// Binds an outgoing channel to the inspected peer, never to later device selection.
-  Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) => run('open', () async {
-    if (!supportsL2cap) {
-      throw const _Unsupported('L2CAP is not available on this platform.');
-    }
-    final key = (device.remoteId, psm);
-    if (_channels[key]?.closed == false) {
-      throw StateError('This peer already has a channel on PSM $psm.');
-    }
-    final disconnects = _disconnectRequests[device.remoteId] ?? 0;
-    final channel = await () async {
-      try {
-        return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
-      } catch (error, stackTrace) {
-        // A secure handshake can drop the link transiently; a disconnect the
-        // user requested meanwhile must not be undone by the retry.
-        final userDisconnected = (_disconnectRequests[device.remoteId] ?? 0) != disconnects;
-        if (_disposed || !ready || userDisconnected || _isUnsupported(error)) {
-          Error.throwWithStackTrace(error, stackTrace);
+  Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) =>
+      run(Operation.open, () async {
+        if (!supportsL2cap) {
+          throw const _Unsupported('L2CAP is not available on this platform.');
         }
-        log('L2CAP open failed; retrying once: $error');
-        debugPrintStack(stackTrace: stackTrace);
-        if (!device.isConnected) {
-          await device.connect(mtu: null);
+        final key = (device.remoteId, psm);
+        if (_channels[key]?.closed == false) {
+          throw StateError('This peer already has a channel on PSM $psm.');
         }
-        return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
-      }
-    }();
-    if (_disposed || !device.isConnected) {
-      await channel.close();
-      return;
-    }
-    _trackChannel(channel, incoming: false);
-    log('L2CAP opened ${device.remoteId} / PSM $psm');
-  });
+        final disconnects = _disconnectRequests[device.remoteId] ?? 0;
+        final channel = await () async {
+          try {
+            return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
+          } catch (error, stackTrace) {
+            // A secure handshake can drop the link transiently; a disconnect the
+            // user requested meanwhile must not be undone by the retry.
+            final userDisconnected = (_disconnectRequests[device.remoteId] ?? 0) != disconnects;
+            if (_disposed || !ready || userDisconnected || _isUnsupported(error)) {
+              Error.throwWithStackTrace(error, stackTrace);
+            }
+            log('L2CAP open failed; retrying once: $error');
+            debugPrintStack(stackTrace: stackTrace);
+            if (!device.isConnected) {
+              await device.connect(mtu: null);
+            }
+            return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
+          }
+        }();
+        if (_disposed || !device.isConnected) {
+          await channel.close();
+          return;
+        }
+        _trackChannel(channel, incoming: false);
+        log('L2CAP opened ${device.remoteId} / PSM $psm');
+      });
 
-  Future<void> send(ChannelSession session, List<int> bytes) => run('channel:${session.key}', () async {
+  Future<void> send(ChannelSession session, List<int> bytes) => run(Operation.channel(session), () async {
     await session.channel.write(bytes);
     session.transmitted += bytes.length;
     log(
@@ -556,7 +557,7 @@ class WorkbenchController({
 
   /// Explicit reads drain the native buffer; streamed bytes are not counted twice.
   /// An empty read is only logged, so it neither hides the last chunk nor evicts history.
-  Future<void> readChannel(ChannelSession session) => run('channel:${session.key}', () async {
+  Future<void> readChannel(ChannelSession session) => run(Operation.channel(session), () async {
     final bytes = await session.channel.read();
     if (bytes.isNotEmpty) {
       session.recordReceived(bytes, source: 'Buffer read');
@@ -566,7 +567,7 @@ class WorkbenchController({
 
   /// Patterned traffic exposes truncation; concurrent writes exercise native backpressure.
   Future<void> sendTestTraffic(ChannelSession session, {required int size, required int count}) =>
-      run('channel:${session.key}', () async {
+      run(Operation.channel(session), () async {
         if (size <= 0 || count <= 0) {
           throw const FormatException('Payload size and write count must be positive.');
         }
@@ -586,7 +587,7 @@ class WorkbenchController({
         });
       });
 
-  Future<void> closeChannel(ChannelSession session) => run('channel:${session.key}', () async {
+  Future<void> closeChannel(ChannelSession session) => run(Operation.channel(session), () async {
     await session.channel.close();
     session.closed = true;
   });
@@ -617,7 +618,7 @@ class WorkbenchController({
   }
 
   /// Reports errors once and prevents duplicate submissions of the same action.
-  Future<void> run(String operation, Future<void> Function() action) async {
+  Future<void> run(Operation operation, Future<void> Function() action) async {
     if (_disposed || !_busy.add(operation)) {
       return;
     }
@@ -629,9 +630,9 @@ class WorkbenchController({
       if (_isUnsupported(exception)) {
         error = 'This operation is not supported on this device.';
       } else {
-        error = '$operation: $exception';
+        error = '${operation.label}: $exception';
       }
-      log('ERROR $operation: $exception');
+      log('ERROR ${operation.label}: $exception');
       debugPrintStack(stackTrace: stackTrace);
     } finally {
       _busy.remove(operation);
@@ -826,6 +827,39 @@ class WorkbenchController({
       }
     }
   }
+}
+
+/// Identifies an operation for [WorkbenchController.run] and [WorkbenchController.busy].
+/// Operations with a [scope], such as one channel, run independently of each other.
+class const Operation._(
+  /// Prefixes the error the operation reports.
+  final String label, [
+  final Object? scope,
+]) {
+  static const initialize = Operation._('Initialize');
+  static const scan = Operation._('Scan');
+  static const systemDevices = Operation._('System devices');
+  static const connection = Operation._('Connection');
+  static const cancelConnection = Operation._('Cancel connection');
+  static const adapter = Operation._('Turn on Bluetooth');
+  static const discover = Operation._('Service discovery');
+  static const bond = Operation._('Bond');
+  static const mtu = Operation._('MTU request');
+  static const server = Operation._('L2CAP server');
+  static const open = Operation._('Open L2CAP channel');
+
+  new rssi(BluetoothDevice device) : this._('Read RSSI', device.remoteId);
+  new channel(ChannelSession session) : this._('L2CAP channel', session.key);
+  new characteristic(BluetoothCharacteristic c)
+    : this._('Characteristic ${c.uuid}', (c.remoteId, c.serviceUuid, c.uuid, c.instanceId));
+  new descriptor(BluetoothDescriptor d)
+    : this._('Descriptor ${d.uuid}', (d.remoteId, d.serviceUuid, d.characteristicUuid, d.uuid, d.instanceId));
+
+  @override
+  bool operator ==(Object other) => other is Operation && other.label == label && other.scope == scope;
+
+  @override
+  int get hashCode => Object.hash(label, scope);
 }
 
 /// A capability the platform lacks, as opposed to a failure of the operation.

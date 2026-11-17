@@ -109,7 +109,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
           ),
           const SizedBox(height: 14),
           () {
-            final enabled = c.ready && !c.busy('scan');
+            final enabled = c.ready && !c.busy(Operation.scan);
             if (tracking) {
               return FilledButton.icon(
                 onPressed: enabled ? c.stopTracking : null,

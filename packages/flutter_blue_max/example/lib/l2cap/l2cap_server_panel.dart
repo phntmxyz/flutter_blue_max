@@ -25,7 +25,9 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
           contentPadding: EdgeInsets.zero,
           title: const Text('Require encryption'),
           value: _secure,
-          onChanged: c.serverPsm == null && !c.busy('server') ? (value) => setState(() => _secure = value) : null,
+          onChanged: c.serverPsm == null && !c.busy(Operation.server)
+              ? (value) => setState(() => _secure = value)
+              : null,
         ),
         if (c.serverPsm != null) ...[
           const SizedBox(height: 8),
@@ -42,8 +44,8 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
           const SizedBox(height: 12),
         ],
         () {
-          final canChangeServer = c.ready && !c.busy('server');
-          final label = c.busy('server') ? 'Working…' : null;
+          final canChangeServer = c.ready && !c.busy(Operation.server);
+          final label = c.busy(Operation.server) ? 'Working…' : null;
           if (c.serverPsm == null) {
             return FilledButton.icon(
               onPressed: canChangeServer ? () => c.startServer(secure: _secure) : null,
