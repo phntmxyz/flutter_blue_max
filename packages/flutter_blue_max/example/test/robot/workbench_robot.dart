@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
@@ -147,7 +148,11 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   }
 
   Future<void> openL2cap() => tapLabel('L2CAP');
-  Future<void> openLocalServer() => tapLabel('Local server');
+  Future<void> openLocalServer() async {
+    await tapLabel('Local server');
+    spot<ServerStatusCard>().spot<ServerListenerControls>().existsOnce();
+  }
+
   Future<void> readAndWriteCharacteristic() async {
     await tapLabel('180F');
     await tapLabel('2A19');

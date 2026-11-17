@@ -21,48 +21,14 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
     final c = context.read<WorkbenchController>();
     final incoming = c.channelSessions.where((s) => s.incoming).toList();
     final connectedCount = incoming.where((s) => !s.closed).length;
-    final listenerControls = Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        SwitchListTile.adaptive(
-          contentPadding: EdgeInsets.zero,
-          title: const Text('Require encryption'),
-          value: _secure,
-          onChanged: c.serverPsm == null && !c.busy(Operation.server)
-              ? (value) => setState(() => _secure = value)
-              : null,
-        ),
-        if (c.serverPsm != null) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: SelectableText('PSM ${c.serverPsm}', style: Theme.of(context).textTheme.headlineSmall)),
-              IconButton(
-                tooltip: 'Copy server PSM',
-                onPressed: () => Clipboard.setData(ClipboardData(text: '${c.serverPsm}')),
-                icon: const Icon(Icons.copy),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-        ],
-        () {
-          final canChangeServer = c.ready && !c.busy(Operation.server);
-          final label = c.busy(Operation.server) ? 'Working…' : null;
-          if (c.serverPsm == null) {
-            return FilledButton.icon(
-              onPressed: canChangeServer ? () => c.startServer(secure: _secure) : null,
-              icon: const Icon(Icons.play_arrow_rounded),
-              label: Text(label ?? 'Start server'),
-            );
-          }
-          return FilledButton.icon(
-            onPressed: canChangeServer ? c.stopServer : null,
-            icon: const Icon(Icons.stop_rounded),
-            label: Text(label ?? 'Stop server'),
-          );
-        }(),
-      ],
+    final listenerControls = ServerListenerControls(
+      psm: c.serverPsm,
+      secure: _secure,
+      busy: c.busy(Operation.server),
+      ready: c.ready,
+      onSecureChanged: (value) => setState(() => _secure = value),
+      onStart: () => c.startServer(secure: _secure),
+      onStop: c.stopServer,
     );
     return ListView(
       padding: const EdgeInsets.all(24),
@@ -74,28 +40,7 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
           'To open a channel yourself, select a device in Devices and use its L2CAP tab.',
         ),
         const SizedBox(height: 24),
-        () {
-          if (c.serverPsm == null) {
-            return WorkbenchCard(
-              title: const Text('Prepare this device'),
-              icon: Icons.dns_outlined,
-              subtitle: const Text('Start listening before the other device connects.'),
-              child: listenerControls,
-            );
-          }
-          final String status;
-          if (connectedCount == 0) {
-            status = 'Waiting for a peer — no channel connected yet.';
-          } else {
-            status = '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.';
-          }
-          return WorkbenchCard(
-            title: Text('Listening on PSM ${c.serverPsm}'),
-            icon: Icons.dns_outlined,
-            subtitle: Text(status),
-            child: listenerControls,
-          );
-        }(),
+        ServerStatusCard(psm: c.serverPsm, connectedCount: connectedCount, child: listenerControls),
         const WorkbenchCard(
           title: Text('Connect from the other device'),
           icon: Icons.info_outline,
@@ -112,6 +57,96 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
           for (final session in incoming) L2capChannelCard(key: ValueKey(session.key), session: session),
         ],
       ],
+    );
+  }
+}
+
+/// Listener settings and start/stop controls in the Local server destination.
+class const ServerListenerControls({
+  super.key,
+  required final int? psm,
+  required final bool secure,
+  required final bool busy,
+  required final bool ready,
+  required final ValueChanged<bool> onSecureChanged,
+  required final VoidCallback onStart,
+  required final VoidCallback onStop,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final canChangeServer = ready && !busy;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        SwitchListTile.adaptive(
+          contentPadding: EdgeInsets.zero,
+          title: const Text('Require encryption'),
+          value: secure,
+          onChanged: psm == null && !busy ? onSecureChanged : null,
+        ),
+        if (psm != null) ...[
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(child: SelectableText('PSM $psm', style: Theme.of(context).textTheme.headlineSmall)),
+              IconButton(
+                tooltip: 'Copy server PSM',
+                onPressed: () => Clipboard.setData(ClipboardData(text: '$psm')),
+                icon: const Icon(Icons.copy),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+        ],
+        Builder(
+          builder: (context) {
+            if (psm == null) {
+              return FilledButton.icon(
+                onPressed: canChangeServer ? onStart : null,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(busy ? 'Working…' : 'Start server'),
+              );
+            }
+            return FilledButton.icon(
+              onPressed: canChangeServer ? onStop : null,
+              icon: const Icon(Icons.stop_rounded),
+              label: Text(busy ? 'Working…' : 'Stop server'),
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+/// The preparation or active-listener card in Local server, including its incoming connection count.
+class const ServerStatusCard({
+  super.key,
+  required final int? psm,
+  required final int connectedCount,
+  required final Widget child,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    if (psm == null) {
+      return WorkbenchCard(
+        title: const Text('Prepare this device'),
+        icon: Icons.dns_outlined,
+        subtitle: const Text('Start listening before the other device connects.'),
+        child: child,
+      );
+    }
+    final String status;
+    if (connectedCount == 0) {
+      status = 'Waiting for a peer — no channel connected yet.';
+    } else {
+      status = '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.';
+    }
+    return WorkbenchCard(
+      title: Text('Listening on PSM $psm'),
+      icon: Icons.dns_outlined,
+      subtitle: Text(status),
+      child: child,
     );
   }
 }
