@@ -1,5 +1,7 @@
 import 'dart:convert';
 
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
@@ -11,6 +13,13 @@ void main() {
     final services = [...testDongleServices, ...standardServices];
     expect(jsonEncode(decodeCatalogFile(encodeCatalogFile(services))), jsonEncode(services));
     expect(decodeCatalogFile('{"services": []}'), isEmpty);
+  });
+
+  test('a file with duplicate service UUIDs is rejected before it can overwrite entries', () {
+    final first = KnownService(Guid('fff0'), 'First', []);
+    final second = KnownService(Guid('fff0'), 'Second', []);
+    expect(() => decodeCatalogFile(encodeCatalogFile([first, second])), throwsFormatException);
+    expect(() => decodeCatalogFile(encodeCatalogFile([first, first])), throwsFormatException);
   });
 
   test('foreign files are rejected with a reason', () {

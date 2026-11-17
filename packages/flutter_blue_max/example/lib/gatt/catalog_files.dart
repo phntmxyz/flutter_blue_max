@@ -1,5 +1,7 @@
 import 'dart:ui';
 
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
@@ -11,8 +13,16 @@ const _key = 'services';
 String encodeCatalogFile(List<KnownService> services) => encodeJsonList(_key, services);
 
 /// Throws a [FormatException] for files that do not hold catalog services.
-List<KnownService> decodeCatalogFile(String text) =>
-    decodeJsonList(text, key: _key, noun: serviceNoun, fromJson: KnownService.fromJson);
+List<KnownService> decodeCatalogFile(String text) {
+  final services = decodeJsonList(text, key: _key, noun: serviceNoun, fromJson: KnownService.fromJson);
+  final seen = <Guid>{};
+  for (final service in services) {
+    if (!seen.add(service.uuid)) {
+      throw FormatException('The file repeats service UUID ${service.uuid}.');
+    }
+  }
+  return services;
+}
 
 /// Lets the user pick a catalog file; null when cancelled.
 Future<List<KnownService>?> openCatalogFile() async {
