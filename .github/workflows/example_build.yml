@@ -88,7 +88,8 @@ jobs:
           flutter test --no-pub
           flutter test --no-pub --platform chrome \
             test/scenarios/workbench_test.dart --plain-name 'web:'
-          flutter test --no-pub --platform chrome test/unit/web_export_test.dart
+          flutter test --no-pub --platform chrome \
+            test/unit/web_export_test.dart test/unit/advertisement_parser_test.dart
 
       - name: Build Android APK
         if: matrix.platform == 'android'

@@ -406,7 +406,8 @@ class const AdvertisementField(
       value = raw;
     }
     final scaled = value * scale + add;
-    final text = value is int && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()
+    final integerType = type != AdvertisementFieldType.float32le && type != AdvertisementFieldType.float32be;
+    final text = integerType && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()
         ? '${scaled.round()}'
         : scaled.toStringAsFixed(_decimals);
     return unit.isEmpty ? text : '$text $unit';
