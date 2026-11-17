@@ -47,8 +47,8 @@ class const AdvertisementParser({
       );
     } on FormatException {
       rethrow;
-    } on Object catch (error) {
-      throw FormatException('Invalid parser: $error');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid parser: $error'), stackTrace);
     }
     // The same rules as the editor, so imported and stored parsers render like hand-made ones.
     final companyId = parser.companyId;
@@ -216,8 +216,8 @@ class const RecordFormat({
         type: RecordTypeFormat.values.byName(json['type'] as String),
         length: RecordLength.values.byName(json['length'] as String),
       );
-    } on Object catch (error) {
-      throw FormatException('Invalid record format: $error');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid record format: $error'), stackTrace);
     }
     if (format.offset < 0) {
       throw FormatException('Invalid record format: offset ${format.offset}');
@@ -317,8 +317,8 @@ class const AdvertisementField(
         bit: json['bit'] as int,
         bits: json['bits'] as int?,
       );
-    } on Object catch (error) {
-      throw FormatException('Invalid parser field: $error');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid parser field: $error'), stackTrace);
     }
     if (field.scale == 0 || !field.scale.isFinite) {
       throw FormatException('Invalid parser field ${field.name}: scale ${field.scale}');

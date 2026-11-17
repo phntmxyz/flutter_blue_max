@@ -36,8 +36,8 @@ class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>
       );
     } on FormatException {
       rethrow;
-    } on Object catch (error) {
-      throw FormatException('Invalid catalog characteristic: $error');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid catalog characteristic: $error'), stackTrace);
     }
   }
 
@@ -82,8 +82,8 @@ class KnownService(
       ], test: json['test'] as bool);
     } on FormatException {
       rethrow;
-    } on Object catch (error) {
-      throw FormatException('Invalid catalog service: $error');
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid catalog service: $error'), stackTrace);
     }
   }
 
