@@ -207,7 +207,9 @@ void main() {
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.error, startsWith('Loading GATT catalog'));
       await controller.resetCatalog();
-      expect(await loadCatalog(), isEmpty);
+      final stored = await loadCatalog();
+      expect(stored?.items, isEmpty);
+      expect(stored?.unreadable, isEmpty);
     });
 
     test('restoring the examples adds only missing ones', () async {
@@ -236,7 +238,43 @@ void main() {
       expect(controller.parsers, isEmpty);
       await controller.resetParsers();
       expect(jsonEncode(controller.parsers), jsonEncode(testDongleParsers));
-      expect(jsonEncode(await loadParsers()), jsonEncode(testDongleParsers));
+      final stored = await loadParsers();
+      expect(jsonEncode(stored?.items), jsonEncode(testDongleParsers));
+      expect(stored?.unreadable, isEmpty);
+    });
+
+    test('a stored entry that no longer decodes survives saving the readable ones', () async {
+      final own = KnownService(Guid('fff0'), 'Own', []);
+      const broken = {'name': 'Broken'};
+      SharedPreferences.setMockInitialValues({
+        catalogStoreKey: jsonEncode([own, broken]),
+        parserStoreKey: jsonEncode([testDongleParsers.first, broken]),
+      });
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      expect(controller.catalog.single.name, 'Own');
+      expect(controller.parsers.single.name, testDongleParsers.first.name);
+      expect(controller.error, contains('1 stored entry could not be read'));
+
+      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
+      await controller.removeParser(controller.parsers.single);
+      final catalog = await loadCatalog();
+      expect(catalog?.items.map((service) => service.name), ['Own', 'Lamp']);
+      expect(catalog?.unreadable, [broken]);
+      final parsers = await loadParsers();
+      expect(parsers?.items, isEmpty);
+      expect(parsers?.unreadable, [broken]);
+    });
+
+    test('a store that is not a list is never overwritten by an ordinary save', () async {
+      SharedPreferences.setMockInitialValues({catalogStoreKey: '{"not": "a list"}'});
+      final (:controller, platform: _) = await _setup(resetStorage: false);
+      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
+      expect(controller.error, contains('changes are not saved'));
+      final preferences = await SharedPreferences.getInstance();
+      expect(preferences.getString(catalogStoreKey), '{"not": "a list"}');
+
+      await controller.resetCatalog();
+      expect((await loadCatalog())?.items, isEmpty);
     });
 
     test('unreadable stored parsers are reported instead of crashing the app', () async {

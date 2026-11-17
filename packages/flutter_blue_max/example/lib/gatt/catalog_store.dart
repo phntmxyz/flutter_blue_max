@@ -1,25 +1,12 @@
-import 'dart:convert';
-
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter_blue_max_example/shared/stored_list.dart';
 
 /// The user's own catalog services, stored as JSON in the platform's preferences like the parsers.
 const catalogStoreKey = 'gatt_catalog';
 
-Future<List<KnownService>> loadCatalog() async {
-  final preferences = await SharedPreferences.getInstance();
-  final json = preferences.getString(catalogStoreKey);
-  if (json == null) {
-    return [];
-  }
-  final decoded = jsonDecode(json);
-  if (decoded is! List) {
-    throw const FormatException('Stored catalog is not a list.');
-  }
-  return [for (final service in decoded) KnownService.fromJson(service as Map<String, dynamic>)];
-}
+/// Null until the catalog was saved once.
+Future<StoredList<KnownService>?> loadCatalog() => loadStoredList(catalogStoreKey, KnownService.fromJson);
 
-Future<void> saveCatalog(List<KnownService> services) async {
-  final preferences = await SharedPreferences.getInstance();
-  await preferences.setString(catalogStoreKey, jsonEncode([for (final service in services) service.toJson()]));
-}
+/// Keeps the [unreadable] entries of the last load, so saving never drops them.
+Future<void> saveCatalog(List<KnownService> services, {List<Object?> unreadable = const []}) =>
+    saveStoredList(catalogStoreKey, services, unreadable: unreadable);

@@ -25,6 +25,14 @@ class WorkbenchController() extends ChangeNotifier {
   final _parsers = <AdvertisementParser>[];
   final _catalog = <KnownService>[];
 
+  /// Stored entries that no longer decode. Saves write them back unchanged until a reset removes them.
+  List<Object?> _unreadableParsers = const [];
+  List<Object?> _unreadableCatalog = const [];
+
+  /// Set when the stored value itself is unreadable. Saving would overwrite it, so only a reset may.
+  bool _parserStoreUnreadable = false;
+  bool _catalogStoreUnreadable = false;
+
   /// Serializes writes so a slow save never overwrites a newer one.
   Future<void> _writes = Future.value();
 
@@ -219,24 +227,43 @@ class WorkbenchController() extends ChangeNotifier {
     );
     // Not run(): starting an operation clears the error, which would hide a failed initialization.
     try {
+      final stored = await loadParsers();
       _parsers
         ..clear()
-        ..addAll(await loadParsers() ?? testDongleParsers);
+        ..addAll(stored?.items ?? testDongleParsers);
+      _unreadableParsers = stored?.unreadable ?? const [];
+      _reportUnreadable('parsers', _unreadableParsers.length, stored?.problem, reset: 'Reset parsers');
     } catch (exception, stackTrace) {
-      error = 'Loading parsers: $exception';
+      _parserStoreUnreadable = true;
+      error = 'Loading parsers: $exception\nChanges are not saved until you reset the parsers.';
       log('ERROR loading parsers: $exception');
       debugPrintStack(stackTrace: stackTrace);
     }
     try {
+      final stored = await loadCatalog();
       _catalog
         ..clear()
-        ..addAll(await loadCatalog());
+        ..addAll(stored?.items ?? const []);
+      _unreadableCatalog = stored?.unreadable ?? const [];
+      _reportUnreadable('GATT catalog', _unreadableCatalog.length, stored?.problem, reset: 'Reset catalog');
     } catch (exception, stackTrace) {
-      error = 'Loading GATT catalog: $exception';
+      _catalogStoreUnreadable = true;
+      error = 'Loading GATT catalog: $exception\nChanges are not saved until you reset the catalog.';
       log('ERROR loading GATT catalog: $exception');
       debugPrintStack(stackTrace: stackTrace);
     }
     _update();
+  }
+
+  void _reportUnreadable(String what, int count, FormatException? problem, {required String reset}) {
+    if (count == 0) {
+      return;
+    }
+    final entries = count == 1 ? '1 stored entry' : '$count stored entries';
+    error =
+        'Loading $what: $entries could not be read and stay stored unchanged. '
+        '$reset removes them. ${problem?.message ?? ''}';
+    log('ERROR loading $what: $entries unreadable: ${problem?.message}');
   }
 
   void setQuery(String value) {
@@ -637,6 +664,8 @@ class WorkbenchController() extends ChangeNotifier {
     _parsers
       ..clear()
       ..addAll(testDongleParsers);
+    _unreadableParsers = const [];
+    _parserStoreUnreadable = false;
     return _persistParsers();
   }
 
@@ -686,17 +715,35 @@ class WorkbenchController() extends ChangeNotifier {
   /// Removes every own service, which also overwrites a stored catalog that no longer loads.
   Future<void> resetCatalog() {
     _catalog.clear();
+    _unreadableCatalog = const [];
+    _catalogStoreUnreadable = false;
     return _persistCatalog();
   }
 
   Future<void> _persistParsers() {
+    if (_parserStoreUnreadable) {
+      return _refuseToOverwrite('parsers', reset: 'Reset parsers');
+    }
     final snapshot = List.of(_parsers);
-    return _persist('parsers', () => saveParsers(snapshot));
+    final unreadable = _unreadableParsers;
+    return _persist('parsers', () => saveParsers(snapshot, unreadable: unreadable));
   }
 
   Future<void> _persistCatalog() {
+    if (_catalogStoreUnreadable) {
+      return _refuseToOverwrite('GATT catalog', reset: 'Reset catalog');
+    }
     final snapshot = List.of(_catalog);
-    return _persist('GATT catalog', () => saveCatalog(snapshot));
+    final unreadable = _unreadableCatalog;
+    return _persist('GATT catalog', () => saveCatalog(snapshot, unreadable: unreadable));
+  }
+
+  /// The stored value could not be read at all, so saving over it would lose it without the user asking.
+  Future<void> _refuseToOverwrite(String what, {required String reset}) {
+    error = 'Saving $what: the stored $what could not be read, so changes are not saved. $reset replaces them.';
+    log('ERROR saving $what: stored value unreadable');
+    _update();
+    return Future.value();
   }
 
   Future<void> _persist(String what, Future<void> Function() save) {
