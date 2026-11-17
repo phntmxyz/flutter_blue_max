@@ -174,8 +174,14 @@ class FlutterBlueMax {
         .setOptions(BmSetOptionsRequest(showPowerAlert: showPowerAlert, restoreState: restoreState)));
   }
 
-  /// Turn on Bluetooth (Android only),
+  /// Turn on Bluetooth (Android & Linux only).
+  ///  - iOS & macOS do not let apps turn Bluetooth on, this throws [FbpErrorCode.androidOnly] there.
   static Future<void> turnOn({int timeout = 60}) async {
+    // check platform
+    if (!kIsWeb && (Platform.isIOS || Platform.isMacOS)) {
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "turnOn", FbpErrorCode.androidOnly.index, "android-only");
+    }
+
     var responseStream = FlutterBlueMaxPlatform.instance.onTurnOnResponse;
 
     // Start listening now, before invokeMethod, to ensure we don't miss the response
