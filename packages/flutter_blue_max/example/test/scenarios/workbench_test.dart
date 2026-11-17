@@ -319,6 +319,12 @@ void main() {
       await robot.removeOwnCatalogService();
     });
 
+    testWidgets('the catalog editor rejects invalid entries and edits in place', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.validateCatalogEditor();
+    });
+
     testWidgets('broadcast advertisements retain appearance and cannot be connected', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));

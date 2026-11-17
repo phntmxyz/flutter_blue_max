@@ -108,12 +108,63 @@ extension GattCatalogRobot on WorkbenchRobot {
     spotText('None yet. Add a service here or from a discovered service in the GATT explorer.').existsOnce();
   }
 
+  Future<void> validateCatalogEditor() async {
+    await tapLabel('Library');
+    await tapLabel('GATT catalog');
+    await tapLabel('Add service');
+    logEvent('Saving an empty entry names every missing value');
+    await tapLabel('Save entry');
+    spotText('Enter a name.', exact: true).existsExactlyNTimes(2);
+    spotText('Enter a 16, 32 or 128-bit UUID.', exact: true).existsExactlyNTimes(2);
+    spotText('Select the expected properties.', exact: true).existsOnce();
+    await _enter('Service name', 'Sensor');
+    await _enter('Service UUID', 'fff0');
+    await _enter('Characteristic name', 'Level');
+    await _enter('Characteristic UUID', 'fff1');
+    await tapLabel('Read');
+    logEvent('A second characteristic may not repeat a UUID and needs properties while checked');
+    await tapLabel('Add characteristic');
+    await _enter('Characteristic name', 'Copy', index: 1);
+    await _enter('Characteristic UUID', 'fff1', index: 1);
+    await tapLabel('Save entry');
+    spotText('This service already has this characteristic.', exact: true).existsExactlyNTimes(2);
+    spotText('Select the expected properties.', exact: true).existsOnce();
+    expect(controller.catalog, isEmpty);
+    await _enter('Characteristic UUID', 'fff2', index: 1);
+    logEvent('Without checks the entry only names its characteristics');
+    await tapLabel('Check characteristics');
+    await tapLabel('Save entry');
+    final saved = controller.catalog.single;
+    expect(saved.test, isFalse);
+    expect(
+      [for (final characteristic in saved.characteristics) (characteristic.uuid, characteristic.properties)],
+      [(Guid('fff1'), null), (Guid('fff2'), null)],
+    );
+    logEvent('Another entry may not reuse the service UUID');
+    await tapLabel('Add service');
+    await _enter('Service name', 'Other');
+    await _enter('Service UUID', 'fff0');
+    await tapLabel('Save entry');
+    spotText('Your catalog already has this service.', exact: true).existsOnce();
+    await tester.pageBack();
+    await idle();
+    expect(controller.catalog, [saved]);
+    logEvent('Editing replaces the entry in place, and its own UUID is no duplicate');
+    await tapLabel('Sensor');
+    await tapLabel('Edit');
+    await _enter('Service name', 'Renamed');
+    await tapLabel('Save entry');
+    expect([for (final service in controller.catalog) (service.name, service.uuid)], [('Renamed', Guid('fff0'))]);
+    spotText('Renamed', exact: true).existsOnce();
+  }
+
   WidgetSelector<TextField> _field(String label) => spot<TextField>().withChild(spotText(label, exact: true));
 
-  Future<void> _enter(String label, String text) async {
+  /// [index] picks one of several fields with the same label, e.g. of the second characteristic.
+  Future<void> _enter(String label, String text, {int index = 0}) async {
     logEvent('Enter "$text" into "$label"');
-    final field = _field(label)..existsOnce();
-    await tester.ensureVisible(find.widgetWithText(TextField, label));
+    final field = _field(label).atIndex(index)..existsOnce();
+    await tester.ensureVisible(find.widgetWithText(TextField, label).at(index));
     await idle();
     await act.enterText(field, text);
     await idle();
