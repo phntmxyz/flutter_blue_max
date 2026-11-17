@@ -114,12 +114,6 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
     super.dispose();
   }
 
-  static String _companyText(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
-
-  static String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
-
-  static int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
-
   int? get _companyId => _hexNumber(_key.text);
 
   Guid? get _serviceUuid {
@@ -591,3 +585,9 @@ class _FieldDraft() {
     }
   }
 }
+
+String _companyText(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+
+String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
+
+int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);

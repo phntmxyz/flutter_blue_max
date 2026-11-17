@@ -164,18 +164,20 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
     }
   }
 
-  static Future<List<AdvertisementParser>?> _choose(
-    BuildContext context, {
-    required String title,
-    required String action,
-    required List<AdvertisementParser> parsers,
-  }) => SelectionDialog.show(
-    context,
-    title: title,
-    action: action,
-    noun: parserNoun,
-    items: parsers,
-    label: (parser) => parser.name,
-    details: (parser) => parser.summary,
-  );
+
 }
+
+Future<List<AdvertisementParser>?> _choose(
+  BuildContext context, {
+  required String title,
+  required String action,
+  required List<AdvertisementParser> parsers,
+}) => SelectionDialog.show(
+  context,
+  title: title,
+  action: action,
+  noun: parserNoun,
+  items: parsers,
+  label: (parser) => parser.name,
+  details: (parser) => parser.summary,
+);
