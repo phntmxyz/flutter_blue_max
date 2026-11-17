@@ -1,0 +1,50 @@
+name: Package checks
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/package_checks.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'packages/**'
+      - '.github/workflows/package_checks.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - flutter_blue_max
+          - flutter_blue_max_android
+          - flutter_blue_max_darwin
+          - flutter_blue_max_linux
+          - flutter_blue_max_platform_interface
+          - flutter_blue_max_web
+    defaults:
+      run:
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          channel: stable
+          cache: true
+      - run: flutter pub get
+      - name: Check formatting and analysis
+        shell: bash
+        run: |
+          sources=(lib)
+          if [[ -d test ]]; then sources+=(test); fi
+          dart format --output=none --set-exit-if-changed "${sources[@]}"
+          flutter analyze --no-pub "${sources[@]}"
+      - name: Test package
+        shell: bash
+        run: |
+          if [[ -d test ]]; then flutter test --no-pub; fi

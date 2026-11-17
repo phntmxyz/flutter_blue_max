@@ -10,7 +10,8 @@ class DeviceIdentifier {
   int get hashCode => str.hashCode;
 
   @override
-  bool operator ==(other) => other is DeviceIdentifier && _compareAsciiLowerCase(str, other.str) == 0;
+  bool operator ==(Object other) =>
+      other is DeviceIdentifier && _compareAsciiLowerCase(str, other.str) == 0;
 
   @Deprecated('Use str instead')
   String get id => str;
@@ -23,8 +24,8 @@ int _compareAsciiLowerCase(String a, String b) {
   var defaultResult = 0;
   for (var i = 0; i < a.length; i++) {
     if (i >= b.length) return 1;
-    var aChar = a.codeUnitAt(i);
-    var bChar = b.codeUnitAt(i);
+    final aChar = a.codeUnitAt(i);
+    final bChar = b.codeUnitAt(i);
     if (aChar == bChar) continue;
     var aLowerCase = aChar;
     var bLowerCase = bChar;

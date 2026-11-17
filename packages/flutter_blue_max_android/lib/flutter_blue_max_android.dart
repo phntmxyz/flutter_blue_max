@@ -13,24 +13,40 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
   var _logLevel = LogLevel.none;
   var _logColor = true;
 
-  final _onAdapterStateChangedController = StreamController<BmBluetoothAdapterState>.broadcast();
-  final _onBondStateChangedController = StreamController<BmBondStateResponse>.broadcast();
-  final _onCharacteristicReceivedController = StreamController<BmCharacteristicData>.broadcast();
-  final _onCharacteristicWrittenController = StreamController<BmCharacteristicData>.broadcast();
-  final _onConnectionStateChangedController = StreamController<BmConnectionStateResponse>.broadcast();
-  final _onDescriptorReadController = StreamController<BmDescriptorData>.broadcast();
-  final _onDescriptorWrittenController = StreamController<BmDescriptorData>.broadcast();
-  final _onDetachedFromEngineController = StreamController<BmDetachedFromEngineResponse>.broadcast();
-  final _onDiscoveredServicesController = StreamController<BmDiscoverServicesResult>.broadcast();
-  final _onMtuChangedController = StreamController<BmMtuChangedResponse>.broadcast();
+  final _onAdapterStateChangedController =
+      StreamController<BmBluetoothAdapterState>.broadcast();
+  final _onBondStateChangedController =
+      StreamController<BmBondStateResponse>.broadcast();
+  final _onCharacteristicReceivedController =
+      StreamController<BmCharacteristicData>.broadcast();
+  final _onCharacteristicWrittenController =
+      StreamController<BmCharacteristicData>.broadcast();
+  final _onConnectionStateChangedController =
+      StreamController<BmConnectionStateResponse>.broadcast();
+  final _onDescriptorReadController =
+      StreamController<BmDescriptorData>.broadcast();
+  final _onDescriptorWrittenController =
+      StreamController<BmDescriptorData>.broadcast();
+  final _onDetachedFromEngineController =
+      StreamController<BmDetachedFromEngineResponse>.broadcast();
+  final _onDiscoveredServicesController =
+      StreamController<BmDiscoverServicesResult>.broadcast();
+  final _onMtuChangedController =
+      StreamController<BmMtuChangedResponse>.broadcast();
   final _onNameChangedController = StreamController<BmNameChanged>.broadcast();
   final _onReadRssiController = StreamController<BmReadRssiResult>.broadcast();
-  final _onScanResponseController = StreamController<BmScanResponse>.broadcast();
-  final _onServicesResetController = StreamController<BmBluetoothDevice>.broadcast();
-  final _onTurnOnResponseController = StreamController<BmTurnOnResponse>.broadcast();
-  final _onL2CapChannelReceivedController = StreamController<L2CapChannelData>.broadcast();
-  final _onL2CapChannelClosedController = StreamController<L2CapChannelClosed>.broadcast();
-  final _onL2CapChannelConnectedController = StreamController<L2CapChannelConnected>.broadcast();
+  final _onScanResponseController =
+      StreamController<BmScanResponse>.broadcast();
+  final _onServicesResetController =
+      StreamController<BmBluetoothDevice>.broadcast();
+  final _onTurnOnResponseController =
+      StreamController<BmTurnOnResponse>.broadcast();
+  final _onL2CapChannelReceivedController =
+      StreamController<L2CapChannelData>.broadcast();
+  final _onL2CapChannelClosedController =
+      StreamController<L2CapChannelClosed>.broadcast();
+  final _onL2CapChannelConnectedController =
+      StreamController<L2CapChannelConnected>.broadcast();
 
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
@@ -193,9 +209,9 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     BmBluetoothAdapterNameRequest request,
   ) async {
     return BmBluetoothAdapterName(
-      adapterName: await _invokeMethod(
+      adapterName: (await _invokeMethod(
         'getAdapterName',
-      ),
+      )) as String,
     );
   }
 
@@ -204,9 +220,9 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     BmBluetoothAdapterStateRequest request,
   ) async {
     return BmBluetoothAdapterState.fromMap(
-      await _invokeMethod(
+      (await _invokeMethod(
         'getAdapterState',
-      ),
+      )) as Map<dynamic, dynamic>,
     );
   }
 
@@ -215,10 +231,10 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     BmBondStateRequest request,
   ) async {
     return BmBondStateResponse.fromMap(
-      await _invokeMethod(
+      (await _invokeMethod(
         'getBondState',
         request.remoteId.str,
-      ),
+      )) as Map<dynamic, dynamic>,
     );
   }
 
@@ -227,9 +243,9 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     BmBondedDevicesRequest request,
   ) async {
     return BmDevicesList.fromMap(
-      await _invokeMethod(
+      (await _invokeMethod(
         'getBondedDevices',
-      ),
+      )) as Map<dynamic, dynamic>,
     );
   }
 
@@ -238,9 +254,9 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     PhySupportRequest request,
   ) async {
     return PhySupport.fromMap(
-      await _invokeMethod(
+      (await _invokeMethod(
         'getPhySupport',
-      ),
+      )) as Map<dynamic, dynamic>,
     );
   }
 
@@ -249,9 +265,9 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     BmSystemDevicesRequest request,
   ) async {
     return BmDevicesList.fromMap(
-      await _invokeMethod(
+      (await _invokeMethod(
         'getSystemDevices',
-      ),
+      )) as Map<dynamic, dynamic>,
     );
   }
 
@@ -269,7 +285,7 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
   Future<int> listenL2CapChannel(
     ListenL2CapChannelRequest request,
   ) async {
-    var result = await _invokeMethod('listenL2CapChannel', request.toMap());
+    final result = await _invokeMethod('listenL2CapChannel', request.toMap());
     return result is Map ? (result['psm'] as int? ?? 4097) : 4097;
   }
 
@@ -307,9 +323,11 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     ReadL2CapChannelRequest request,
   ) async {
     return await _invokeMethod('readL2CapChannel', request.toMap())
-        .then((buffer) => ReadL2CapChannelResponse.fromMap(buffer))
+        .then((buffer) =>
+            ReadL2CapChannelResponse.fromMap(buffer as Map<dynamic, dynamic>))
         .then((readChannelResponse) {
-      return readChannelResponse.value.sublist(0, readChannelResponse.bytesRead);
+      return readChannelResponse.value
+          .sublist(0, readChannelResponse.bytesRead);
     });
   }
 
@@ -581,43 +599,43 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
       case 'OnAdapterStateChanged':
         return _onAdapterStateChangedController.add(
           BmBluetoothAdapterState.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnBondStateChanged':
         return _onBondStateChangedController.add(
           BmBondStateResponse.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnCharacteristicReceived':
         return _onCharacteristicReceivedController.add(
           BmCharacteristicData.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnCharacteristicWritten':
         return _onCharacteristicWrittenController.add(
           BmCharacteristicData.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnConnectionStateChanged':
         return _onConnectionStateChangedController.add(
           BmConnectionStateResponse.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnDescriptorRead':
         return _onDescriptorReadController.add(
           BmDescriptorData.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnDescriptorWritten':
         return _onDescriptorWrittenController.add(
           BmDescriptorData.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnDetachedFromEngine':
@@ -627,61 +645,61 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
       case 'OnDiscoveredServices':
         return _onDiscoveredServicesController.add(
           BmDiscoverServicesResult.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnMtuChanged':
         return _onMtuChangedController.add(
           BmMtuChangedResponse.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnNameChanged':
         return _onNameChangedController.add(
           BmNameChanged.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnReadRssi':
         return _onReadRssiController.add(
           BmReadRssiResult.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnScanResponse':
         return _onScanResponseController.add(
           BmScanResponse.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnServicesReset':
         return _onServicesResetController.add(
           BmBluetoothDevice.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnL2CapChannelReceived':
         return _onL2CapChannelReceivedController.add(
           L2CapChannelData.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnL2CapChannelClosed':
         return _onL2CapChannelClosedController.add(
           L2CapChannelClosed.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnL2CapChannelConnected':
         return _onL2CapChannelConnectedController.add(
           L2CapChannelConnected.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
       case 'OnTurnOnResponse':
         return _onTurnOnResponseController.add(
           BmTurnOnResponse.fromMap(
-            call.arguments,
+            (call.arguments) as Map<dynamic, dynamic>,
           ),
         );
     }
@@ -691,7 +709,7 @@ final class FlutterBlueMaxAndroid extends FlutterBlueMaxPlatform {
     dynamic data,
   ) {
     if (data is Map || data is List) {
-      return JsonEncoder.withIndent('  ').convert(data);
+      return const JsonEncoder.withIndent('  ').convert(data);
     } else {
       return data.toString();
     }

@@ -5,13 +5,14 @@
 class Guid {
   final List<int> bytes;
 
+  Guid(String input) : bytes = _toBytes(input);
+
   Guid.empty() : bytes = List.filled(16, 0);
 
-  Guid.fromBytes(this.bytes) : assert(_checkLen(bytes.length), 'GUID must be 16, 32, or 128 bit.');
+  Guid.fromBytes(this.bytes)
+      : assert(_checkLen(bytes.length), 'GUID must be 16, 32, or 128 bit.');
 
   Guid.fromString(String input) : bytes = _toBytes(input);
-
-  Guid(String input) : bytes = _toBytes(input);
 
   static Guid? parse(String? input) {
     if (input == null || input.isEmpty) {
@@ -26,11 +27,11 @@ class Guid {
       return List.filled(16, 0);
     }
 
-    input = input.replaceAll('-', '');
+    final normalized = input.replaceAll('-', '');
 
-    List<int>? bytes = _tryHexDecode(input);
+    final List<int>? bytes = _tryHexDecode(normalized);
     if (bytes == null) {
-      throw FormatException("GUID not hex format: $input");
+      throw FormatException("GUID not hex format: $normalized");
     }
 
     _checkLen(bytes.length);
@@ -40,7 +41,8 @@ class Guid {
 
   static bool _checkLen(int len) {
     if (!(len == 16 || len == 4 || len == 2)) {
-      throw FormatException("GUID must be 16, 32, or 128 bit, yours: ${len * 8}-bit");
+      throw FormatException(
+          "GUID must be 16, 32, or 128 bit, yours: ${len * 8}-bit");
     }
     return true;
   }
@@ -49,25 +51,26 @@ class Guid {
   String get str128 {
     if (bytes.length == 2) {
       // 16-bit uuid
-      return '0000${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb'.toLowerCase();
+      return '0000${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb'
+          .toLowerCase();
     }
     if (bytes.length == 4) {
       // 32-bit uuid
       return '${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb'.toLowerCase();
     }
     // 128-bit uuid
-    String one = _hexEncode(bytes.sublist(0, 4));
-    String two = _hexEncode(bytes.sublist(4, 6));
-    String three = _hexEncode(bytes.sublist(6, 8));
-    String four = _hexEncode(bytes.sublist(8, 10));
-    String five = _hexEncode(bytes.sublist(10, 16));
+    final String one = _hexEncode(bytes.sublist(0, 4));
+    final String two = _hexEncode(bytes.sublist(4, 6));
+    final String three = _hexEncode(bytes.sublist(6, 8));
+    final String four = _hexEncode(bytes.sublist(8, 10));
+    final String five = _hexEncode(bytes.sublist(10, 16));
     return "$one-$two-$three-$four-$five".toLowerCase();
   }
 
   // shortest representation
   String get str {
-    bool starts = str128.startsWith('0000');
-    bool ends = str128.contains('-0000-1000-8000-00805f9b34fb');
+    final bool starts = str128.startsWith('0000');
+    final bool ends = str128.contains('-0000-1000-8000-00805f9b34fb');
     if (starts && ends) {
       // 16-bit
       return str128.substring(4, 8);
@@ -84,7 +87,7 @@ class Guid {
   String toString() => str;
 
   @override
-  operator ==(other) => other is Guid && str128 == other.str128;
+  bool operator ==(Object other) => other is Guid && str128 == other.str128;
 
   @override
   int get hashCode => str128.hashCode;
@@ -97,14 +100,16 @@ class Guid {
 }
 
 String _hexEncode(List<int> numbers) {
-  return numbers.map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0')).join();
+  return numbers
+      .map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0'))
+      .join();
 }
 
 List<int>? _tryHexDecode(String hex) {
-  List<int> numbers = [];
+  final List<int> numbers = [];
   for (int i = 0; i < hex.length; i += 2) {
-    String hexPart = hex.substring(i, i + 2);
-    int? num = int.tryParse(hexPart, radix: 16);
+    final String hexPart = hex.substring(i, i + 2);
+    final int? num = int.tryParse(hexPart, radix: 16);
     if (num == null) {
       return null;
     }

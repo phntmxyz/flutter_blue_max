@@ -39,12 +39,18 @@ class BluetoothCharacteristic {
 
   /// Get Properties from known services
   CharacteristicProperties get properties {
-    return _bmchr != null ? CharacteristicProperties.fromProto(_bmchr!.properties) : CharacteristicProperties();
+    return _bmchr != null
+        ? CharacteristicProperties.fromProto(_bmchr!.properties)
+        : const CharacteristicProperties();
   }
 
   /// Get Descriptors from known services
   List<BluetoothDescriptor> get descriptors {
-    return _bmchr != null ? _bmchr!.descriptors.map((d) => BluetoothDescriptor.fromProto(d)).toList() : [];
+    return _bmchr != null
+        ? _bmchr!.descriptors
+            .map((d) => BluetoothDescriptor.fromProto(d))
+            .toList()
+        : [];
   }
 
   /// this variable is updated:
@@ -53,7 +59,8 @@ class BluetoothCharacteristic {
   ///   - anytime a notification arrives (if subscribed)
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key = FlutterBlueMax._chrCacheKey(serviceUuid, characteristicUuid, instanceId, primaryServiceUuid);
+    final String key = FlutterBlueMax._chrCacheKey(
+        serviceUuid, characteristicUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastChrs[remoteId]?[key] ?? [];
   }
 
@@ -78,19 +85,20 @@ class BluetoothCharacteristic {
   /// this stream emits values:
   ///   - anytime `read()` is called
   ///   - anytime a notification arrives (if subscribed)
-  Stream<List<int>> get onValueReceived => FlutterBlueMaxPlatform.instance.onCharacteristicReceived
-      .where((p) => p.remoteId == remoteId)
-      .where((p) => p.serviceUuid == serviceUuid)
-      .where((p) => p.characteristicUuid == characteristicUuid)
-      .where((p) => p.primaryServiceUuid == primaryServiceUuid)
-      .where((p) => p.instanceId == null || p.instanceId == instanceId)
-      .where((p) => p.success == true)
-      .map((c) => c.value);
+  Stream<List<int>> get onValueReceived =>
+      FlutterBlueMaxPlatform.instance.onCharacteristicReceived
+          .where((p) => p.remoteId == remoteId)
+          .where((p) => p.serviceUuid == serviceUuid)
+          .where((p) => p.characteristicUuid == characteristicUuid)
+          .where((p) => p.primaryServiceUuid == primaryServiceUuid)
+          .where((p) => p.instanceId == null || p.instanceId == instanceId)
+          .where((p) => p.success == true)
+          .map((c) => c.value);
 
   /// return true if we're subscribed to this characteristic
   ///   -  you can subscribe using setNotifyValue(true)
   bool get isNotifying {
-    var cccd = descriptors._firstWhereOrNull(
+    final cccd = descriptors._firstWhereOrNull(
       (d) => d.descriptorUuid == cccdUuid && d.instanceId == instanceId,
     );
 
@@ -98,8 +106,10 @@ class BluetoothCharacteristic {
       return false;
     }
 
-    var hasNotify = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x01) > 0;
-    var hasIndicate = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x02) > 0;
+    final hasNotify =
+        cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x01) > 0;
+    final hasIndicate =
+        cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x02) > 0;
 
     return hasNotify || hasIndicate;
   }
@@ -108,19 +118,19 @@ class BluetoothCharacteristic {
   Future<List<int>> read({int timeout = 15}) async {
     // check connected
     if (device.isDisconnected) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "readCharacteristic", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "readCharacteristic",
+          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _mutexForKey("global");
     await mtx.take();
 
     // return value
     List<int> responseValue = [];
 
     try {
-      var request = BmReadCharacteristicRequest(
+      final request = BmReadCharacteristicRequest(
         remoteId: remoteId,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
@@ -128,28 +138,32 @@ class BluetoothCharacteristic {
         instanceId: instanceId,
       );
 
-      var responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicReceived
+      final responseStream = FlutterBlueMaxPlatform
+          .instance.onCharacteristicReceived
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
           .where((p) => p.primaryServiceUuid == request.primaryServiceUuid)
-          .where((p) => p.instanceId == null || p.instanceId == request.instanceId);
+          .where((p) =>
+              p.instanceId == null || p.instanceId == request.instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmCharacteristicData> futureResponse = responseStream.first;
+      final Future<BmCharacteristicData> futureResponse = responseStream.first;
 
       // invoke
-      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.readCharacteristic(request));
+      await FlutterBlueMax._invokeMethod(
+          () => FlutterBlueMaxPlatform.instance.readCharacteristic(request));
 
       // wait for response
-      BmCharacteristicData response = await futureResponse
+      final BmCharacteristicData response = await futureResponse
           .fbpEnsureAdapterIsOn("readCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "readCharacteristic")
           .fbpTimeout(timeout, "readCharacteristic");
 
       // failed?
       if (!response.success) {
-        throw FlutterBlueMaxException(_nativeError, "readCharacteristic", response.errorCode, response.errorString);
+        throw FlutterBlueMaxException(_nativeError, "readCharacteristic",
+            response.errorCode, response.errorString);
       }
 
       // set return value
@@ -172,26 +186,31 @@ class BluetoothCharacteristic {
   ///         3. Interrupted transfers can leave the characteristic in a partially written state
   ///         4. If the mtu is small, it is very very slow.
   Future<void> write(List<int> value,
-      {bool withoutResponse = false, bool allowLongWrite = false, int timeout = 15}) async {
+      {bool withoutResponse = false,
+      bool allowLongWrite = false,
+      int timeout = 15}) async {
     //  check args
     if (withoutResponse && allowLongWrite) {
-      throw ArgumentError("cannot longWrite withoutResponse, not allowed on iOS or Android");
+      throw ArgumentError(
+          "cannot longWrite withoutResponse, not allowed on iOS or Android");
     }
 
     // check connected
     if (device.isDisconnected) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "writeCharacteristic", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "writeCharacteristic",
+          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _mutexForKey("global");
     await mtx.take();
 
     try {
-      final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
+      final writeType = withoutResponse
+          ? BmWriteType.withoutResponse
+          : BmWriteType.withResponse;
 
-      var request = BmWriteCharacteristicRequest(
+      final request = BmWriteCharacteristicRequest(
         remoteId: remoteId,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
@@ -202,7 +221,8 @@ class BluetoothCharacteristic {
         value: value,
       );
 
-      var responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicWritten
+      final responseStream = FlutterBlueMaxPlatform
+          .instance.onCharacteristicWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -210,25 +230,27 @@ class BluetoothCharacteristic {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmCharacteristicData> futureResponse = responseStream.first;
+      final Future<BmCharacteristicData> futureResponse = responseStream.first;
 
       // invoke
-      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.writeCharacteristic(request));
+      await FlutterBlueMax._invokeMethod(
+          () => FlutterBlueMaxPlatform.instance.writeCharacteristic(request));
 
       // wait for response so that we can:
       //  1. check for success (writeWithResponse)
       //  2. wait until the packet has been sent, to prevent iOS & Android dropping packets (writeWithoutResponse)
-      BmCharacteristicData response = await futureResponse
+      final BmCharacteristicData response = await futureResponse
           .fbpEnsureAdapterIsOn("writeCharacteristic")
           .fbpEnsureDeviceIsConnected(device, "writeCharacteristic")
           .fbpTimeout(timeout, "writeCharacteristic");
 
       // failed?
       if (!response.success) {
-        throw FlutterBlueMaxException(_nativeError, "writeCharacteristic", response.errorCode, response.errorString);
+        throw FlutterBlueMaxException(_nativeError, "writeCharacteristic",
+            response.errorCode, response.errorString);
       }
 
-      return Future.value();
+      return;
     } finally {
       mtx.give();
     }
@@ -238,24 +260,26 @@ class BluetoothCharacteristic {
   ///   - If a characteristic supports both notifications and indications,
   ///     we use notifications. This is a limitation of CoreBluetooth on iOS.
   ///   - [forceIndications] Android Only. force indications to be used instead of notifications.
-  Future<bool> setNotifyValue(bool notify, {int timeout = 15, bool forceIndications = false}) async {
+  Future<bool> setNotifyValue(bool notify,
+      {int timeout = 15, bool forceIndications = false}) async {
     // check connected
     if (device.isDisconnected) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "setNotifyValue", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "setNotifyValue",
+          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // check
     if (!kIsWeb && !Platform.isAndroid) {
-      assert(forceIndications == false, "Only Android supports forcing indications");
+      assert(forceIndications == false,
+          "Only Android supports forcing indications");
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _mutexForKey("global");
     await mtx.take();
 
     try {
-      var request = BmSetNotifyValueRequest(
+      final request = BmSetNotifyValueRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -267,7 +291,8 @@ class BluetoothCharacteristic {
 
       // Notifications & Indications are configured by writing to the
       // Client Characteristic Configuration Descriptor (CCCD)
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform
+          .instance.onDescriptorWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -276,22 +301,23 @@ class BluetoothCharacteristic {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      bool hasCCCD =
-          await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
+      final bool hasCCCD = await FlutterBlueMax._invokeMethod(
+          () => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
 
       // wait for CCCD descriptor to be written?
       if (hasCCCD) {
-        BmDescriptorData response = await futureResponse
+        final BmDescriptorData response = await futureResponse
             .fbpEnsureAdapterIsOn("setNotifyValue")
             .fbpEnsureDeviceIsConnected(device, "setNotifyValue")
             .fbpTimeout(timeout, "setNotifyValue");
 
         // failed?
         if (!response.success) {
-          throw FlutterBlueMaxException(_nativeError, "setNotifyValue", response.errorCode, response.errorString);
+          throw FlutterBlueMaxException(_nativeError, "setNotifyValue",
+              response.errorCode, response.errorString);
         }
       }
     } finally {
@@ -304,7 +330,7 @@ class BluetoothCharacteristic {
   // get known service
   BmBluetoothService? get _bmsvc {
     if (FlutterBlueMax._knownServices[remoteId] != null) {
-      for (var s in FlutterBlueMax._knownServices[remoteId]!.services) {
+      for (final s in FlutterBlueMax._knownServices[remoteId]!.services) {
         if (s.serviceUuid == serviceUuid) {
           if (s.primaryServiceUuid == primaryServiceUuid) {
             return s;
@@ -318,7 +344,7 @@ class BluetoothCharacteristic {
   /// get known characteristic
   BmBluetoothCharacteristic? get _bmchr {
     if (_bmsvc != null) {
-      for (var c in _bmsvc!.characteristics) {
+      for (final c in _bmsvc!.characteristics) {
         if (c.characteristicUuid == uuid) {
           if (c.instanceId == null || c.instanceId == instanceId) {
             return c;

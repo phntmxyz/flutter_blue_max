@@ -15,9 +15,8 @@ library;
 
 import 'dart:js_interop';
 
+import 'package:flutter_blue_max_web/src/web_bluetooth.dart';
 import 'package:web/web.dart' show EventTarget;
-
-import 'web_bluetooth.dart';
 
 @JS()
 external Window get window;

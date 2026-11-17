@@ -15,21 +15,25 @@ extension AddOrUpdate<T> on List<T> {
 extension FutureTimeout<T> on Future<T> {
   Future<T> fbpTimeout(int seconds, String function) {
     return timeout(Duration(seconds: seconds), onTimeout: () {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, function, FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, function,
+          FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
     });
   }
 
-  Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) {
+  Future<T> fbpEnsureDeviceIsConnected(
+      BluetoothDevice device, String function) {
     // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
+    final completer = Completer<T>();
 
     // disconnection listener.
-    var subscription = device.connectionState.listen((event) {
+    final subscription = device.connectionState.listen((event) {
       if (event == BluetoothConnectionState.disconnected) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
-              ErrorPlatform.fbp, function, FbpErrorCode.deviceIsDisconnected.index, "Device is disconnected"));
+              ErrorPlatform.fbp,
+              function,
+              FbpErrorCode.deviceIsDisconnected.index,
+              "Device is disconnected"));
         }
       }
     });
@@ -44,7 +48,7 @@ extension FutureTimeout<T> on Future<T> {
     }).catchError((error) {
       if (!completer.isCompleted) {
         subscription.cancel();
-        completer.completeError(error);
+        completer.completeError(error as Object);
       }
     });
 
@@ -53,14 +57,18 @@ extension FutureTimeout<T> on Future<T> {
 
   Future<T> fbpEnsureAdapterIsOn(String function) {
     // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
+    final completer = Completer<T>();
 
     // disconnection listener.
-    var subscription = FlutterBlueMax.adapterState.listen((event) {
-      if (event == BluetoothAdapterState.off || event == BluetoothAdapterState.turningOff) {
+    final subscription = FlutterBlueMax.adapterState.listen((event) {
+      if (event == BluetoothAdapterState.off ||
+          event == BluetoothAdapterState.turningOff) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
-              ErrorPlatform.fbp, function, FbpErrorCode.adapterIsOff.index, "Bluetooth adapter is off"));
+              ErrorPlatform.fbp,
+              function,
+              FbpErrorCode.adapterIsOff.index,
+              "Bluetooth adapter is off"));
         }
       }
     });
@@ -75,7 +83,7 @@ extension FutureTimeout<T> on Future<T> {
     }).catchError((error) {
       if (!completer.isCompleted) {
         subscription.cancel();
-        completer.completeError(error);
+        completer.completeError(error as Object);
       }
     });
 
@@ -92,7 +100,8 @@ class _StreamControllerReEmit<T> {
 
   final StreamController<T> _controller = StreamController<T>.broadcast();
 
-  _StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
+  _StreamControllerReEmit({required T initialValue})
+      : latestValue = initialValue;
 
   Stream<T> get stream {
     if (latestValue != null) {
@@ -113,9 +122,11 @@ class _StreamControllerReEmit<T> {
     _controller.addError(error);
   }
 
-  void listen(Function(T) onData, {Function? onError, void Function()? onDone, bool? cancelOnError}) {
+  void listen(Function(T) onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     onData(latestValue);
-    _controller.stream.listen(onData, onError: onError, onDone: onDone, cancelOnError: cancelOnError);
+    _controller.stream.listen(onData,
+        onError: onError, onDone: onDone, cancelOnError: cancelOnError);
   }
 
   Future<void> close() {
@@ -152,7 +163,7 @@ class _BufferStream<T> {
         _controller.add(data);
       },
       onError: (e) {
-        _controller.addError(e);
+        _controller.addError(e as Object);
       },
       onDone: () {
         _controller.close();
@@ -172,7 +183,8 @@ class _BufferStream<T> {
 }
 
 // Helper for 'newStreamWithInitialValue' method for streams.
-class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, T> {
+class _NewStreamWithInitialValueTransformer<T>
+    extends StreamTransformerBase<T, T> {
   /// the initial value to push to the new stream
   final T initialValue;
 
@@ -183,7 +195,7 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
   late StreamSubscription<T> subscription;
 
   /// new stream listener count
-  var listenerCount = 0;
+  int listenerCount = 0;
 
   _NewStreamWithInitialValueTransformer(this.initialValue);
 
@@ -197,10 +209,9 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
   }
 
   Stream<T> _bind(Stream<T> stream, {bool broadcast = false}) {
-
     /////////////////////////////////////////
     /// Original Stream Subscription Callbacks
-    /// 
+    ///
 
     /// When the original stream emits data, forward it to our new stream
     void onData(T data) {
@@ -238,22 +249,22 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
 
     //////////////////////////////////////
     ///  New Stream Controller Callbacks
-    /// 
+    ///
 
     /// (Single Subscription Only) When a client pauses
-    /// the new stream, pause the original stream 
+    /// the new stream, pause the original stream
     void onPause() {
       subscription.pause();
     }
 
     /// (Single Subscription Only) When a client resumes
-    /// the new stream, resume the original stream 
+    /// the new stream, resume the original stream
     void onResume() {
       subscription.resume();
     }
 
-    /// Called when a client cancels their 
-    /// subscription to the new stream, 
+    /// Called when a client cancels their
+    /// subscription to the new stream,
     void onCancel() {
       // count listeners of the new stream
       listenerCount--;
@@ -269,7 +280,7 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
 
     //////////////////////////////////////
     /// Return New Stream
-    /// 
+    ///
 
     // create a new stream controller
     if (broadcast) {
@@ -298,8 +309,8 @@ extension _StreamNewStreamWithInitialValue<T> on Stream<T> {
 
 // ignore: unused_element
 Stream<T> _mergeStreams<T>(List<Stream<T>> streams) {
-  StreamController<T> controller = StreamController<T>();
-  List<StreamSubscription<T>> subscriptions = [];
+  final StreamController<T> controller = StreamController<T>();
+  final List<StreamSubscription<T>> subscriptions = [];
 
   void handleData(T data) {
     if (!controller.isClosed) {
@@ -314,14 +325,15 @@ Stream<T> _mergeStreams<T>(List<Stream<T>> streams) {
   }
 
   void handleDone() {
-    for (var s in subscriptions) {
+    for (final s in subscriptions) {
       s.cancel();
     }
     controller.close();
   }
 
   void subscribeToStream(Stream<T> stream) {
-    final s = stream.listen(handleData, onError: handleError, onDone: handleDone);
+    final s =
+        stream.listen(handleData, onError: handleError, onDone: handleDone);
     subscriptions.add(s);
   }
 
@@ -342,7 +354,7 @@ class _Mutex {
   int issued = 0;
 
   Future<bool> take() async {
-    int mine = issued;
+    final int mine = issued;
     issued++;
     // tasks are executed in the same order they call take()
     while (mine != execute) {
@@ -359,18 +371,13 @@ class _Mutex {
 }
 
 // Create mutexes in a parallel-safe way,
-class _MutexFactory {
-  static final Map<String, _Mutex> _all = {};
-  static _Mutex getMutexForKey(String key) {
-    _all[key] ??= _Mutex();
-    return _all[key]!;
-  }
-}
+final Map<String, _Mutex> _mutexes = {};
+_Mutex _mutexForKey(String key) => _mutexes.putIfAbsent(key, _Mutex.new);
 
 extension FirstWhereOrNullExtension<T> on Iterable<T> {
   /// returns first item to satisfy `test`, else null
   T? _firstWhereOrNull(bool Function(T) test) {
-    for (var element in this) {
+    for (final element in this) {
       if (test(element)) {
         return element;
       }
@@ -382,7 +389,7 @@ extension FirstWhereOrNullExtension<T> on Iterable<T> {
 extension RemoveWhere<T> on List<T> {
   /// returns true if some items where removed
   bool _removeWhere(bool Function(T) test) {
-    int initialLength = length;
+    final int initialLength = length;
     removeWhere(test);
     return length != initialLength;
   }

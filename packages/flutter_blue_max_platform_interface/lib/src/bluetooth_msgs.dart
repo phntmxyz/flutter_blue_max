@@ -1,8 +1,8 @@
 import 'dart:typed_data';
 
-import 'device_identifier.dart';
-import 'guid.dart';
-import 'log_level.dart';
+import 'package:flutter_blue_max_platform_interface/src/device_identifier.dart';
+import 'package:flutter_blue_max_platform_interface/src/guid.dart';
+import 'package:flutter_blue_max_platform_interface/src/log_level.dart';
 
 class BmBluetoothAdapterStateRequest {
   BmBluetoothAdapterStateRequest();
@@ -25,7 +25,7 @@ class BmBluetoothAdapterState {
 
   factory BmBluetoothAdapterState.fromMap(Map<dynamic, dynamic> json) {
     return BmBluetoothAdapterState(
-      adapterState: BmAdapterStateEnum.values[json['adapter_state']],
+      adapterState: BmAdapterStateEnum.values[(json['adapter_state']) as int],
     );
   }
 }
@@ -113,7 +113,8 @@ class BmScanSettings {
     data['android_scan_mode'] = androidScanMode;
     data['android_uses_fine_location'] = androidUsesFineLocation;
     data['android_check_location_services'] = androidCheckLocationServices;
-    data['web_optional_services'] = webOptionalServices.map((s) => s.str).toList();
+    data['web_optional_services'] =
+        webOptionalServices.map((s) => s.str).toList();
     return data;
   }
 }
@@ -149,35 +150,38 @@ class BmScanAdvertisement {
 
   factory BmScanAdvertisement.fromMap(Map<dynamic, dynamic> json) {
     // Get raw data
-    var rawManufacturerData = json['manufacturer_data'] ?? {};
-    var rawServiceData = json['service_data'] ?? {};
-    var rawServiceUuids = json['service_uuids'] ?? [];
+    final rawManufacturerData =
+        json['manufacturer_data'] as Map<dynamic, dynamic>? ?? {};
+    final rawServiceData = json['service_data'] as Map<dynamic, dynamic>? ?? {};
+    final rawServiceUuids = json['service_uuids'] as List<dynamic>? ?? [];
 
     // Cast the data to the right type
-    Map<int, List<int>> manufacturerData = {};
+    final Map<int, List<int>> manufacturerData = {};
     rawManufacturerData.forEach((k, v) {
-      manufacturerData[k] = v;
+      manufacturerData[k as int] = v as List<int>;
     });
     // Cast the data to the right type
-    Map<Guid, List<int>> serviceData = {};
+    final Map<Guid, List<int>> serviceData = {};
     rawServiceData.forEach((k, v) {
-      serviceData[Guid(k)] = v;
+      serviceData[Guid(k as String)] = v as List<int>;
     });
     // Cast the data to the right type
-    List<Guid> serviceUuids = [];
-    rawServiceUuids.forEach((e) => serviceUuids.add(Guid(e)));
+    final List<Guid> serviceUuids = [];
+    for (final e in rawServiceUuids) {
+      serviceUuids.add(Guid(e as String));
+    }
 
     return BmScanAdvertisement(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      platformName: json['platform_name'],
-      advName: json['adv_name'],
-      connectable: json['connectable'] != null ? json['connectable'] != 0 : false,
-      txPowerLevel: json['tx_power_level'],
-      appearance: json['appearance'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      platformName: (json['platform_name']) as String?,
+      advName: (json['adv_name']) as String?,
+      connectable: json['connectable'] != null && json['connectable'] != 0,
+      txPowerLevel: (json['tx_power_level']) as int?,
+      appearance: (json['appearance']) as int?,
       manufacturerData: manufacturerData,
       serviceData: serviceData,
       serviceUuids: serviceUuids,
-      rssi: json['rssi'] ?? 0,
+      rssi: (json['rssi'] ?? 0) as int,
     );
   }
 }
@@ -196,18 +200,19 @@ class BmScanResponse {
   });
 
   factory BmScanResponse.fromMap(Map<dynamic, dynamic> json) {
-    List<BmScanAdvertisement> advertisements = [];
-    for (var item in json['advertisements']) {
-      advertisements.add(BmScanAdvertisement.fromMap(item));
+    final List<BmScanAdvertisement> advertisements = [];
+    for (final item in (json['advertisements']) as List<dynamic>) {
+      advertisements
+          .add(BmScanAdvertisement.fromMap(item as Map<dynamic, dynamic>));
     }
 
-    bool success = json['success'] == null || json['success'] != 0;
+    final bool success = json['success'] == null || json['success'] != 0;
 
     return BmScanResponse(
       advertisements: advertisements,
       success: success,
-      errorCode: !success ? json['error_code'] : 0,
-      errorString: !success ? json['error_string'] : "",
+      errorCode: (!success ? json['error_code'] : 0) as int,
+      errorString: (!success ? json['error_string'] : "") as String,
     );
   }
 }
@@ -248,8 +253,8 @@ class BmBluetoothDevice {
 
   factory BmBluetoothDevice.fromMap(Map<dynamic, dynamic> json) {
     return BmBluetoothDevice(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      platformName: json['platform_name'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      platformName: (json['platform_name']) as String?,
     );
   }
 }
@@ -265,8 +270,8 @@ class BmNameChanged {
 
   factory BmNameChanged.fromMap(Map<dynamic, dynamic> json) {
     return BmNameChanged(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      name: json['name'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      name: (json['name']) as String,
     );
   }
 }
@@ -286,15 +291,15 @@ class BmBluetoothService {
 
   factory BmBluetoothService.fromMap(Map<dynamic, dynamic> json) {
     // convert characteristics
-    List<BmBluetoothCharacteristic> chrs = [];
-    for (var v in json['characteristics']) {
-      chrs.add(BmBluetoothCharacteristic.fromMap(v));
+    final List<BmBluetoothCharacteristic> chrs = [];
+    for (final v in (json['characteristics']) as List<dynamic>) {
+      chrs.add(BmBluetoothCharacteristic.fromMap(v as Map<dynamic, dynamic>));
     }
 
     return BmBluetoothService(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      serviceUuid: Guid(json['service_uuid']),
-      primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      serviceUuid: Guid((json['service_uuid']) as String),
+      primaryServiceUuid: Guid.parse((json['primary_service_uuid']) as String?),
       characteristics: chrs,
     );
   }
@@ -321,19 +326,20 @@ class BmBluetoothCharacteristic {
 
   factory BmBluetoothCharacteristic.fromMap(Map<dynamic, dynamic> json) {
     // convert descriptors
-    List<BmBluetoothDescriptor> descs = [];
-    for (var v in json['descriptors']) {
-      descs.add(BmBluetoothDescriptor.fromMap(v));
+    final List<BmBluetoothDescriptor> descs = [];
+    for (final v in (json['descriptors']) as List<dynamic>) {
+      descs.add(BmBluetoothDescriptor.fromMap(v as Map<dynamic, dynamic>));
     }
 
     return BmBluetoothCharacteristic(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      serviceUuid: Guid(json['service_uuid']),
-      characteristicUuid: Guid(json['characteristic_uuid']),
-      primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
-      instanceId: json['instance_id'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      serviceUuid: Guid((json['service_uuid']) as String),
+      characteristicUuid: Guid((json['characteristic_uuid']) as String),
+      primaryServiceUuid: Guid.parse((json['primary_service_uuid']) as String?),
+      instanceId: (json['instance_id']) as int?,
       descriptors: descs,
-      properties: BmCharacteristicProperties.fromMap(json['properties']),
+      properties: BmCharacteristicProperties.fromMap(
+          (json['properties']) as Map<dynamic, dynamic>),
     );
   }
 }
@@ -357,12 +363,12 @@ class BmBluetoothDescriptor {
 
   factory BmBluetoothDescriptor.fromMap(Map<dynamic, dynamic> json) {
     return BmBluetoothDescriptor(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      serviceUuid: Guid(json['service_uuid']),
-      characteristicUuid: Guid(json['characteristic_uuid']),
-      descriptorUuid: Guid(json['descriptor_uuid']),
-      primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
-      instanceId: json['instance_id'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      serviceUuid: Guid((json['service_uuid']) as String),
+      characteristicUuid: Guid((json['characteristic_uuid']) as String),
+      descriptorUuid: Guid((json['descriptor_uuid']) as String),
+      primaryServiceUuid: Guid.parse((json['primary_service_uuid']) as String?),
+      instanceId: (json['instance_id']) as int?,
     );
   }
 }
@@ -433,13 +439,13 @@ class BmDiscoverServicesResult {
 
   factory BmDiscoverServicesResult.fromMap(Map<dynamic, dynamic> json) {
     return BmDiscoverServicesResult(
-      remoteId: DeviceIdentifier(json['remote_id']),
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
       services: (json['services'] as List<dynamic>)
           .map((e) => BmBluetoothService.fromMap(e as Map<dynamic, dynamic>))
           .toList(),
       success: json['success'] != 0,
-      errorCode: json['error_code'],
-      errorString: json['error_string'],
+      errorCode: (json['error_code']) as int,
+      errorString: (json['error_string']) as String,
     );
   }
 }
@@ -496,15 +502,15 @@ class BmCharacteristicData {
 
   factory BmCharacteristicData.fromMap(Map<dynamic, dynamic> json) {
     return BmCharacteristicData(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      serviceUuid: Guid(json['service_uuid']),
-      characteristicUuid: Guid(json['characteristic_uuid']),
-      primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
-      instanceId: json['instance_id'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      serviceUuid: Guid((json['service_uuid']) as String),
+      characteristicUuid: Guid((json['characteristic_uuid']) as String),
+      primaryServiceUuid: Guid.parse((json['primary_service_uuid']) as String?),
+      instanceId: (json['instance_id']) as int?,
       value: json['value'] as Uint8List,
       success: json['success'] != 0,
-      errorCode: json['error_code'],
-      errorString: json['error_string'],
+      errorCode: (json['error_code']) as int,
+      errorString: (json['error_string']) as String,
     );
   }
 }
@@ -640,16 +646,16 @@ class BmDescriptorData {
 
   factory BmDescriptorData.fromMap(Map<dynamic, dynamic> json) {
     return BmDescriptorData(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      serviceUuid: Guid(json['service_uuid']),
-      characteristicUuid: Guid(json['characteristic_uuid']),
-      descriptorUuid: Guid(json['descriptor_uuid']),
-      primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
-      instanceId: json['instance_id'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      serviceUuid: Guid((json['service_uuid']) as String),
+      characteristicUuid: Guid((json['characteristic_uuid']) as String),
+      descriptorUuid: Guid((json['descriptor_uuid']) as String),
+      primaryServiceUuid: Guid.parse((json['primary_service_uuid']) as String?),
+      instanceId: (json['instance_id']) as int?,
       value: json['value'] as Uint8List,
       success: json['success'] != 0,
-      errorCode: json['error_code'],
-      errorString: json['error_string'],
+      errorCode: (json['error_code']) as int,
+      errorString: (json['error_string']) as String,
     );
   }
 }
@@ -707,10 +713,11 @@ class BmConnectionStateResponse {
 
   factory BmConnectionStateResponse.fromMap(Map<dynamic, dynamic> json) {
     return BmConnectionStateResponse(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      connectionState: BmConnectionStateEnum.values[json['connection_state'] as int],
-      disconnectReasonCode: json['disconnect_reason_code'],
-      disconnectReasonString: json['disconnect_reason_string'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      connectionState:
+          BmConnectionStateEnum.values[json['connection_state'] as int],
+      disconnectReasonCode: (json['disconnect_reason_code']) as int?,
+      disconnectReasonString: (json['disconnect_reason_string']) as String?,
     );
   }
 }
@@ -739,11 +746,9 @@ class BmDevicesList {
   BmDevicesList({required this.devices});
 
   factory BmDevicesList.fromMap(Map<dynamic, dynamic> json) {
-    // convert to BmBluetoothDevice
-    List<BmBluetoothDevice> devices = [];
-    for (var i = 0; i < json['devices'].length; i++) {
-      devices.add(BmBluetoothDevice.fromMap(json['devices'][i]));
-    }
+    final devices = (json['devices'] as List<dynamic>)
+        .map((item) => BmBluetoothDevice.fromMap(item as Map<dynamic, dynamic>))
+        .toList();
     return BmDevicesList(devices: devices);
   }
 }
@@ -779,11 +784,11 @@ class BmMtuChangedResponse {
 
   factory BmMtuChangedResponse.fromMap(Map<dynamic, dynamic> json) {
     return BmMtuChangedResponse(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      mtu: json['mtu'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      mtu: (json['mtu']) as int,
       success: json['success'] != 0,
-      errorCode: json['error_code'],
-      errorString: json['error_string'],
+      errorCode: (json['error_code']) as int,
+      errorString: (json['error_string']) as String,
     );
   }
 }
@@ -813,11 +818,11 @@ class BmReadRssiResult {
 
   factory BmReadRssiResult.fromMap(Map<dynamic, dynamic> json) {
     return BmReadRssiResult(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      rssi: json['rssi'],
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      rssi: (json['rssi']) as int,
       success: json['success'] != 0,
-      errorCode: json['error_code'],
-      errorString: json['error_string'],
+      errorCode: (json['error_code']) as int,
+      errorString: (json['error_string']) as String,
     );
   }
 }
@@ -895,9 +900,11 @@ class BmBondStateResponse {
 
   factory BmBondStateResponse.fromMap(Map<dynamic, dynamic> json) {
     return BmBondStateResponse(
-      remoteId: DeviceIdentifier(json['remote_id']),
-      bondState: BmBondStateEnum.values[json['bond_state']],
-      prevState: json['prev_state'] != null ? BmBondStateEnum.values[json['prev_state']] : null,
+      remoteId: DeviceIdentifier((json['remote_id']) as String),
+      bondState: BmBondStateEnum.values[(json['bond_state']) as int],
+      prevState: json['prev_state'] != null
+          ? BmBondStateEnum.values[(json['prev_state']) as int]
+          : null,
     );
   }
 }
@@ -956,7 +963,7 @@ class BmTurnOnResponse {
 
   factory BmTurnOnResponse.fromMap(Map<dynamic, dynamic> json) {
     return BmTurnOnResponse(
-      userAccepted: json['user_accepted'],
+      userAccepted: (json['user_accepted']) as bool,
     );
   }
 }
@@ -1010,8 +1017,8 @@ class PhySupport {
 
   factory PhySupport.fromMap(Map<dynamic, dynamic> json) {
     return PhySupport(
-      le2M: json['le_2M'],
-      leCoded: json['le_coded'],
+      le2M: (json['le_2M']) as bool,
+      leCoded: (json['le_coded']) as bool,
     );
   }
 }
@@ -1046,7 +1053,8 @@ class ListenL2CapChannelResponse {
   final int psm;
 
   /// Creates a [ListenL2CapChannelResponse] from a platform message map
-  ListenL2CapChannelResponse.fromMap(Map<dynamic, dynamic> map) : psm = map['psm'];
+  ListenL2CapChannelResponse.fromMap(Map<dynamic, dynamic> map)
+      : psm = map['psm'] as int;
 }
 
 /// Request message for stopping an L2CAP server.
@@ -1075,10 +1083,10 @@ class StopListenL2CapChannelRequest {
 class OpenL2CapChannelRequest {
   /// The device identifier of the target device
   final String remoteId;
-  
+
   /// The PSM to connect to on the remote device
   final int psm;
-  
+
   /// Whether to use a secure L2CAP channel
   /// - Android: Uses createL2capChannel() vs createInsecureL2capChannel()
   /// - iOS: Security controlled by server's publishL2CAPChannelWithEncryption setting
@@ -1107,7 +1115,7 @@ class OpenL2CapChannelRequest {
 class CloseL2CapChannelRequest {
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to close
   final int psm;
 
@@ -1132,7 +1140,7 @@ class CloseL2CapChannelRequest {
 class ReadL2CapChannelRequest {
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to read from
   final int psm;
 
@@ -1157,22 +1165,22 @@ class ReadL2CapChannelRequest {
 class ReadL2CapChannelResponse {
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel that was read from
   final int psm;
-  
+
   /// The number of bytes that were read
   final int bytesRead;
-  
+
   /// The actual data bytes that were read
   final List<int> value;
 
   /// Creates a [ReadL2CapChannelResponse] from a platform message map
   ReadL2CapChannelResponse.fromMap(Map<dynamic, dynamic> map)
-      : remoteId = map['remote_id'],
-        psm = map['psm'],
-        bytesRead = map['bytes_read'],
-        value = Uint8List.fromList(map['value']);
+      : remoteId = map['remote_id'] as String,
+        psm = map['psm'] as int,
+        bytesRead = map['bytes_read'] as int,
+        value = Uint8List.fromList((map['value']) as List<int>);
 }
 
 /// Request message for writing data to an L2CAP channel.
@@ -1182,15 +1190,16 @@ class ReadL2CapChannelResponse {
 class WriteL2CapChannelRequest {
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to write to
   final int psm;
-  
+
   /// The data bytes to write
   final List<int> value;
 
   /// Creates a new [WriteL2CapChannelRequest]
-  WriteL2CapChannelRequest({required this.remoteId, required this.psm, required this.value});
+  WriteL2CapChannelRequest(
+      {required this.remoteId, required this.psm, required this.value});
 
   Map<dynamic, dynamic> toMap() {
     return {
@@ -1217,22 +1226,23 @@ class WriteL2CapChannelRequest {
 class L2CapChannelData {
   /// The device identifier of the device that sent this data
   final DeviceIdentifier remoteId;
-  
+
   /// The PSM (Protocol Service Multiplexer) of the channel this data was received on
   final int psm;
-  
+
   /// The actual data bytes that were received
   final List<int> value;
 
   /// Creates a new [L2CapChannelData] instance
-  L2CapChannelData({required this.remoteId, required this.psm, required this.value});
+  L2CapChannelData(
+      {required this.remoteId, required this.psm, required this.value});
 
   /// Creates an [L2CapChannelData] from a platform message map
   factory L2CapChannelData.fromMap(Map<dynamic, dynamic> map) {
     return L2CapChannelData(
-      remoteId: DeviceIdentifier(map['remote_id']),
-      psm: map['psm'],
-      value: Uint8List.fromList(map['value']),
+      remoteId: DeviceIdentifier((map['remote_id']) as String),
+      psm: (map['psm']) as int,
+      value: Uint8List.fromList((map['value']) as List<int>),
     );
   }
 }
@@ -1252,8 +1262,8 @@ class L2CapChannelClosed {
   /// Creates an [L2CapChannelClosed] from a platform message map
   factory L2CapChannelClosed.fromMap(Map<dynamic, dynamic> map) {
     return L2CapChannelClosed(
-      remoteId: DeviceIdentifier(map['remote_id']),
-      psm: map['psm'],
+      remoteId: DeviceIdentifier((map['remote_id']) as String),
+      psm: (map['psm']) as int,
     );
   }
 }
@@ -1278,8 +1288,8 @@ class L2CapChannelConnected {
   /// Creates an [L2CapChannelConnected] from a platform message map
   factory L2CapChannelConnected.fromMap(Map<dynamic, dynamic> map) {
     return L2CapChannelConnected(
-      remoteId: DeviceIdentifier(map['remote_id']),
-      psm: map['psm'],
+      remoteId: DeviceIdentifier((map['remote_id']) as String),
+      psm: (map['psm']) as int,
     );
   }
 }

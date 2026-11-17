@@ -1,7 +1,15 @@
 part of '../flutter_blue_max.dart';
 
 /// State of the bluetooth adapter.
-enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
+enum BluetoothAdapterState {
+  unknown,
+  unavailable,
+  unauthorized,
+  turningOn,
+  on,
+  turningOff,
+  off
+}
 
 class DisconnectReason {
   final ErrorPlatform platform;
@@ -121,4 +129,12 @@ enum PhyType { le1m, le2m, leCoded }
 enum BluetoothDeviceState { disconnected, connecting, connected, disconnecting }
 
 @Deprecated('Use BluetoothAdapterState instead')
-enum BluetoothState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
+enum BluetoothState {
+  unknown,
+  unavailable,
+  unauthorized,
+  turningOn,
+  on,
+  turningOff,
+  off
+}

@@ -78,7 +78,8 @@ class OnConnectionStateChangedEvent {
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
 
   /// the new connection state
-  BluetoothConnectionState get connectionState => _bmToConnectionState(_response.connectionState);
+  BluetoothConnectionState get connectionState =>
+      _bmToConnectionState(_response.connectionState);
 }
 
 // On Mtu Changed
@@ -94,7 +95,9 @@ class OnMtuChangedEvent {
   int get mtu => _response.mtu;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Read Rssi
@@ -110,7 +113,9 @@ class OnReadRssiEvent {
   int get rssi => _response.rssi;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Services Reset
@@ -133,10 +138,13 @@ class OnDiscoveredServicesEvent {
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
 
   /// the discovered services
-  List<BluetoothService> get services => _response.services.map((p) => BluetoothService.fromProto(p)).toList();
+  List<BluetoothService> get services =>
+      _response.services.map((p) => BluetoothService.fromProto(p)).toList();
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Characteristic Received
@@ -159,7 +167,9 @@ class OnCharacteristicReceivedEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Characteristic Written
@@ -182,7 +192,9 @@ class OnCharacteristicWrittenEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Descriptor Received
@@ -205,7 +217,9 @@ class OnDescriptorReadEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Descriptor Written
@@ -228,7 +242,9 @@ class OnDescriptorWrittenEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbpError? get error => _response.success
+      ? null
+      : FbpError(_response.errorCode, _response.errorString);
 }
 
 // On Name Changed

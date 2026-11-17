@@ -10,13 +10,19 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
   var _initialized = false;
   var _logLevel = LogLevel.none;
 
-  final _onCharacteristicReadController = StreamController<BmCharacteristicData>.broadcast();
-  final _onCharacteristicWrittenController = StreamController<BmCharacteristicData>.broadcast();
-  final _onDescriptorReadController = StreamController<BmDescriptorData>.broadcast();
-  final _onDescriptorWrittenController = StreamController<BmDescriptorData>.broadcast();
-  final _onDiscoveredServicesController = StreamController<BmDiscoverServicesResult>.broadcast();
+  final _onCharacteristicReadController =
+      StreamController<BmCharacteristicData>.broadcast();
+  final _onCharacteristicWrittenController =
+      StreamController<BmCharacteristicData>.broadcast();
+  final _onDescriptorReadController =
+      StreamController<BmDescriptorData>.broadcast();
+  final _onDescriptorWrittenController =
+      StreamController<BmDescriptorData>.broadcast();
+  final _onDiscoveredServicesController =
+      StreamController<BmDiscoverServicesResult>.broadcast();
   final _onReadRssiController = StreamController<BmReadRssiResult>.broadcast();
-  final _onTurnOnResponseController = StreamController<BmTurnOnResponse>.broadcast();
+  final _onTurnOnResponseController =
+      StreamController<BmTurnOnResponse>.broadcast();
 
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
@@ -33,7 +39,9 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
         ).map(
           (properties) {
             return BmBluetoothAdapterState(
-              adapterState: adapters.first.powered ? BmAdapterStateEnum.on : BmAdapterStateEnum.off,
+              adapterState: adapters.first.powered
+                  ? BmAdapterStateEnum.on
+                  : BmAdapterStateEnum.off,
             );
           },
         );
@@ -56,7 +64,9 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 (properties) {
                   return BmBondStateResponse(
                     remoteId: device.remoteId,
-                    bondState: device.paired ? BmBondStateEnum.bonded : BmBondStateEnum.none,
+                    bondState: device.paired
+                        ? BmBondStateEnum.bonded
+                        : BmBondStateEnum.none,
                     prevState: null,
                   );
                 },
@@ -132,8 +142,9 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 (properties) {
                   return BmConnectionStateResponse(
                     remoteId: device.remoteId,
-                    connectionState:
-                        device.connected ? BmConnectionStateEnum.connected : BmConnectionStateEnum.disconnected,
+                    connectionState: device.connected
+                        ? BmConnectionStateEnum.connected
+                        : BmConnectionStateEnum.disconnected,
                     disconnectReasonCode: null,
                     disconnectReasonString: null,
                   );
@@ -163,7 +174,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
 
   @override
   Stream<BmMtuChangedResponse> get onMtuChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   @override
@@ -344,7 +355,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 remoteId: device.remoteId,
                 characteristics: service.characteristics.map(
                   (characteristic) {
-                    int instanceId = _UniqueCharacteristicInstanceId.next();
+                    final int instanceId = _nextCharacteristicInstanceId();
                     instanceIdToCharMap[instanceId] = characteristic;
                     charToInstanceIdMap[characteristic] = instanceId;
 
@@ -395,7 +406,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                         indicate: characteristic.flags.contains(
                           BlueZGattCharacteristicFlag.indicate,
                         ),
-                        authenticatedSignedWrites: characteristic.flags.contains(
+                        authenticatedSignedWrites:
+                            characteristic.flags.contains(
                           BlueZGattCharacteristicFlag.authenticatedSignedWrites,
                         ),
                         extendedProperties: characteristic.flags.contains(
@@ -557,7 +569,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           );
 
           return uuid == request.characteristicUuid &&
-              (characteristic.instanceId == null || characteristic.instanceId == request.instanceId);
+              (characteristic.instanceId == null ||
+                  characteristic.instanceId == request.instanceId);
         },
       );
 
@@ -631,7 +644,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           );
 
           return uuid == request.characteristicUuid &&
-              (characteristic.instanceId == null || characteristic.instanceId == request.instanceId);
+              (characteristic.instanceId == null ||
+                  characteristic.instanceId == request.instanceId);
         },
       );
 
@@ -768,7 +782,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
         );
 
         return uuid == request.characteristicUuid &&
-            (characteristic.instanceId == null || characteristic.instanceId == request.instanceId);
+            (characteristic.instanceId == null ||
+                characteristic.instanceId == request.instanceId);
       },
     );
 
@@ -893,7 +908,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           );
 
           return uuid == request.characteristicUuid &&
-              (characteristic.instanceId == null || characteristic.instanceId == request.instanceId);
+              (characteristic.instanceId == null ||
+                  characteristic.instanceId == request.instanceId);
         },
       );
 
@@ -972,7 +988,8 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           );
 
           return uuid == request.characteristicUuid &&
-              (characteristic.instanceId == null || characteristic.instanceId == request.instanceId);
+              (characteristic.instanceId == null ||
+                  characteristic.instanceId == request.instanceId);
         },
       );
 
@@ -1127,20 +1144,14 @@ extension on BlueZGattCharacteristic {
   int? get instanceId => charToInstanceIdMap[this];
 }
 
-class _UniqueCharacteristicInstanceId {
-  static int _counter = 0;
-
-  static int next() {
-    _counter++;
-    return _counter;
-  }
-}
+int _characteristicInstanceId = 0;
+int _nextCharacteristicInstanceId() => ++_characteristicInstanceId;
 
 /// Resets the instance IDs for all characteristics for a specific device,
 /// so we do not keep incrementing the map for multiple
 /// calls to discoverServices.
 void resetInstanceIds(DeviceIdentifier discoveredDevice) {
-  List<int> instanceIdsToRemove = [];
+  final List<int> instanceIdsToRemove = [];
 
   for (final entry in instanceIdToDeviceMap.entries) {
     if (entry.value == discoveredDevice.str) {

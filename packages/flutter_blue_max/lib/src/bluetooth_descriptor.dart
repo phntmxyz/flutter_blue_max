@@ -44,8 +44,8 @@ class BluetoothDescriptor {
   ///   - anytime `write()` is called
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key =
-        FlutterBlueMax._descCacheKey(serviceUuid, characteristicUuid, descriptorUuid, instanceId, primaryServiceUuid);
+    final String key = FlutterBlueMax._descCacheKey(serviceUuid,
+        characteristicUuid, descriptorUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastDescs[remoteId]?[key] ?? [];
   }
 
@@ -53,47 +53,50 @@ class BluetoothDescriptor {
   ///   - anytime `read()` is called
   ///   - anytime `write()` is called
   ///   - and when first listened to, it re-emits the last value for convenience
-  Stream<List<int>> get lastValueStream => _mergeStreams(
-          [FlutterBlueMaxPlatform.instance.onDescriptorRead, FlutterBlueMaxPlatform.instance.onDescriptorWritten])
-      .where((p) => p.remoteId == remoteId)
-      .where((p) => p.characteristicUuid == characteristicUuid)
-      .where((p) => p.serviceUuid == serviceUuid)
-      .where((p) => p.descriptorUuid == descriptorUuid)
-      .where((p) => p.primaryServiceUuid == primaryServiceUuid)
-      .where((p) => p.instanceId == null || p.instanceId == instanceId)
-      .where((p) => p.success == true)
-      .map((p) => p.value)
-      .newStreamWithInitialValue(lastValue);
+  Stream<List<int>> get lastValueStream => _mergeStreams([
+        FlutterBlueMaxPlatform.instance.onDescriptorRead,
+        FlutterBlueMaxPlatform.instance.onDescriptorWritten
+      ])
+          .where((p) => p.remoteId == remoteId)
+          .where((p) => p.characteristicUuid == characteristicUuid)
+          .where((p) => p.serviceUuid == serviceUuid)
+          .where((p) => p.descriptorUuid == descriptorUuid)
+          .where((p) => p.primaryServiceUuid == primaryServiceUuid)
+          .where((p) => p.instanceId == null || p.instanceId == instanceId)
+          .where((p) => p.success == true)
+          .map((p) => p.value)
+          .newStreamWithInitialValue(lastValue);
 
   /// this stream emits values:
   ///   - anytime `read()` is called
-  Stream<List<int>> get onValueReceived => FlutterBlueMaxPlatform.instance.onDescriptorRead
-      .where((p) => p.remoteId == remoteId)
-      .where((p) => p.characteristicUuid == characteristicUuid)
-      .where((p) => p.serviceUuid == serviceUuid)
-      .where((p) => p.descriptorUuid == descriptorUuid)
-      .where((p) => p.primaryServiceUuid == primaryServiceUuid)
-      .where((p) => p.instanceId == null || p.instanceId == instanceId)
-      .where((p) => p.success == true)
-      .map((p) => p.value);
+  Stream<List<int>> get onValueReceived =>
+      FlutterBlueMaxPlatform.instance.onDescriptorRead
+          .where((p) => p.remoteId == remoteId)
+          .where((p) => p.characteristicUuid == characteristicUuid)
+          .where((p) => p.serviceUuid == serviceUuid)
+          .where((p) => p.descriptorUuid == descriptorUuid)
+          .where((p) => p.primaryServiceUuid == primaryServiceUuid)
+          .where((p) => p.instanceId == null || p.instanceId == instanceId)
+          .where((p) => p.success == true)
+          .map((p) => p.value);
 
   /// Retrieves the value of a specified descriptor
   Future<List<int>> read({int timeout = 15}) async {
     // check connected
     if (device.isDisconnected) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "readDescriptor", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "readDescriptor",
+          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _mutexForKey("global");
     await mtx.take();
 
     // return value
     List<int> readValue = [];
 
     try {
-      var request = BmReadDescriptorRequest(
+      final request = BmReadDescriptorRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -102,7 +105,8 @@ class BluetoothDescriptor {
         instanceId: instanceId,
       );
 
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorRead
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform
+          .instance.onDescriptorRead
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -111,20 +115,22 @@ class BluetoothDescriptor {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.readDescriptor(request));
+      await FlutterBlueMax._invokeMethod(
+          () => FlutterBlueMaxPlatform.instance.readDescriptor(request));
 
       // wait for response
-      BmDescriptorData response = await futureResponse
+      final BmDescriptorData response = await futureResponse
           .fbpEnsureAdapterIsOn("readDescriptor")
           .fbpEnsureDeviceIsConnected(device, "readDescriptor")
           .fbpTimeout(timeout, "readDescriptor");
 
       // failed?
       if (!response.success) {
-        throw FlutterBlueMaxException(_nativeError, "readDescriptor", response.errorCode, response.errorString);
+        throw FlutterBlueMaxException(_nativeError, "readDescriptor",
+            response.errorCode, response.errorString);
       }
 
       readValue = response.value;
@@ -139,16 +145,16 @@ class BluetoothDescriptor {
   Future<void> write(List<int> value, {int timeout = 15}) async {
     // check connected
     if (device.isDisconnected) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "writeDescriptor", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "writeDescriptor",
+          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _mutexForKey("global");
     await mtx.take();
 
     try {
-      var request = BmWriteDescriptorRequest(
+      final request = BmWriteDescriptorRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -158,7 +164,8 @@ class BluetoothDescriptor {
         instanceId: instanceId,
       );
 
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform
+          .instance.onDescriptorWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -167,26 +174,28 @@ class BluetoothDescriptor {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.writeDescriptor(request));
+      await FlutterBlueMax._invokeMethod(
+          () => FlutterBlueMaxPlatform.instance.writeDescriptor(request));
 
       // wait for response
-      BmDescriptorData response = await futureResponse
+      final BmDescriptorData response = await futureResponse
           .fbpEnsureAdapterIsOn("writeDescriptor")
           .fbpEnsureDeviceIsConnected(device, "writeDescriptor")
           .fbpTimeout(timeout, "writeDescriptor");
 
       // failed?
       if (!response.success) {
-        throw FlutterBlueMaxException(_nativeError, "writeDescriptor", response.errorCode, response.errorString);
+        throw FlutterBlueMaxException(_nativeError, "writeDescriptor",
+            response.errorCode, response.errorString);
       }
     } finally {
       mtx.give();
     }
 
-    return Future.value();
+    return;
   }
 
   @override
