@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
-
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
