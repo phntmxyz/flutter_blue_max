@@ -56,9 +56,16 @@ class KnownService(
       final actual = matching(known);
       return actual.isNotEmpty && !actual.every((c) => known.matches(c.properties));
     }
+
     return (
-      missing: [for (final known in characteristics) if (matching(known).isEmpty) known.name],
-      different: [for (final known in characteristics) if (differs(known)) known.name],
+      missing: [
+        for (final known in characteristics)
+          if (matching(known).isEmpty) known.name,
+      ],
+      different: [
+        for (final known in characteristics)
+          if (differs(known)) known.name,
+      ],
     );
   }
 }

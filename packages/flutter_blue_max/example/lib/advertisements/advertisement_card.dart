@@ -42,6 +42,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
       final readsTracked = tracker?.history.any((entry) => parser.readsFrom(entry.data)) ?? false;
       return boundToDevice || readsLatest || readsTracked;
     }
+
     final relevant = parsers.where(isRelevant).toList();
     final tracking = tracker != null && c.tracking;
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);

@@ -65,7 +65,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final known = service?.characteristic(c.uuid);
     final isTestEntry = service?.test ?? false;
     final checked = isTestEntry && known != null;
-    final expected = checked ? known!.matches(p) : null;
+    final expected = checked ? known.matches(p) : null;
     final description = userDescription(c);
     final uuid = c.uuid.str.toUpperCase();
     final name = known == null ? description : '${expected ?? false ? 'Test · ' : ''}${known.name}';
@@ -224,8 +224,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
 }
 
 /// Styled title shared by discovered service and characteristic tiles, with an optional test verdict.
-class const GattTitle({super.key, required final Widget title, final bool? expected})
-    extends StatelessWidget {
+class const GattTitle({super.key, required final Widget title, final bool? expected}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colors = Theme.of(context).colorScheme;

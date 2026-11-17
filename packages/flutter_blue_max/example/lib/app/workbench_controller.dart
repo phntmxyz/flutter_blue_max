@@ -172,7 +172,9 @@ class WorkbenchController({
     if (device.platformName.isNotEmpty) {
       return device.platformName;
     }
-    final advertised = scanResults.where((r) => r.device == device && r.advertisementData.advName.isNotEmpty).firstOrNull;
+    final advertised = scanResults
+        .where((r) => r.device == device && r.advertisementData.advName.isNotEmpty)
+        .firstOrNull;
     return advertised?.advertisementData.advName ?? 'Unnamed device';
   }
 
