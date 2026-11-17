@@ -75,6 +75,20 @@ extension ParserFilesRobot on WorkbenchRobot {
     expect(controller.parsers, hasLength(testDongleParsers.length));
   }
 
+  Future<void> rejectParserWithoutCompanyId() async {
+    logEvent('Pick a file with a manufacturer parser that has no company ID');
+    files.openContent = jsonEncode({
+      'parsers': [
+        {..._ownParser.toJson(), 'companyId': null},
+      ],
+    });
+    await tapLabel('Library');
+    await tapLabel('Import');
+    spot<Dialog>().doesNotExist();
+    spotText('Import failed: Invalid parser Own sensor').existsOnce();
+    expect(controller.parsers, hasLength(testDongleParsers.length));
+  }
+
   Future<void> resetToBundledParsers() async {
     files.openContent = encodeParserFile([_ownParser]);
     await tapLabel('Library');

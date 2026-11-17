@@ -294,6 +294,56 @@ void main() {
     expect(() => AdvertisementParser.fromJson({'name': 'Broken'}), throwsFormatException);
   });
 
+  test('decoding rejects parsers the editor would not save', () {
+    final parser = climate.toJson();
+    final field = {...(parser['fields'] as List).first as Map<String, dynamic>, 'type': 'uint8'};
+    final rejected = <Map<String, dynamic>>[
+      {...parser, 'companyId': null},
+      {...parser, 'companyId': 0x10000},
+      {...parser, 'source': 'service'},
+      {...parser, 'matchOffset': -1},
+      {
+        ...parser,
+        'match': [256],
+      },
+      {
+        ...parser,
+        'records': {...const RecordFormat().toJson(), 'offset': -1},
+      },
+      for (final change in {'offset': -1, 'length': 0, 'bit': -1, 'bits': 0}.entries)
+        {
+          ...parser,
+          'fields': [
+            {...field, change.key: change.value},
+          ],
+        },
+      {
+        ...parser,
+        'fields': [
+          {...field, 'bit': 4, 'bits': 5},
+        ],
+      },
+      {
+        ...parser,
+        'fields': [
+          {...field, 'type': 'int8', 'bits': 1},
+        ],
+      },
+    ];
+    for (final json in rejected) {
+      expect(() => AdvertisementParser.fromJson(json), throwsFormatException, reason: '$json');
+    }
+    expect(
+      AdvertisementParser.fromJson({
+        ...parser,
+        'fields': [
+          {...field, 'bit': 4, 'bits': 4},
+        ],
+      }).fields.single.bits,
+      4,
+    );
+  });
+
   group('Test dongle parsers', () {
     List<String> read(List<int> bytes) => [
       for (final parser in testDongleParsers) ...parser.read(companyId: 0xffff, bytes: bytes),

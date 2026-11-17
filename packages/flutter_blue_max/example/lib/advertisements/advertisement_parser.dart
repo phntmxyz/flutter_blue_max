@@ -73,8 +73,9 @@ class const RecordFormat({
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a record format.
   factory fromJson(Map<String, dynamic> json) {
+    final RecordFormat format;
     try {
-      return RecordFormat(
+      format = RecordFormat(
         offset: json['offset'] as int,
         type: RecordTypeFormat.values.byName(json['type'] as String),
         length: RecordLength.values.byName(json['length'] as String),
@@ -82,6 +83,10 @@ class const RecordFormat({
     } on Object catch (error) {
       throw FormatException('Invalid record format: $error');
     }
+    if (format.offset < 0) {
+      throw FormatException('Invalid record format: offset ${format.offset}');
+    }
+    return format;
   }
 
   Map<String, dynamic> toJson() => {'offset': offset, 'type': type.name, 'length': length.name};
@@ -184,6 +189,17 @@ class const AdvertisementField(
     }
     if (!field.add.isFinite) {
       throw FormatException('Invalid parser field ${field.name}: add ${field.add}');
+    }
+    if (field.offset < 0 || field.length < 1 || field.bit < 0) {
+      throw FormatException(
+        'Invalid parser field ${field.name}: offset ${field.offset}, length ${field.length}, bit ${field.bit}',
+      );
+    }
+    final bits = field.bits;
+    if (bits != null && (!field.type.unsigned || bits < 1 || field.bit + bits > field.size * 8)) {
+      throw FormatException(
+        'Invalid parser field ${field.name}: $bits bits from bit ${field.bit} of ${field.type.label}',
+      );
     }
     return field;
   }
@@ -294,11 +310,12 @@ class const AdvertisementParser({
 }) {
   /// Throws a [FormatException] for stored data that no longer describes a parser.
   factory fromJson(Map<String, dynamic> json) {
+    final AdvertisementParser parser;
     try {
       final serviceUuid = json['serviceUuid'] as String?;
       final records = json['records'] as Map<String, dynamic>?;
       final device = json['device'] as String?;
-      return AdvertisementParser(
+      parser = AdvertisementParser(
         name: json['name'] as String,
         source: AdvertisementSource.values.byName(json['source'] as String),
         companyId: json['companyId'] as int?,
@@ -316,6 +333,19 @@ class const AdvertisementParser({
     } on Object catch (error) {
       throw FormatException('Invalid parser: $error');
     }
+    // The same rules as the editor, so imported and stored parsers render like hand-made ones.
+    final companyId = parser.companyId;
+    final hasSource = switch (parser.source) {
+      AdvertisementSource.manufacturer => companyId != null && companyId >= 0 && companyId <= 0xffff,
+      AdvertisementSource.service => parser.serviceUuid != null,
+    };
+    if (!hasSource) {
+      throw FormatException('Invalid parser ${parser.name}: ${parser.source.label} needs a company ID or service UUID');
+    }
+    if (parser.matchOffset < 0 || parser.match.any((byte) => byte < 0 || byte > 0xff)) {
+      throw FormatException('Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}');
+    }
+    return parser;
   }
 
   Map<String, dynamic> toJson() => {

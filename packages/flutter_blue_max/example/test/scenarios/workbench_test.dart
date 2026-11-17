@@ -134,6 +134,12 @@ void main() {
       await robot.rejectFileWithoutParsers();
     });
 
+    testWidgets('desktop: a parser the editor would not save is rejected', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.rejectParserWithoutCompanyId();
+    });
+
     testWidgets('desktop: reset replaces every parser with the bundled ones', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
