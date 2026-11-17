@@ -40,48 +40,6 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
     super.dispose();
   }
 
-  ThemeData _theme(Brightness brightness) {
-    final dark = brightness == Brightness.dark;
-    final colors = ColorScheme.fromSeed(seedColor: const Color(0xFF207F75), brightness: brightness).copyWith(
-      primary: dark ? const Color(0xFF85E3D1) : const Color(0xFF006B5E),
-      surface: dark ? const Color(0xFF101820) : const Color(0xFFF6F8FA),
-    );
-    return ThemeData(
-      useMaterial3: true,
-      colorScheme: colors,
-      scaffoldBackgroundColor: colors.surface,
-      appBarTheme: AppBarTheme(backgroundColor: colors.surface, centerTitle: false, toolbarHeight: 80, elevation: 0),
-      cardTheme: CardThemeData(
-        elevation: 0,
-        margin: EdgeInsets.zero,
-        color: dark ? const Color(0xFF19242E) : Colors.white,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-          side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45)),
-        ),
-      ),
-      inputDecorationTheme: InputDecorationTheme(
-        filled: true,
-        fillColor: dark ? const Color(0xFF101820) : const Color(0xFFF0F4F6),
-        border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-        contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-      ),
-      filledButtonTheme: FilledButtonThemeData(
-        style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
-      ),
-      outlinedButtonTheme: OutlinedButtonThemeData(
-        style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16)),
-      ),
-      dividerTheme: DividerThemeData(color: colors.outlineVariant.withValues(alpha: 0.45)),
-      // Expanded tiles otherwise draw lines flush against their header and last child, and center their children.
-      expansionTileTheme: const ExpansionTileThemeData(
-        shape: Border(),
-        collapsedShape: Border(),
-        expandedAlignment: Alignment.centerLeft,
-      ),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return ChangeNotifierProvider.value(
@@ -279,4 +237,46 @@ class const _AdapterBanner() extends StatelessWidget {
       ),
     );
   }
+}
+
+ThemeData _theme(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final colors = ColorScheme.fromSeed(seedColor: const Color(0xFF207F75), brightness: brightness).copyWith(
+    primary: dark ? const Color(0xFF85E3D1) : const Color(0xFF006B5E),
+    surface: dark ? const Color(0xFF101820) : const Color(0xFFF6F8FA),
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: colors,
+    scaffoldBackgroundColor: colors.surface,
+    appBarTheme: AppBarTheme(backgroundColor: colors.surface, centerTitle: false, toolbarHeight: 80, elevation: 0),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: dark ? const Color(0xFF19242E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: dark ? const Color(0xFF101820) : const Color(0xFFF0F4F6),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16)),
+    ),
+    dividerTheme: DividerThemeData(color: colors.outlineVariant.withValues(alpha: 0.45)),
+    // Expanded tiles otherwise draw lines flush against their header and last child, and center their children.
+    expansionTileTheme: const ExpansionTileThemeData(
+      shape: Border(),
+      collapsedShape: Border(),
+      expandedAlignment: Alignment.centerLeft,
+    ),
+  );
 }
