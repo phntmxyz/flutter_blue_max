@@ -68,30 +68,34 @@ class _ActivityPanelState() extends State<ActivityPanel> {
             ),
           ),
         ),
-        if (lines.isEmpty)
-          const SliverFillRemaining(
-            hasScrollBody: false,
-            child: Center(child: Text('Activity will appear as you explore.')),
-          )
-        else
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
-            sliver: SliverList.separated(
-              itemCount: lines.length,
-              separatorBuilder: (_, _) => const Divider(height: 16),
-              itemBuilder: (context, index) {
-                return SelectableText(
-                  lines[index],
-                  style: TextStyle(
-                    fontFamily: 'monospace',
-                    fontSize: 12,
-                    height: 1.6,
-                    color: lines[index].contains('ERROR') ? Theme.of(context).colorScheme.error : null,
-                  ),
-                );
-              },
-            ),
-          ),
+        Builder(
+          builder: (context) {
+            if (lines.isEmpty) {
+              return const SliverFillRemaining(
+                hasScrollBody: false,
+                child: Center(child: Text('Activity will appear as you explore.')),
+              );
+            }
+            return SliverPadding(
+              padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
+              sliver: SliverList.separated(
+                itemCount: lines.length,
+                separatorBuilder: (_, _) => const Divider(height: 16),
+                itemBuilder: (context, index) {
+                  return SelectableText(
+                    lines[index],
+                    style: TextStyle(
+                      fontFamily: 'monospace',
+                      fontSize: 12,
+                      height: 1.6,
+                      color: lines[index].contains('ERROR') ? Theme.of(context).colorScheme.error : null,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ],
     );
   }

@@ -40,6 +40,19 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
   /// Indices, since equal items can appear twice in a file.
   late final _chosen = {for (var i = 0; i < widget.items.length; i++) i};
 
+  bool? get _allValue {
+    if (_chosen.length == widget.items.length) return true;
+    if (_chosen.isEmpty) return false;
+    return null;
+  }
+
+  void _confirmSelection() {
+    Navigator.pop(context, [
+      for (final (index, item) in widget.items.indexed)
+        if (_chosen.contains(index)) item,
+    ]);
+  }
+
   @override
   Widget build(BuildContext context) {
     final items = widget.items;
@@ -54,7 +67,7 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
           children: [
             CheckboxListTile(
               tristate: true,
-              value: all ? true : (_chosen.isEmpty ? false : null),
+              value: _allValue,
               title: Text('All ${widget.noun.$2}'),
               onChanged: (_) {
                 return setState(() {
@@ -80,14 +93,7 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
         FilledButton(
-          onPressed: _chosen.isEmpty
-              ? null
-              : () {
-                  return Navigator.pop(context, [
-                    for (final (index, item) in items.indexed)
-                      if (_chosen.contains(index)) item,
-                  ]);
-                },
+          onPressed: _chosen.isEmpty ? null : _confirmSelection,
           child: Text('${widget.action} ${counted(_chosen.length, widget.noun)}'),
         ),
       ],
