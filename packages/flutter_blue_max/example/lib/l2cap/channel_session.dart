@@ -1,9 +1,14 @@
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
-/// A channel is identified by both its remote peer and PSM.
+/// UI state for one L2CAP channel, retained by the workbench controller.
+/// Reopening the same remote peer and PSM reuses this session, so byte totals
+/// and [history] accumulate across reconnects until the workbench is disposed.
 class ChannelSession(var BluetoothL2capChannel channel, {required var bool incoming}) {
+  /// Retained after closure so the UI can still inspect receipts and totals.
   bool closed = false;
+  /// Bytes whose writes completed successfully across all openings.
   int transmitted = 0;
+  /// Streamed bytes only; buffer snapshots may repeat them and do not count twice.
   int received = 0;
   List<int> lastReceived = [];
   final history = <ChannelReceipt>[];
