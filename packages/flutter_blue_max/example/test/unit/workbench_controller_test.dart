@@ -67,6 +67,43 @@ void main() {
     expect(platform.closeRequests.single.psm, 131);
   });
 
+  test('stopping the server keeps an accepted channel whose close fails open for a retry', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.startServer(secure: true);
+    const closing = DeviceIdentifier('AA:BB:CC:DD:EE:61');
+    const failing = DeviceIdentifier('AA:BB:CC:DD:EE:62');
+    platform.accepted.add(L2CapChannelConnected(remoteId: closing, psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: failing, psm: 129));
+    platform.overrideCloseL2CapChannel = (request) async {
+      if (request.remoteId == failing.str) {
+        throw StateError('close rejected');
+      }
+    };
+
+    await controller.stopServer();
+
+    expect(controller.channels.single.channel.deviceId, failing);
+    expect(controller.channelSessions.singleWhere((s) => s.channel.deviceId == closing).closed, isTrue);
+    expect(controller.serverPsm, isNull);
+    expect(controller.error, contains('close rejected'));
+    expect(controller.busy('server'), isFalse);
+  });
+
+  test('a failed channel close keeps the channel open and releases its controls', () async {
+    final (:controller, :platform) = await _setup();
+    await controller.startServer(secure: false);
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:63'), psm: 129));
+    final session = controller.channels.single;
+    platform.overrideCloseL2CapChannel = (_) async => throw StateError('close rejected');
+
+    await controller.closeChannel(session);
+
+    expect(session.closed, isFalse);
+    expect(controller.channels, [session]);
+    expect(controller.error, contains('close rejected'));
+    expect(controller.busy('channel:${session.key}'), isFalse);
+  });
+
   test('selecting a peer keeps the channel it opened to the local server', () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
