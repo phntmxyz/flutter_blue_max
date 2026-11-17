@@ -9,6 +9,17 @@ import 'workbench_robot.dart';
 
 /// Exercises restored controls through the actual app, replacing only native I/O.
 extension DiagnosticsRobot on WorkbenchRobot {
+  Future<void> selectAdvertisedPeerAlsoConnectedToTheSystem() async {
+    logEvent('Show the same peer in discovery and the expanded system-connected list');
+    platform.systemPeers.add(
+      BmBluetoothDevice(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:01'), platformName: 'Test peripheral'),
+    );
+    await scanForPeripheral();
+    await tapLabel('Connected to the system');
+    await selectPeripheral();
+    expect(controller.selected!.remoteId, const DeviceIdentifier('AA:BB:CC:DD:EE:01'));
+  }
+
   Future<void> connectSystemPeer() async {
     logEvent('Find a system-connected peer that does not advertise');
     platform.systemPeers.add(
@@ -17,7 +28,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     await tapLabel('Start scan');
     await tapLabel('Stop scan');
     await tapLabel('Connected to the system');
-    await selectPeripheral(name: 'System peer');
+    await selectSystemPeer('System peer');
     await connectSelected();
     expect(controller.connected, isTrue);
     expect(controller.rssi, -47);

@@ -2,6 +2,7 @@ import 'package:file_selector_platform_interface/file_selector_platform_interfac
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -94,7 +95,16 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> selectPeripheral({String name = 'Test peripheral'}) async {
     logEvent('Select "$name" in the device list');
-    final tile = spot<ListTile>().withChild(spotText(name, exact: true))..existsOnce();
+    final tile = spot<ScanResultTile>().withChild(spotText(name, exact: true))..existsOnce();
+    await scrollIntoView(tile);
+    await act.tap(tile);
+    await idle();
+  }
+
+  Future<void> selectSystemPeer(String name) async {
+    logEvent('Select "$name" from the system-connected peers');
+    final section = spot<ExpansionTile>().withChild(spotText('Connected to the system', exact: true));
+    final tile = section.spot<ListTile>().withChild(spotText(name, exact: true))..existsOnce();
     await scrollIntoView(tile);
     await act.tap(tile);
     await idle();

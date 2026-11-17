@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
@@ -33,8 +34,14 @@ class _DevicesPanelState() extends State<DevicesPanel> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 850;
-        final list = _discovery(context);
-        final detail = _DeviceDetails(
+        final list = DeviceDiscoveryList(
+          queryController: _query,
+          onSelect: (device) {
+            context.read<WorkbenchController>().select(device);
+            setState(() => _showDetails = true);
+          },
+        );
+        final detail = DeviceDetails(
           key: ValueKey(context.read<WorkbenchController>().selected?.remoteId),
           onBack: wide ? null : () => setState(() => _showDetails = false),
         );
@@ -63,216 +70,15 @@ class _DevicesPanelState() extends State<DevicesPanel> {
       },
     );
   }
-
-  Widget _discovery(BuildContext context) {
-    final c = context.read<WorkbenchController>();
-    final results = c.visibleDevices;
-    return RefreshIndicator(
-      onRefresh: c.refreshScan,
-      child: CustomScrollView(
-        physics: const AlwaysScrollableScrollPhysics(),
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
-                  const SizedBox(height: 6),
-                  Text(
-                    (() {
-                      if (kIsWeb) {
-                        return 'Choose a device in the browser to explore GATT services.';
-                      }
-                      return 'Explore advertisements and GATT services.';
-                    })(),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                  if (c.localName?.isNotEmpty ?? false) ...[
-                    const SizedBox(height: 6),
-                    Text('This device: ${c.localName}', style: Theme.of(context).textTheme.bodySmall),
-                  ],
-                  const SizedBox(height: 20),
-                  TextField(
-                    controller: _query,
-                    onChanged: c.setQuery,
-                    decoration: const InputDecoration(
-                      prefixIcon: Icon(Icons.search),
-                      hintText: 'Name, ID or service UUID',
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  SizedBox(
-                    width: double.infinity,
-                    child: () {
-                      final canScan = c.ready && !c.busy(Operation.scan);
-                      if (c.scanning) {
-                        return FilledButton.icon(
-                          onPressed: canScan ? c.scan : null,
-                          icon: const Icon(Icons.stop_rounded),
-                          label: const Text('Stop scan'),
-                        );
-                      }
-                      return FilledButton.icon(
-                        onPressed: canScan ? c.scan : null,
-                        icon: const Icon(Icons.radar_rounded),
-                        label: const Text('Start scan'),
-                      );
-                    }(),
-                  ),
-                  const SizedBox(height: 14),
-                  if (c.systemDevices.isNotEmpty) ...[
-                    ExpansionTile(
-                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                      title: const Text('Connected to the system'),
-                      subtitle: const Text('These peers may be connected through another app.'),
-                      children: [
-                        for (final device in c.systemDevices)
-                          ListTile(
-                            title: Text(c.nameOf(device)),
-                            subtitle: Text(device.remoteId.str),
-                            trailing: const Icon(Icons.chevron_right),
-                            onTap: () {
-                              c.select(device);
-                              setState(() => _showDetails = true);
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-                  if (c.connectedDevices.isNotEmpty) ...[
-                    Wrap(
-                      spacing: 8,
-                      runSpacing: 6,
-                      children: [
-                        for (final device in c.connectedDevices)
-                          ActionChip(
-                            avatar: const Icon(Icons.link, size: 16),
-                            label: Text(c.nameOf(device), overflow: TextOverflow.ellipsis),
-                            onPressed: () {
-                              c.select(device);
-                              setState(() => _showDetails = true);
-                            },
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                  ],
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 4,
-                    children: [
-                      Text('${results.length} devices', style: Theme.of(context).textTheme.labelMedium),
-                      Text(
-                        (() {
-                          if (c.scanning) {
-                            return 'Scanning…';
-                          }
-                          return (() {
-                            if (kIsWeb) {
-                              return 'Selected devices';
-                            }
-                            return 'In order of discovery';
-                          })();
-                        })(),
-                        style: Theme.of(context).textTheme.bodySmall,
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-          // Reserves the indicator's space so the list does not shift when a scan starts or stops.
-          SliverPadding(
-            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
-            sliver: SliverToBoxAdapter(
-              child: SizedBox(height: 2, child: c.scanning ? const LinearProgressIndicator(minHeight: 2) : null),
-            ),
-          ),
-          if (results.isEmpty)
-            SliverFillRemaining(
-              hasScrollBody: false,
-              child: Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(28),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.bluetooth_searching_rounded, size: 42, color: Theme.of(context).colorScheme.primary),
-                      const SizedBox(height: 16),
-                      Text(
-                        c.query.isNotEmpty ? 'No matching devices' : 'Your next connection starts here',
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 8),
-                      const Text('Keep your peripheral nearby and start a scan.', textAlign: TextAlign.center),
-                    ],
-                  ),
-                ),
-              ),
-            )
-          else
-            SliverPadding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
-              sliver: SliverList.separated(
-                itemCount: results.length,
-                separatorBuilder: (_, _) => const SizedBox(height: 6),
-                itemBuilder: (context, index) {
-                  final result = results[index];
-                  final selected = c.selected == result.device;
-                  return Card(
-                    color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      title: Text(c.nameOf(result.device), maxLines: 1, overflow: TextOverflow.ellipsis),
-                      subtitle: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const SizedBox(height: 5),
-                          Text(
-                            result.device.remoteId.str,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
-                          ),
-                          const SizedBox(height: 5),
-                          Text(
-                            (() {
-                              if (kIsWeb) {
-                                return 'Selected in browser';
-                              }
-                              return '${result.rssi} dBm · '
-                                  '${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}';
-                            })(),
-                            style: Theme.of(context).textTheme.bodySmall,
-                          ),
-                        ],
-                      ),
-                      trailing: const Icon(Icons.chevron_right_rounded),
-                      onTap: () {
-                        c.select(result.device);
-                        setState(() => _showDetails = true);
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 }
 
-class const _DeviceDetails({super.key, final VoidCallback? onBack}) extends StatefulWidget {
+/// Selected peer inspector within DevicesPanel, including GATT, advertisements and L2CAP.
+class const DeviceDetails({super.key, final VoidCallback? onBack}) extends StatefulWidget {
   @override
-  State<_DeviceDetails> createState() => _DeviceDetailsState();
+  State<DeviceDetails> createState() => _DeviceDetailsState();
 }
 
-class _DeviceDetailsState() extends State<_DeviceDetails> {
+class _DeviceDetailsState() extends State<DeviceDetails> {
   bool _l2cap = false;
   WorkbenchController get controller => context.read<WorkbenchController>();
   VoidCallback? get onBack => widget.onBack;
@@ -514,5 +320,227 @@ class _DeviceDetailsState() extends State<_DeviceDetails> {
     if (value != null) {
       await controller.requestMtu(value);
     }
+  }
+}
+
+/// Discovery column in the Devices destination; coordinates scan state and selection.
+class const DeviceDiscoveryList({
+  super.key,
+  required final TextEditingController queryController,
+  required final ValueChanged<BluetoothDevice> onSelect,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.read<WorkbenchController>();
+    final results = c.visibleDevices;
+    return RefreshIndicator(
+      onRefresh: c.refreshScan,
+      child: CustomScrollView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        slivers: [
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
+                  const SizedBox(height: 6),
+                  Text(
+                    (() {
+                      if (kIsWeb) {
+                        return 'Choose a device in the browser to explore GATT services.';
+                      }
+                      return 'Explore advertisements and GATT services.';
+                    })(),
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  if (c.localName?.isNotEmpty ?? false) ...[
+                    const SizedBox(height: 6),
+                    Text('This device: ${c.localName}', style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                  const SizedBox(height: 20),
+                  TextField(
+                    controller: queryController,
+                    onChanged: c.setQuery,
+                    decoration: const InputDecoration(
+                      prefixIcon: Icon(Icons.search),
+                      hintText: 'Name, ID or service UUID',
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  SizedBox(
+                    width: double.infinity,
+                    child: () {
+                      final canScan = c.ready && !c.busy(Operation.scan);
+                      if (c.scanning) {
+                        return FilledButton.icon(
+                          onPressed: canScan ? c.scan : null,
+                          icon: const Icon(Icons.stop_rounded),
+                          label: const Text('Stop scan'),
+                        );
+                      }
+                      return FilledButton.icon(
+                        onPressed: canScan ? c.scan : null,
+                        icon: const Icon(Icons.radar_rounded),
+                        label: const Text('Start scan'),
+                      );
+                    }(),
+                  ),
+                  const SizedBox(height: 14),
+                  if (c.systemDevices.isNotEmpty) ...[
+                    ExpansionTile(
+                      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+                      title: const Text('Connected to the system'),
+                      subtitle: const Text('These peers may be connected through another app.'),
+                      children: [
+                        for (final device in c.systemDevices)
+                          ListTile(
+                            title: Text(c.nameOf(device)),
+                            subtitle: Text(device.remoteId.str),
+                            trailing: const Icon(Icons.chevron_right),
+                            onTap: () {
+                              onSelect(device);
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  if (c.connectedDevices.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 6,
+                      children: [
+                        for (final device in c.connectedDevices)
+                          ActionChip(
+                            avatar: const Icon(Icons.link, size: 16),
+                            label: Text(c.nameOf(device), overflow: TextOverflow.ellipsis),
+                            onPressed: () {
+                              onSelect(device);
+                            },
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                  ],
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 4,
+                    children: [
+                      Text('${results.length} devices', style: Theme.of(context).textTheme.labelMedium),
+                      Text(
+                        (() {
+                          if (c.scanning) {
+                            return 'Scanning…';
+                          }
+                          return (() {
+                            if (kIsWeb) {
+                              return 'Selected devices';
+                            }
+                            return 'In order of discovery';
+                          })();
+                        })(),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Reserves the indicator's space so the list does not shift when a scan starts or stops.
+          SliverPadding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+            sliver: SliverToBoxAdapter(
+              child: SizedBox(height: 2, child: c.scanning ? const LinearProgressIndicator(minHeight: 2) : null),
+            ),
+          ),
+          if (results.isEmpty)
+            SliverFillRemaining(
+              hasScrollBody: false,
+              child: Center(
+                child: Padding(
+                  padding: const EdgeInsets.all(28),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.bluetooth_searching_rounded, size: 42, color: Theme.of(context).colorScheme.primary),
+                      const SizedBox(height: 16),
+                      Text(
+                        c.query.isNotEmpty ? 'No matching devices' : 'Your next connection starts here',
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text('Keep your peripheral nearby and start a scan.', textAlign: TextAlign.center),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            SliverPadding(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 20),
+              sliver: SliverList.separated(
+                itemCount: results.length,
+                separatorBuilder: (_, _) => const SizedBox(height: 6),
+                itemBuilder: (context, index) {
+                  final result = results[index];
+                  final selected = c.selected == result.device;
+                  final String signal;
+                  if (kIsWeb) {
+                    signal = 'Selected in browser';
+                  } else {
+                    signal =
+                        '${result.rssi} dBm · ${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}';
+                  }
+                  return ScanResultTile(
+                    title: Text(c.nameOf(result.device), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    identifier: Text(result.device.remoteId.str, maxLines: 1, overflow: TextOverflow.ellipsis),
+                    signal: Text(signal),
+                    selected: selected,
+                    onTap: () => onSelect(result.device),
+                  );
+                },
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+}
+
+/// A discovered advertiser row, distinct from system-connected peer rows.
+class const ScanResultTile({
+  super.key,
+  required final Widget title,
+  required final Widget identifier,
+  required final Widget signal,
+  required final bool selected,
+  required final VoidCallback onTap,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      color: selected ? Theme.of(context).colorScheme.primaryContainer : null,
+      child: ListTile(
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        title: title,
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 5),
+            DefaultTextStyle.merge(
+              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+              child: identifier,
+            ),
+            const SizedBox(height: 5),
+            DefaultTextStyle(style: Theme.of(context).textTheme.bodySmall!, child: signal),
+          ],
+        ),
+        trailing: const Icon(Icons.chevron_right_rounded),
+        onTap: onTap,
+      ),
+    );
   }
 }

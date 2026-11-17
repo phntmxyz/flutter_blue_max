@@ -23,6 +23,12 @@ void main() {
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
   });
 
+  testWidgets('discovery: a peer in both lists can be selected unambiguously', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 1000));
+    await robot.selectAdvertisedPeerAlsoConnectedToTheSystem();
+  });
+
   testWidgets('catalog editor: removing a field keeps validation with its own characteristic', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
