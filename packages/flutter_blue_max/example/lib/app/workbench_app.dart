@@ -42,8 +42,12 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider.value(
-      value: _controller,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider.value(value: _controller),
+        ChangeNotifierProvider.value(value: _controller.parserLibrary),
+        ChangeNotifierProvider.value(value: _controller.catalogLibrary),
+      ],
       child: MaterialApp(
         title: 'Blue Max',
         debugShowCheckedModeBanner: false,

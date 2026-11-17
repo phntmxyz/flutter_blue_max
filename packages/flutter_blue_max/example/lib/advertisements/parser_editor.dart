@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:provider/provider.dart';
 
@@ -23,7 +23,7 @@ class const ParserEditorPage({
     DeviceIdentifier? device,
     AdvertisementData? advertisement,
   }) async {
-    final controller = context.read<WorkbenchController>();
+    final controller = context.read<ParserLibrary>();
     final parser = await Navigator.of(context).push(
       MaterialPageRoute<AdvertisementParser>(
         builder: (_) => ParserEditorPage(device: device, advertisement: advertisement, initial: previous),
@@ -452,7 +452,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       validator: (value) {
                         final record = _hexNumber(value ?? '');
                         final bits = _recordType.size * 8;
-                        return record == null || record < 0 || record >= 1 << bits ? 'Enter a $bits-bit hex type.' : null;
+                        return record == null || record < 0 || record >= 1 << bits
+                            ? 'Enter a $bits-bit hex type.'
+                            : null;
                       },
                     ),
                   ),

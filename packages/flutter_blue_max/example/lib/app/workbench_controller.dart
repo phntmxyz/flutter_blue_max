@@ -1,18 +1,17 @@
 import 'dart:async';
-import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/persisted_library.dart';
 import 'package:flutter_blue_max_example/shared/stored_list.dart';
 
 /// Owns the example's Bluetooth session across navigation and device selection.
@@ -30,19 +29,8 @@ class WorkbenchController({
   /// Characteristics subscribed on web per peer, where no CCCD event reports it; cleared when the link drops.
   final _webSubscriptions = <DeviceIdentifier, Set<Operation>>{};
   final _logs = <String>[];
-  final _parsers = <AdvertisementParser>[];
-  final _catalog = <KnownService>[];
-
-  /// Stored entries that no longer decode. Saves write them back unchanged until a reset removes them.
-  List<Object?> _unreadableParsers = const [];
-  List<Object?> _unreadableCatalog = const [];
-
-  /// Set when the stored value itself is unreadable. Saving would overwrite it, so only a reset may.
-  bool _parserStoreUnreadable = false;
-  bool _catalogStoreUnreadable = false;
-
-  /// Serializes writes so a slow save never overwrites a newer one.
-  Future<void> _writes = Future.value();
+  late final parserLibrary = ParserLibrary(write: saveList, onProblem: _libraryProblem)..addListener(_update);
+  late final catalogLibrary = GattCatalogLibrary(write: saveList, onProblem: _libraryProblem)..addListener(_update);
 
   /// Counts user-requested disconnects per peer so a pending channel open can
   /// tell a transient drop from an intentional disconnect.
@@ -95,8 +83,8 @@ class WorkbenchController({
     rssi,
     mtu,
     Map.of(_services),
-    List.of(_parsers),
-    List.of(_catalog),
+    parserLibrary.items,
+    catalogLibrary.items,
     _busy.where((o) => o != Operation.server && !_incomingOperation(o)).toList(),
     _channelState(incoming: false),
   ];
@@ -119,16 +107,16 @@ class WorkbenchController({
   ];
 
   /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
-  List<AdvertisementParser> get parsers => List.unmodifiable(_parsers);
+  List<AdvertisementParser> get parsers => parserLibrary.items;
   List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>
-      _parsers.where((parser) => parser.appliesTo(remoteId)).toList();
+      parserLibrary.items.where((parser) => parser.appliesTo(remoteId)).toList();
 
   /// The user's own GATT catalog services, saved across launches.
-  List<KnownService> get catalog => List.unmodifiable(_catalog);
+  List<KnownService> get catalog => catalogLibrary.items;
 
   /// The user's own entries replace built-in ones with the same UUID.
   KnownService? knownService(Guid uuid) {
-    for (final service in _catalog) {
+    for (final service in catalogLibrary.items) {
       if (service.uuid == uuid) {
         return service;
       }
@@ -209,6 +197,7 @@ class WorkbenchController({
       return;
     }
     _started = true;
+    final libraries = Future.wait([parserLibrary.load(), catalogLibrary.load()]);
     _subscriptions.add(FlutterBlueMax.logs.listen(log));
     _subscriptions.add(
       FlutterBlueMax.scanResults.listen((results) {
@@ -289,45 +278,16 @@ class WorkbenchController({
         _update();
       }, onError: _streamError),
     );
-    // Not run(): starting an operation clears the error, which would hide a failed initialization.
-    try {
-      final stored = await loadParsers();
-      _parsers
-        ..clear()
-        ..addAll(stored?.items ?? testDongleParsers);
-      _unreadableParsers = stored?.unreadable ?? const [];
-      _reportUnreadable('parsers', _unreadableParsers.length, stored?.problem, reset: 'Reset parsers');
-    } catch (exception, stackTrace) {
-      _parserStoreUnreadable = true;
-      error = 'Loading parsers: $exception\nChanges are not saved until you reset the parsers.';
-      log('ERROR loading parsers: $exception');
-      debugPrintStack(stackTrace: stackTrace);
-    }
-    try {
-      final stored = await loadCatalog();
-      _catalog
-        ..clear()
-        ..addAll(stored?.items ?? const []);
-      _unreadableCatalog = stored?.unreadable ?? const [];
-      _reportUnreadable('GATT catalog', _unreadableCatalog.length, stored?.problem, reset: 'Reset catalog');
-    } catch (exception, stackTrace) {
-      _catalogStoreUnreadable = true;
-      error = 'Loading GATT catalog: $exception\nChanges are not saved until you reset the catalog.';
-      log('ERROR loading GATT catalog: $exception');
-      debugPrintStack(stackTrace: stackTrace);
-    }
+    await libraries;
     _update();
   }
 
-  void _reportUnreadable(String what, int count, FormatException? problem, {required String reset}) {
-    if (count == 0) {
-      return;
+  void _libraryProblem(LibraryProblem problem) {
+    error = problem.message;
+    log(problem.activity);
+    if (problem.stackTrace != null) {
+      debugPrintStack(stackTrace: problem.stackTrace);
     }
-    final entries = count == 1 ? '1 stored entry' : '$count stored entries';
-    error =
-        'Loading $what: $entries could not be read and stay stored unchanged. '
-        '$reset removes them. ${problem?.message ?? ''}';
-    log('ERROR loading $what: $entries unreadable: ${problem?.message}');
   }
 
   void setQuery(String value) {
@@ -706,129 +666,18 @@ class WorkbenchController({
   }
 
   /// Replaces [previous] in place so the display order stays stable while editing.
-  Future<void> saveParser(AdvertisementParser parser, {AdvertisementParser? previous}) {
-    final index = previous == null ? -1 : _parsers.indexOf(previous);
-    if (index < 0) {
-      _parsers.add(parser);
-    } else {
-      _parsers[index] = parser;
-    }
-    return _persistParsers();
-  }
-
-  Future<void> removeParser(AdvertisementParser parser) {
-    _parsers.remove(parser);
-    return _persistParsers();
-  }
-
-  /// Adds the [parsers] that are not already present, e.g. examples after deleting them or imported ones.
-  /// Returns how many were added.
-  Future<int> addParsers(List<AdvertisementParser> parsers) async {
-    final existing = {for (final parser in _parsers) jsonEncode(parser)};
-    final added = [
-      for (final parser in parsers)
-        if (existing.add(jsonEncode(parser))) parser,
-    ];
-    _parsers.addAll(added);
-    await _persistParsers();
-    return added.length;
-  }
-
-  /// Replaces every parser with the bundled ones, which also overwrites stored parsers that no longer load.
-  Future<void> resetParsers() {
-    _parsers
-      ..clear()
-      ..addAll(testDongleParsers);
-    _unreadableParsers = const [];
-    _parserStoreUnreadable = false;
-    return _persistParsers();
-  }
-
-  /// Replaces [previous] in place, like [saveParser].
-  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) {
-    final index = previous == null ? -1 : _catalog.indexOf(previous);
-    if (index < 0) {
-      _catalog.add(service);
-    } else {
-      _catalog[index] = service;
-    }
-    return _persistCatalog();
-  }
-
-  Future<void> removeCatalogService(KnownService service) {
-    _catalog.remove(service);
-    return _persistCatalog();
-  }
-
-  /// The own service that adding [service] would replace: one with the same UUID that differs from it.
-  KnownService? catalogServiceReplacedBy(KnownService service) {
-    final own = _catalog.where((own) => own.uuid == service.uuid).firstOrNull;
-    return own == null || jsonEncode(own) == jsonEncode(service) ? null : own;
-  }
-
-  /// Adds [services], replacing own entries with the same UUID and skipping identical ones.
-  Future<CatalogImportResult> addCatalogServices(List<KnownService> services) async {
-    var added = 0;
-    var replaced = 0;
-    var present = 0;
-    for (final service in services) {
-      final previous = catalogServiceReplacedBy(service);
-      if (previous != null) {
-        _catalog[_catalog.indexOf(previous)] = service;
-        replaced++;
-      } else if (_catalog.any((own) => own.uuid == service.uuid)) {
-        present++;
-      } else {
-        _catalog.add(service);
-        added++;
-      }
-    }
-    await _persistCatalog();
-    return CatalogImportResult(added: added, replaced: replaced, present: present);
-  }
-
-  /// Removes every own service, which also overwrites a stored catalog that no longer loads.
-  Future<void> resetCatalog() {
-    _catalog.clear();
-    _unreadableCatalog = const [];
-    _catalogStoreUnreadable = false;
-    return _persistCatalog();
-  }
-
-  Future<void> _persistParsers() {
-    if (_parserStoreUnreadable) {
-      return _refuseToOverwrite('parsers', reset: 'Reset parsers');
-    }
-    final snapshot = List.of(_parsers);
-    final unreadable = _unreadableParsers;
-    return _persist('parsers', () => saveList(parserStoreKey, snapshot, unreadable: unreadable));
-  }
-
-  Future<void> _persistCatalog() {
-    if (_catalogStoreUnreadable) {
-      return _refuseToOverwrite('GATT catalog', reset: 'Reset catalog');
-    }
-    final snapshot = List.of(_catalog);
-    final unreadable = _unreadableCatalog;
-    return _persist('GATT catalog', () => saveList(catalogStoreKey, snapshot, unreadable: unreadable));
-  }
-
-  /// The stored value could not be read at all, so saving over it would lose it without the user asking.
-  Future<void> _refuseToOverwrite(String what, {required String reset}) {
-    error = 'Saving $what: the stored $what could not be read, so changes are not saved. $reset replaces them.';
-    log('ERROR saving $what: stored value unreadable');
-    _update();
-    return Future.value();
-  }
-
-  Future<void> _persist(String what, Future<void> Function() save) {
-    _update();
-    return _writes = _writes.then((_) => save()).catchError((Object exception, StackTrace stackTrace) {
-      error = 'Saving $what: $exception';
-      log('ERROR saving $what: $exception');
-      debugPrintStack(stackTrace: stackTrace);
-    });
-  }
+  Future<void> saveParser(AdvertisementParser parser, {AdvertisementParser? previous}) =>
+      parserLibrary.saveParser(parser, previous: previous);
+  Future<void> removeParser(AdvertisementParser parser) => parserLibrary.removeParser(parser);
+  Future<int> addParsers(List<AdvertisementParser> parsers) => parserLibrary.addParsers(parsers);
+  Future<void> resetParsers() => parserLibrary.resetParsers();
+  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) =>
+      catalogLibrary.saveCatalogService(service, previous: previous);
+  Future<void> removeCatalogService(KnownService service) => catalogLibrary.removeCatalogService(service);
+  KnownService? catalogServiceReplacedBy(KnownService service) => catalogLibrary.catalogServiceReplacedBy(service);
+  Future<CatalogImportResult> addCatalogServices(List<KnownService> services) =>
+      catalogLibrary.addCatalogServices(services);
+  Future<void> resetCatalog() => catalogLibrary.resetCatalog();
 
   void dismissError() {
     error = null;
@@ -866,6 +715,8 @@ class WorkbenchController({
   @override
   void dispose() {
     _disposed = true;
+    parserLibrary.dispose();
+    catalogLibrary.dispose();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }

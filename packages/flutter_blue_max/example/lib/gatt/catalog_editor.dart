@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:provider/provider.dart';
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
@@ -17,7 +17,7 @@ class const CatalogEditorPage({
   /// Opens the editor and saves the result, replacing [previous] when editing.
   /// [initial] prefills a new entry, e.g. from a discovered service.
   static Future<void> open(BuildContext context, {KnownService? initial, KnownService? previous}) async {
-    final controller = context.read<WorkbenchController>();
+    final controller = context.read<GattCatalogLibrary>();
     final service = await Navigator.of(context).push(
       MaterialPageRoute<KnownService>(
         builder: (_) => CatalogEditorPage(

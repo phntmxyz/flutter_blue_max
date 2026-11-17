@@ -3,7 +3,7 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/parser_editor.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
@@ -14,8 +14,8 @@ import 'package:provider/provider.dart';
 class const ParsersPanel({super.key}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) => c.parsers);
-    final c = context.read<WorkbenchController>();
+    context.select<ParserLibrary, Object?>((c) => c.parsers);
+    final c = context.read<ParserLibrary>();
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -95,7 +95,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
   }
 
   Future<void> _import(BuildContext context) async {
-    final controller = context.read<WorkbenchController>();
+    final controller = context.read<ParserLibrary>();
     final List<AdvertisementParser>? parsers;
     try {
       parsers = await openParserFile();
@@ -134,7 +134,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
       button,
       title: 'Export parsers',
       action: 'Export',
-      parsers: button.read<WorkbenchController>().parsers,
+      parsers: button.read<ParserLibrary>().parsers,
     );
     if (chosen == null || !button.mounted) {
       return;
@@ -152,7 +152,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
   }
 
   Future<void> _reset(BuildContext context) async {
-    final controller = context.read<WorkbenchController>();
+    final controller = context.read<ParserLibrary>();
     final confirmed = await confirm(
       context,
       title: 'Reset parsers?',
