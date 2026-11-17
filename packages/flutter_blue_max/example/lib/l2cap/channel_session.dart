@@ -1,3 +1,4 @@
+import 'package:clock/clock.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 /// UI state for one L2CAP channel, retained by the workbench controller.
@@ -54,7 +55,7 @@ class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
 
   void _record(List<int> bytes, {required ReceiveSource source}) {
     _lastReceived = List.of(bytes);
-    _history.insert(0, ChannelReceipt(time: DateTime.now(), source: source, bytes: List.unmodifiable(bytes)));
+    _history.insert(0, ChannelReceipt(time: clock.now(), source: source, bytes: List.unmodifiable(bytes)));
     if (_history.length > maxHistoryEntries) {
       _history.removeLast();
     }

@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:developer' as developer;
 
+import 'package:clock/clock.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
@@ -735,7 +736,7 @@ class WorkbenchController({
     if (_disposed) {
       return;
     }
-    _logs.add('${DateTime.now().toIso8601String()}  $message');
+    _logs.add('${clock.now().toIso8601String()}  $message');
     if (_logs.length > maxLogEntries) {
       _logs.removeRange(0, _logs.length - maxLogEntries);
     }
