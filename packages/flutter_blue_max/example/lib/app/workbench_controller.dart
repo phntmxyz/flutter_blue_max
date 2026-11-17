@@ -9,7 +9,7 @@ import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dar
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';

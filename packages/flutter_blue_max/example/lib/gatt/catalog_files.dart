@@ -2,7 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 

@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_editor.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:provider/provider.dart';
 

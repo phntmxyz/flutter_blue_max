@@ -1,7 +1,7 @@
 import 'dart:collection';
 
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {

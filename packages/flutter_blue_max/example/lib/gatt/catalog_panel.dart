@@ -1,9 +1,9 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_editor.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';

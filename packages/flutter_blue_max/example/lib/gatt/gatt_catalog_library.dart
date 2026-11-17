@@ -2,7 +2,7 @@ import 'dart:convert';
 
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/persisted_library.dart';
 
 /// Owns the user's saved catalog independently of Bluetooth; imports replace by UUID.

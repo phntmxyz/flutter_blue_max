@@ -2,67 +2,6 @@ import 'dart:convert';
 
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
-/// The characteristic properties the GATT explorer shows and the catalog compares.
-enum GattProperty(final String label) {
-  read('Read'),
-  write('Write'),
-  writeWithoutResponse('Write without response'),
-  notify('Notify'),
-  indicate('Indicate');
-
-  static Set<GattProperty> of(CharacteristicProperties properties) => {
-    if (properties.read) read,
-    if (properties.write) write,
-    if (properties.writeWithoutResponse) writeWithoutResponse,
-    if (properties.notify) notify,
-    if (properties.indicate) indicate,
-  };
-}
-
-/// A characteristic name and, for test services, the exact properties it must report.
-class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>? properties}) {
-  final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
-
-  /// Throws a [FormatException] for stored data that no longer describes a characteristic.
-  factory fromJson(Map<String, dynamic> json) {
-    try {
-      final properties = json['properties'] as List?;
-      return KnownCharacteristic(
-        Guid(json['uuid'] as String),
-        json['name'] as String,
-        properties: properties == null
-            ? null
-            : {for (final property in properties) GattProperty.values.byName(property as String)},
-      );
-    } on FormatException {
-      rethrow;
-    } on Object catch (error, stackTrace) {
-      Error.throwWithStackTrace(FormatException('Invalid catalog characteristic: $error'), stackTrace);
-    }
-  }
-
-  Map<String, dynamic> toJson() => {
-    'uuid': uuid.str128,
-    'name': name,
-    'properties': properties == null
-        ? null
-        : [
-            for (final property in GattProperty.values)
-              if (properties!.contains(property)) property.name,
-          ],
-  };
-
-  /// True when nothing is expected or [reported] are exactly the expected properties.
-  bool matches(CharacteristicProperties reported) {
-    final expected = properties;
-    if (expected == null) {
-      return true;
-    }
-    final actual = GattProperty.of(reported);
-    return actual.length == expected.length && actual.containsAll(expected);
-  }
-}
-
 /// A service name and its known characteristics.
 /// A [test] service must contain every listed characteristic with exactly its properties.
 class KnownService(
@@ -132,6 +71,68 @@ class KnownService(
       }
     }
     return (missing: missing, different: different);
+  }
+}
+
+
+/// The characteristic properties the GATT explorer shows and the catalog compares.
+enum GattProperty(final String label) {
+  read('Read'),
+  write('Write'),
+  writeWithoutResponse('Write without response'),
+  notify('Notify'),
+  indicate('Indicate');
+
+  static Set<GattProperty> of(CharacteristicProperties properties) => {
+    if (properties.read) read,
+    if (properties.write) write,
+    if (properties.writeWithoutResponse) writeWithoutResponse,
+    if (properties.notify) notify,
+    if (properties.indicate) indicate,
+  };
+}
+
+/// A characteristic name and, for test services, the exact properties it must report.
+class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>? properties}) {
+  final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
+
+  /// Throws a [FormatException] for stored data that no longer describes a characteristic.
+  factory fromJson(Map<String, dynamic> json) {
+    try {
+      final properties = json['properties'] as List?;
+      return KnownCharacteristic(
+        Guid(json['uuid'] as String),
+        json['name'] as String,
+        properties: properties == null
+            ? null
+            : {for (final property in properties) GattProperty.values.byName(property as String)},
+      );
+    } on FormatException {
+      rethrow;
+    } on Object catch (error, stackTrace) {
+      Error.throwWithStackTrace(FormatException('Invalid catalog characteristic: $error'), stackTrace);
+    }
+  }
+
+  Map<String, dynamic> toJson() => {
+    'uuid': uuid.str128,
+    'name': name,
+    'properties': properties == null
+        ? null
+        : [
+            for (final property in GattProperty.values)
+              if (properties!.contains(property)) property.name,
+          ],
+  };
+
+  /// True when nothing is expected or [reported] are exactly the expected properties.
+  bool matches(CharacteristicProperties reported) {
+    final expected = properties;
+    if (expected == null) {
+      return true;
+    }
+    final actual = GattProperty.of(reported);
+    return actual.length == expected.length && actual.containsAll(expected);
   }
 }
 
