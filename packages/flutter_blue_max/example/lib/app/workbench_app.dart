@@ -11,7 +11,11 @@ import 'package:flutter_blue_max_example/library/library_panel.dart';
 import 'package:provider/provider.dart';
 
 /// A responsive diagnostic app for the plugin's native and web backends.
-class const WorkbenchApp({super.key, final WorkbenchController? controller}) extends StatefulWidget {
+class const WorkbenchApp({
+  super.key,
+  /// An injected controller remains owned by the caller; only an app-created controller is disposed here.
+  final WorkbenchController? controller,
+}) extends StatefulWidget {
   @override
   State<WorkbenchApp> createState() => _WorkbenchAppState();
 }

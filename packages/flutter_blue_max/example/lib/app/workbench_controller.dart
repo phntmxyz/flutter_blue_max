@@ -154,6 +154,7 @@ class WorkbenchController({
   bool get connected => selected?.isConnected ?? false;
   bool get tracking => _trackingScan && scanning;
   bool get ready => adapter == BluetoothAdapterState.on;
+  /// Matches the typed operation passed to [run], including any device/channel scope.
   bool busy(Operation operation) => _busy.contains(operation);
 
   /// Whether this workbench subscribed to [c] on web, which reports no subscription state itself.
@@ -201,6 +202,7 @@ class WorkbenchController({
     return 'Unnamed device';
   }
 
+  /// Starts once, subscribing to plugin events and loading the saved parser/catalog libraries.
   Future<void> start() async {
     if (_started) {
       return;
@@ -342,6 +344,7 @@ class WorkbenchController({
     _update();
   }
 
+  /// Watches connection, MTU and service-reset streams once per peer until this controller is disposed.
   void select(BluetoothDevice device) {
     selected = device;
     rssi = null;
@@ -389,6 +392,7 @@ class WorkbenchController({
     _update();
   }
 
+  /// Toggles scanning: a running scan is stopped rather than restarted.
   Future<void> scan() => run(Operation.scan, () async {
     if (scanning) {
       await FlutterBlueMax.stopScan();
@@ -475,6 +479,7 @@ class WorkbenchController({
     await FlutterBlueMax.turnOn();
   });
 
+  /// Discovers services and also reads their Characteristic User Description descriptors.
   Future<void> discover() => run(Operation.discover, () async {
     final device = selected!;
     final result = await device.discoverServices();
