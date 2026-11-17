@@ -189,6 +189,18 @@ void main() {
     await robot.keepSearchAcrossDetails();
   });
 
+  testWidgets('android: request an MTU in range and create a bond', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.scanForPeripheral();
+    await robot.selectPeripheral();
+    await robot.connectSelected();
+    await robot.requestMtuAndCreateBond();
+    debugDefaultTargetPlatformOverride = null;
+  });
+
   testWidgets('phone: tapping outside a text field closes the keyboard', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);

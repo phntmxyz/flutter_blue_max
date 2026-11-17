@@ -58,6 +58,31 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     spotText('Buffer read').existsAtLeastOnce();
   }
 
+  Future<void> requestMtuAndCreateBond() async {
+    logEvent('Reject MTU values outside 23–517 and input that is no number');
+    await tapLabel('Request MTU');
+    final field = spot<Dialog>().spot<TextFormField>()..existsOnce();
+    for (final input in ['22', '518', 'abc']) {
+      await act.enterText(field, input);
+      await tapInDialog('Request');
+      spotText('Enter a value from 23 to 517.', exact: true).existsOnce();
+    }
+    logEvent('Cancelling sends no request');
+    await tapInDialog('Cancel');
+    spot<Dialog>().doesNotExist();
+    expect(controller.logs.where((line) => line.contains('requestMtu')), isEmpty);
+    // The plugin checks dart:io's Platform.isAndroid, so on a test host the request fails before the platform
+    // channel; its android-only error shows that the dialog value went to requestMtu.
+    logEvent('Request the largest MTU');
+    await tapLabel('Request MTU');
+    await act.enterText(field, '517');
+    await tapInDialog('Request');
+    spot<Dialog>().doesNotExist();
+    expect(controller.logs.last, allOf(contains('ERROR MTU request'), contains('requestMtu')));
+    await tapLabel('Create bond');
+    expect(controller.logs.last, allOf(contains('ERROR Bond'), contains('createBond')));
+  }
+
   Future<void> keepWebSubscriptionUntilDisconnect() async {
     Future<void> openBatteryLevel() async {
       await tapLabel('180F');
