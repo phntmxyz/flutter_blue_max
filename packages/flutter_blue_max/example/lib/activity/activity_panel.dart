@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:provider/provider.dart';
 
+/// Activity destination in `WorkbenchApp`.
 /// Searchable session output includes native diagnostics and payload previews.
 class const ActivityPanel({super.key}) extends StatefulWidget {
   @override

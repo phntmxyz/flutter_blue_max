@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/parsers_panel.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
 
+/// Library destination in `WorkbenchApp`, switching between `ParsersPanel` and `CatalogPanel`.
 /// What the app knows about payloads and GATT databases, saved on this device.
 class const LibraryPanel({super.key}) extends StatefulWidget {
   @override

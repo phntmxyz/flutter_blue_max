@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+/// Section card shared by the device inspector and L2CAP panels.
 /// Consistent section spacing for the phone and desktop workspaces.
 class const WorkbenchCard({
   super.key,

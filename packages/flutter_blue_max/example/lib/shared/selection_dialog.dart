@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 
+/// Import/export chooser used by `ParsersPanel` and `CatalogPanel`.
 /// Lets the user choose all or some [items], all selected at first.
 /// Pops with the chosen items, or with nothing when cancelled.
 class const SelectionDialog<T>({
