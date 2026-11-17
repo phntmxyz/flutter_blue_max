@@ -10,10 +10,32 @@ void main() {
     expect(decodeParserFile('{"parsers": []}'), isEmpty);
   });
 
+  test('malformed JSON retains the decoder reason, source and position', () {
+    const text = '{"parsers": [\n?]}';
+    late FormatException original;
+    try {
+      jsonDecode(text);
+    } on FormatException catch (exception) {
+      original = exception;
+    }
+    expect(
+      () => decodeParserFile(text),
+      throwsA(
+        isA<FormatException>()
+            .having((e) => e.message, 'reason', contains(original.message))
+            .having((e) => e.source, 'source', text)
+            .having((e) => e.offset, 'offset', original.offset),
+      ),
+    );
+  });
+
   test('foreign files are rejected with a reason', () {
     Matcher rejected(String message) => throwsA(isA<FormatException>().having((e) => e.message, 'message', message));
 
-    expect(() => decodeParserFile('not json'), rejected('The file is not JSON.'));
+    expect(
+      () => decodeParserFile('not json'),
+      throwsA(isA<FormatException>().having((e) => e.message, 'message', startsWith('The file is not JSON:'))),
+    );
     expect(() => decodeParserFile('[]'), rejected('The file holds no parsers.'));
     expect(() => decodeParserFile('{"services": []}'), rejected('The file holds no parsers.'));
     expect(() => decodeParserFile('{"parsers": [1]}'), rejected('Invalid parser: 1'));

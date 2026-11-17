@@ -27,8 +27,11 @@ List<T> decodeJsonList<T>(
   final Object? json;
   try {
     json = jsonDecode(text);
-  } on FormatException {
-    throw const FormatException('The file is not JSON.');
+  } on FormatException catch (exception, stackTrace) {
+    Error.throwWithStackTrace(
+      FormatException('The file is not JSON: ${exception.message}', exception.source, exception.offset),
+      stackTrace,
+    );
   }
   final items = json is Map<String, dynamic> ? json[key] : null;
   if (items is! List) {

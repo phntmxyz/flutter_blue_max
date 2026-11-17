@@ -101,7 +101,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
       parsers = await openParserFile();
     } on Exception catch (exception) {
       if (context.mounted) {
-        tell(context, 'Import failed: ${exception is FormatException ? exception.message : exception}');
+        tell(context, 'Import failed: ${exception is FormatException ? exception.toString() : exception}');
       }
       return;
     }

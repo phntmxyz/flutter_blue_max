@@ -1,7 +1,6 @@
 import 'dart:convert';
 
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
@@ -25,7 +24,10 @@ void main() {
   test('foreign files are rejected with a reason', () {
     Matcher rejected(String message) => throwsA(isA<FormatException>().having((e) => e.message, 'message', message));
 
-    expect(() => decodeCatalogFile('not json'), rejected('The file is not JSON.'));
+    expect(
+      () => decodeCatalogFile('not json'),
+      throwsA(isA<FormatException>().having((e) => e.message, 'message', startsWith('The file is not JSON:'))),
+    );
     expect(() => decodeCatalogFile(encodeParserFile(testDongleParsers)), rejected('The file holds no services.'));
     expect(() => decodeCatalogFile('{"services": [1]}'), rejected('Invalid service: 1'));
     expect(() => decodeCatalogFile('{"services": [{"name": "Broken"}]}'), throwsFormatException);

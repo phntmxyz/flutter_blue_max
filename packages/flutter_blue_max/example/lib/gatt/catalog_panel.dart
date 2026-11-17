@@ -116,7 +116,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
       services = await openCatalogFile();
     } on Exception catch (exception) {
       if (context.mounted) {
-        tell(context, 'Import failed: ${exception is FormatException ? exception.message : exception}');
+        tell(context, 'Import failed: ${exception is FormatException ? exception.toString() : exception}');
       }
       return;
     }
