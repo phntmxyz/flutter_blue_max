@@ -549,9 +549,12 @@ class WorkbenchController() extends ChangeNotifier {
   });
 
   /// Explicit reads drain the native buffer; streamed bytes are not counted twice.
+  /// An empty read is only logged, so it neither hides the last chunk nor evicts history.
   Future<void> readChannel(ChannelSession session) => run('channel:${session.key}', () async {
     final bytes = await session.channel.read();
-    session.recordReceived(bytes, source: 'Buffer read');
+    if (bytes.isNotEmpty) {
+      session.recordReceived(bytes, source: 'Buffer read');
+    }
     log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
   });
 

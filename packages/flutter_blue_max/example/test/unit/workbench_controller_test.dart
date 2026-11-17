@@ -531,7 +531,9 @@ void main() {
       expect(session.received, 2);
       expect(c.channels.last.history, isEmpty);
       await c.readChannel(session);
-      expect(session.history.first.bytes, isEmpty);
+      expect(session.history.map((e) => e.source), ['Buffer read', 'Stream'], reason: 'An empty read adds no entry');
+      expect(session.lastReceived, [65, 66]);
+      expect(c.logs.last, endsWith(': 0 B'));
       for (var i = 0; i < ChannelSession.maxHistoryEntries + 1; i++) {
         platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [i]));
       }
