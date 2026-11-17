@@ -25,6 +25,7 @@ dev_dependencies:
   lint: ^2.14.0
   share_plus_platform_interface: ^7.2.0
   spot: ^0.18.0
+  web: ^1.1.1
 
 flutter:
   uses-material-design: true

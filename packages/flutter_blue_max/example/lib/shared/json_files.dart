@@ -63,6 +63,10 @@ Future<bool> saveJsonFile(String name, String json, {Rect? origin}) async {
     );
     return result.status != ShareResultStatus.dismissed;
   }
+  if (kIsWeb) {
+    await file.saveTo(name);
+    return true;
+  }
   final location = await getSaveLocation(acceptedTypeGroups: [_jsonFiles], suggestedName: name);
   if (location == null) {
     return false;

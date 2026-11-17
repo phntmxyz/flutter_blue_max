@@ -89,6 +89,7 @@ jobs:
           puro2 -e "$FLUTTER_VERSION" flutter test --no-pub
           puro2 -e "$FLUTTER_VERSION" flutter test --no-pub --platform chrome \
             test/scenarios/workbench_test.dart --plain-name 'web:'
+          puro2 -e "$FLUTTER_VERSION" flutter test --no-pub --platform chrome test/unit/web_export_test.dart
 
       - name: Build Android APK
         if: matrix.platform == 'android'
