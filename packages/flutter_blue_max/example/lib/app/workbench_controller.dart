@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' as developer;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -288,7 +289,7 @@ class WorkbenchController({
     error = problem.message;
     log(problem.activity);
     if (problem.stackTrace != null) {
-      debugPrintStack(stackTrace: problem.stackTrace);
+      developer.log(problem.activity, name: 'workbench', error: problem.error, stackTrace: problem.stackTrace);
     }
   }
 
@@ -302,7 +303,7 @@ class WorkbenchController({
       localName = (await FlutterBlueMax.adapterName).trim();
     } catch (exception, stackTrace) {
       log('Local device name: $exception');
-      debugPrintStack(stackTrace: stackTrace);
+      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     }
     _update();
   }
@@ -473,8 +474,9 @@ class WorkbenchController({
           }
           try {
             await descriptor.read();
-          } catch (exception) {
+          } catch (exception, stackTrace) {
             log('User description of ${characteristic.uuid}: $exception');
+            developer.log('Read user description failed', name: 'workbench', error: exception, stackTrace: stackTrace);
           }
           _update();
         }
@@ -540,7 +542,7 @@ class WorkbenchController({
       _trackChannel(channel, incoming: true);
       error = 'Closing late L2CAP accept: $exception';
       log('ERROR $error');
-      debugPrintStack(stackTrace: stackTrace);
+      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     }
   }
 
@@ -584,7 +586,7 @@ class WorkbenchController({
               Error.throwWithStackTrace(error, stackTrace);
             }
             log('L2CAP open failed; retrying once: $error');
-            debugPrintStack(stackTrace: stackTrace);
+            developer.log('L2CAP open failed; retrying', name: 'workbench', error: error, stackTrace: stackTrace);
             if (!device.isConnected) {
               await device.connect(mtu: null);
             }
@@ -653,7 +655,7 @@ class WorkbenchController({
       unawaited(
         session.channel.close().catchError((Object exception, StackTrace stackTrace) {
           log('L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception');
-          debugPrintStack(stackTrace: stackTrace);
+          developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
         }),
       );
     }
@@ -683,7 +685,7 @@ class WorkbenchController({
         error = '${operation.label}: $exception';
       }
       log('ERROR ${operation.label}: $exception');
-      debugPrintStack(stackTrace: stackTrace);
+      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     } finally {
       _busy.remove(operation);
       _update();
@@ -728,7 +730,7 @@ class WorkbenchController({
   void _streamError(Object exception, StackTrace stackTrace) {
     error = exception.toString();
     log('ERROR $error');
-    debugPrintStack(stackTrace: stackTrace);
+    developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
   }
 
   void _update() {
@@ -763,8 +765,7 @@ class WorkbenchController({
       try {
         await action();
       } catch (exception, stackTrace) {
-        debugPrint('Bluetooth cleanup: $exception');
-        debugPrintStack(stackTrace: stackTrace);
+        developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
       }
     }
   }
