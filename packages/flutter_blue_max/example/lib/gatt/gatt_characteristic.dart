@@ -63,7 +63,9 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final enabled = !context.read<WorkbenchController>().busy(operation) && c.device.isConnected;
     final service = context.read<WorkbenchController>().knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
-    final expected = (service?.test ?? false) && known != null ? known.matches(p) : null;
+    final isTestEntry = service?.test ?? false;
+    final checked = isTestEntry && known != null;
+    final expected = checked ? known!.matches(p) : null;
     final description = userDescription(c);
     final uuid = c.uuid.str.toUpperCase();
     final name = known == null ? description : '${expected ?? false ? 'Test · ' : ''}${known.name}';

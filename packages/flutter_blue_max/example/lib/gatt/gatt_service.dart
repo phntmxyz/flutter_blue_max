@@ -14,6 +14,9 @@ class const GattService({super.key, required final BluetoothService service}) ex
     final known = context.read<WorkbenchController>().knownService(service.uuid);
     final own = known != null && context.read<WorkbenchController>().catalog.contains(known);
     final (:missing, :different) = known?.compare(service) ?? (missing: const <String>[], different: const <String>[]);
+    final isTestEntry = known?.test ?? false;
+    final matches = missing.isEmpty && different.isEmpty;
+    final expected = isTestEntry ? matches : null;
     final uuid = service.uuid.str.toUpperCase();
     final error = TextStyle(color: Theme.of(context).colorScheme.error);
     return ExpansionTile(
@@ -22,7 +25,7 @@ class const GattService({super.key, required final BluetoothService service}) ex
       title: GattTitle(
         known?.name ?? uuid,
         style: known == null ? const TextStyle(fontFamily: 'monospace', fontSize: 14) : null,
-        expected: (known?.test ?? false) ? missing.isEmpty && different.isEmpty : null,
+        expected: expected,
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
