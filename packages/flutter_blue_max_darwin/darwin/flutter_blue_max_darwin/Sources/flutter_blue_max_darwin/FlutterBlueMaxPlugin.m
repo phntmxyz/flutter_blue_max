@@ -339,6 +339,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
         else if ([@"isSupported" isEqualToString:call.method])
         {
             result(self.centralManager != nil ? @(YES) : @(NO));
+            return;
         }
         else if ([@"getAdapterName" isEqualToString:call.method])
         {
