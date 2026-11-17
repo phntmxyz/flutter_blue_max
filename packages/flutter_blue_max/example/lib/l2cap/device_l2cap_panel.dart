@@ -7,6 +7,7 @@ import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
 
+/// L2CAP tab of the selected device inspector in `DevicesPanel`.
 /// Opens outgoing channels only for the device shown in the inspector.
 class const DeviceL2capPanel({super.key, required final BluetoothDevice device}) extends StatefulWidget {
   @override

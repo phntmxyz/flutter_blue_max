@@ -5,6 +5,7 @@ import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
 
+/// Local server destination in `WorkbenchApp`, available only on L2CAP platforms.
 /// The receiving role waits for peers; it does not open a channel to a selected device.
 class const L2capServerPanel({super.key}) extends StatefulWidget {
   @override

@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
 import 'package:provider/provider.dart';
 
+/// Channel card shared by `DeviceL2capPanel` and `L2capServerPanel`.
 /// Exchanges data with the peer that owns this channel, regardless of selection.
 class const L2capChannelCard({super.key, required final ChannelSession session}) extends StatelessWidget {
   @override
