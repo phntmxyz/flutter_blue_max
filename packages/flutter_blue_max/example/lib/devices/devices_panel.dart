@@ -152,7 +152,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     }
                     return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text('Disconnected'));
                   }(),
-                  if (!kIsWeb) ...[if (c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B'))],
+                  if (!kIsWeb && c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B')),
                   if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
                 ],
               ),
@@ -216,10 +216,8 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 ],
               ),
               const SizedBox(height: 28),
-              if (!kIsWeb) ...[
-                if (advertisement != null || c.advertisementTracker?.remoteId == device.remoteId)
-                  AdvertisementCard(device: device),
-              ],
+              if (!kIsWeb && (advertisement != null || c.advertisementTracker?.remoteId == device.remoteId))
+                AdvertisementCard(device: device),
             ],
           ),
         ),
@@ -434,12 +432,10 @@ class const DeviceDiscoveryList({
                           if (c.scanning) {
                             return 'Scanning…';
                           }
-                          return (() {
-                            if (kIsWeb) {
-                              return 'Selected devices';
-                            }
-                            return 'In order of discovery';
-                          })();
+                          if (kIsWeb) {
+                            return 'Selected devices';
+                          }
+                          return 'In order of discovery';
                         })(),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
