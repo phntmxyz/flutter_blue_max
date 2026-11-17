@@ -218,7 +218,9 @@ class WorkbenchController() extends ChangeNotifier {
           unawaited(_loadLocalName());
         }
         if (state != BluetoothAdapterState.on && state != BluetoothAdapterState.unknown) {
-          _channels.clear();
+          for (final session in _channels.values) {
+            session.closed = true;
+          }
           _services.clear();
           serverPsm = null;
         }

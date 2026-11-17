@@ -333,10 +333,15 @@ void main() {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
     platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
+    platform.received.add(L2CapChannelData(remoteId: const DeviceIdentifier('server'), psm: 129, value: [1, 2]));
     platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.off));
     await Future<void>.delayed(Duration.zero);
     expect(controller.channels, isEmpty);
     expect(controller.serverPsm, isNull);
+    final session = controller.channelSessions.single;
+    expect(session.closed, isTrue, reason: 'Adapter loss keeps the closed session for its diagnostics');
+    expect(session.received, 2);
+    expect(session.history.single.bytes, [1, 2]);
     for (var i = 0; i < WorkbenchController.maxLogEntries + 10; i++) {
       controller.log('entry $i');
     }
