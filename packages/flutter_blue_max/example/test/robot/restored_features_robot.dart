@@ -58,6 +58,32 @@ extension RestoredFeaturesRobot on WorkbenchRobot {
     spotText('Buffer read').existsAtLeastOnce();
   }
 
+  Future<void> keepWebSubscriptionUntilDisconnect() async {
+    Future<void> openBatteryLevel() async {
+      await tapLabel('180F');
+      await tapLabel('2A19');
+    }
+
+    await openBatteryLevel();
+    await tapLabel('Subscribe');
+    logEvent('Collapse and reopen the service, which rebuilds the characteristic tile');
+    await tapLabel('180F');
+    await openBatteryLevel();
+    spotText('Unsubscribe', exact: true).existsOnce();
+    logEvent('Select another device and come back');
+    await selectPeripheral(name: 'Other peripheral');
+    await selectPeripheral();
+    await openBatteryLevel();
+    spotText('Unsubscribe', exact: true).existsOnce();
+    logEvent('A dropped link ends the browser subscription');
+    await tapLabel('Disconnect');
+    await connectSelected();
+    await tapLabel('Discover services');
+    await openBatteryLevel();
+    spotText('Subscribe', exact: true).existsOnce();
+    expect(platform.notifyRequests.where((request) => !request.enable), isEmpty);
+  }
+
   Future<void> exerciseNotificationsAndDescriptors() async {
     await tapLabel('180F');
     await tapLabel('2A19');

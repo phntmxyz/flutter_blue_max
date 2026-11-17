@@ -29,6 +29,11 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   @override
   void initState() {
     super.initState();
+    if (kIsWeb) {
+      // Web Bluetooth reports no CCCD writes, so the cached descriptor value would only reset the flag.
+      _notifying = widget.controller.subscribedOnWeb(widget.characteristic);
+      return;
+    }
     _notifying = widget.characteristic.isNotifying;
     for (final descriptor in widget.characteristic.descriptors) {
       if (descriptor.uuid == Guid('2902')) {
@@ -158,7 +163,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                             await c.setNotifyValue(notify);
                             // Web Bluetooth does not publish a CCCD write event.
                             if (kIsWeb) {
-                              // Browser subscriptions have no native CCCD event.
+                              widget.controller.setSubscribedOnWeb(c, subscribed: notify);
                               if (mounted) {
                                 setState(() => _notifying = notify);
                               }

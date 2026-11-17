@@ -25,6 +25,9 @@ class WorkbenchController({
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
   final _busy = <Operation>{};
+
+  /// Characteristics subscribed on web per peer, where no CCCD event reports it; cleared when the link drops.
+  final _webSubscriptions = <DeviceIdentifier, Set<Operation>>{};
   final _logs = <String>[];
   final _parsers = <AdvertisementParser>[];
   final _catalog = <KnownService>[];
@@ -112,6 +115,19 @@ class WorkbenchController({
   bool get tracking => _trackingScan && scanning;
   bool get ready => adapter == BluetoothAdapterState.on;
   bool busy(Operation operation) => _busy.contains(operation);
+
+  /// Whether this workbench subscribed to [c] on web, which reports no subscription state itself.
+  bool subscribedOnWeb(BluetoothCharacteristic c) =>
+      _webSubscriptions[c.remoteId]?.contains(Operation.characteristic(c)) ?? false;
+
+  void setSubscribedOnWeb(BluetoothCharacteristic c, {required bool subscribed}) {
+    final subscriptions = _webSubscriptions.putIfAbsent(c.remoteId, () => {});
+    if (subscribed) {
+      subscriptions.add(Operation.characteristic(c));
+    } else {
+      subscriptions.remove(Operation.characteristic(c));
+    }
+  }
 
   /// The current web and Linux backends do not implement L2CAP.
   bool get supportsL2cap =>
@@ -307,6 +323,7 @@ class WorkbenchController({
           wasConnected = state == BluetoothConnectionState.connected;
           if (lostConnection) {
             _services.remove(device.remoteId);
+            _webSubscriptions.remove(device.remoteId);
             _closeOutgoingChannels(device.remoteId);
           }
           log(

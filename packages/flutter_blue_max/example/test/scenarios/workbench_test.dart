@@ -349,5 +349,18 @@ void main() {
         debugDefaultTargetPlatformOverride = null;
       }, skip: !kIsWeb);
     }
+
+    testWidgets('web: a subscription survives rebuilding its tile until the link drops', (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      platform.includeGattExtras = true;
+      platform.emitNotifyDescriptorEvents = false;
+      await robot.scanForPeripheral(includeSecondPeer: true);
+      await robot.inspectPeripheral();
+      await robot.keepWebSubscriptionUntilDisconnect();
+      debugDefaultTargetPlatformOverride = null;
+    }, skip: !kIsWeb);
   });
 }
