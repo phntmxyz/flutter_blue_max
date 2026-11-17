@@ -33,9 +33,11 @@ void main() {
     await robot.openL2cap();
     await robot.rejectInvalidRemotePsm();
     await robot.openRemoteChannel();
+    robot.expectChannelEncryption(secure: true);
     await robot.openLocalServer();
     robot.expectNoOutgoingChannels();
     await robot.startServer();
+    robot.expectServerEncryption(secure: true);
     await robot.openActivity();
     await robot.openLocalServer();
     robot.expectListening();
@@ -48,7 +50,9 @@ void main() {
     await robot.launch(size: const Size(390, 844));
     robot.expectLocalDeviceName();
     await robot.openLocalServer();
+    await robot.turnOffEncryption();
     await robot.startServer();
+    robot.expectServerEncryption(secure: false);
     await robot.openActivity();
     await robot.openLocalServer();
     robot.expectListening();
@@ -173,6 +177,9 @@ void main() {
   });
 
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
+    // Only Android lets the client choose encryption.
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral();
@@ -180,7 +187,10 @@ void main() {
     await robot.openL2cap();
     robot.expectConnectionRequired();
     await robot.connectSelected();
+    await robot.turnOffEncryption();
     await robot.openRemoteChannel();
+    robot.expectChannelEncryption(secure: false);
+    debugDefaultTargetPlatformOverride = null;
   });
 
   testWidgets('desktop: channels and remote PSM input belong to the inspected device', (tester) async {

@@ -174,6 +174,18 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> startServer() => tapLabel('Start server');
   Future<void> stopServer() => tapLabel('Stop server');
+  Future<void> turnOffEncryption() => tapLabel('Require encryption');
+
+  void expectServerEncryption({required bool secure}) {
+    logEvent('Verify that the server was started ${secure ? 'with' : 'without'} encryption');
+    expect(platform.listenRequests.last.secure, secure);
+  }
+
+  void expectChannelEncryption({required bool secure}) {
+    logEvent('Verify that the channel was opened ${secure ? 'with' : 'without'} encryption');
+    expect(platform.openRequests.last.secure, secure);
+  }
+
   Future<void> openActivity() => tapLabel('Activity');
 
   Future<void> rejectUnsupportedServer() async {

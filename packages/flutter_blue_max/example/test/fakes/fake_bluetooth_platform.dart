@@ -31,6 +31,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final systemDeviceRequests = <BmSystemDevicesRequest>[];
   final scanRequests = <BmScanSettings>[];
   final rssiRequests = <BmReadRssiRequest>[];
+  final listenRequests = <ListenL2CapChannelRequest>[];
   final openRequests = <OpenL2CapChannelRequest>[];
   final readRequests = <ReadL2CapChannelRequest>[];
   final characteristicReads = <BmReadCharacteristicRequest>[];
@@ -84,6 +85,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     systemDeviceRequests.clear();
     scanRequests.clear();
     rssiRequests.clear();
+    listenRequests.clear();
     openRequests.clear();
     readRequests.clear();
     characteristicReads.clear();
@@ -522,6 +524,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
       return await override(request);
     }
     serverStarts++;
+    listenRequests.add(request);
     final failure = l2capFailure;
     if (failure != null) {
       throw failure;
