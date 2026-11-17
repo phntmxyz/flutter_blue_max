@@ -94,8 +94,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   Future<void> selectPeripheral({String name = 'Test peripheral'}) async {
     logEvent('Select "$name" in the device list');
     final tile = spot<ListTile>().withChild(spotText(name, exact: true))..existsOnce();
-    await tester.ensureVisible(find.widgetWithText(ListTile, name));
-    await idle();
+    await scrollIntoView(tile);
     await act.tap(tile);
     await idle();
   }
@@ -157,7 +156,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     await tapLabel('Write');
     logEvent('Enter a malformed payload and verify that it is not transmitted');
     final field = spot<TextFormField>()..existsOnce();
-    await tester.ensureVisible(find.byType(TextFormField));
+    await scrollIntoView(field);
     await act.enterText(field, 'F');
     await idle();
     final count = platform.characteristicWrites.length;
@@ -294,8 +293,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     logEvent('Enter an invalid remote PSM');
     final field = spot<TextFormField>();
     field.existsOnce();
-    await tester.ensureVisible(find.byType(TextFormField));
-    await idle();
+    await scrollIntoView(field);
     await act.enterText(field, '0');
     await idle();
     await tapLabel('Open channel');
@@ -306,8 +304,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   Future<void> openRemoteChannel() async {
     logEvent('Open an L2CAP channel to the connected device');
     final field = spot<TextFormField>()..existsOnce();
-    await tester.ensureVisible(find.byType(TextFormField));
-    await idle();
+    await scrollIntoView(field);
     await act.enterText(field, '131');
     await idle();
     await tapLabel('Open channel');
@@ -319,8 +316,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   Future<void> expectOnlySelectedChannel() async {
     logEvent('Verify that only the inspected peer’s channel is displayed');
     final card = spot<L2capChannelCard>()..existsOnce();
-    await tester.ensureVisible(find.byType(L2capChannelCard));
-    await idle();
+    await scrollIntoView(card);
     expect(card.snapshotWidget().session.channel.deviceId, controller.selected!.remoteId);
     spotText('Outgoing · PSM 131', exact: true).existsOnce();
   }
@@ -338,11 +334,17 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     await idle();
   }
 
+  Future<void> scrollIntoView<T extends Widget>(WidgetSelector<T> target) async {
+    logEvent('Scroll the selected widget into view');
+    target.existsOnce();
+    await tester.ensureVisible(target.finder);
+    await idle();
+  }
+
   Future<void> tapLabel(String label) async {
     logEvent('Tap "$label"');
     final target = spotText(label, exact: true)..existsOnce();
-    await tester.ensureVisible(find.text(label));
-    await idle();
+    await scrollIntoView(target);
     await act.tap(target);
     await idle();
   }

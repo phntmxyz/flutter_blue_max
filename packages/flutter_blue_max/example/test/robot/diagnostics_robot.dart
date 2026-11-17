@@ -138,8 +138,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     logEvent('Write with response, then without response, and read the resulting value back');
     await tapLabel('Write');
     final payload = spot<TextFormField>()..existsOnce();
-    await tester.ensureVisible(find.byType(TextFormField));
-    await idle();
+    await scrollIntoView(payload);
     await act.enterText(payload, '02');
     await idle();
     final readsBeforeWrite = platform.characteristicReads.length;
@@ -156,8 +155,7 @@ extension DiagnosticsRobot on WorkbenchRobot {
     spotText('41', exact: true).existsOnce();
     logEvent('Write an ordinary descriptor through the payload editor');
     final field = spot<TextFormField>()..existsOnce();
-    await tester.ensureVisible(find.byType(TextFormField));
-    await idle();
+    await scrollIntoView(field);
     await act.enterText(field, '01 A2');
     await idle();
     await tapLabel('Write descriptor');
@@ -248,9 +246,9 @@ extension DiagnosticsRobot on WorkbenchRobot {
     logEvent('Pull down to start a fresh scan');
     final before = platform.scanStarts;
     final scanButton = spotText('Start scan', exact: true)..existsOnce();
-    await tester.ensureVisible(find.text('Start scan'));
+    await scrollIntoView(scanButton);
     scanButton.existsOnce();
-    await tester.drag(find.text('Start scan'), const Offset(0, 400));
+    await tester.drag(scanButton.finder, const Offset(0, 400));
     await idle();
     expect(platform.scanStarts, before + 1);
     await tapLabel('Stop scan');

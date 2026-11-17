@@ -102,8 +102,8 @@ extension GattCatalogRobot on WorkbenchRobot {
     await tapLabel('Remove');
     expect(controller.catalog, isEmpty);
     logEvent('Scroll back to the own services');
-    final list = find.descendant(of: find.byType(CatalogPanel), matching: find.byType(Scrollable)).first;
-    await tester.scrollUntilVisible(find.textContaining('None yet.'), -300, scrollable: list);
+    final list = spot<CatalogPanel>().spot<Scrollable>()..existsOnce();
+    await tester.scrollUntilVisible(spotText('None yet.').finder, -300, scrollable: list.finder);
     await idle();
     spotText('None yet. Add a service here or from a discovered service in the GATT explorer.').existsOnce();
   }
@@ -164,8 +164,7 @@ extension GattCatalogRobot on WorkbenchRobot {
   Future<void> _enter(String label, String text, {int index = 0}) async {
     logEvent('Enter "$text" into "$label"');
     final field = _field(label).atIndex(index)..existsOnce();
-    await tester.ensureVisible(find.widgetWithText(TextField, label).at(index));
-    await idle();
+    await scrollIntoView(field);
     await act.enterText(field, text);
     await idle();
   }

@@ -152,8 +152,7 @@ extension AdvertisementRobot on WorkbenchRobot {
 
   Future<void> removeParser() async {
     final remove = spot<IconButton>().withTooltip('Remove parser')..existsOnce();
-    await tester.ensureVisible(find.byTooltip('Remove parser'));
-    await idle();
+    await scrollIntoView(remove);
     await act.tap(remove);
     await idle();
     expect(controller.parsers.where((parser) => parser.name == 'Climate'), isEmpty);
@@ -165,8 +164,7 @@ extension AdvertisementRobot on WorkbenchRobot {
   Future<void> _enter(String label, String text) async {
     logEvent('Enter "$text" into "$label"');
     final field = _field(label)..existsOnce();
-    await tester.ensureVisible(find.widgetWithText(TextField, label));
-    await idle();
+    await scrollIntoView(field);
     await act.enterText(field, text);
     await idle();
   }

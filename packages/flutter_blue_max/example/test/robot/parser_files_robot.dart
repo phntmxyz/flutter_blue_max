@@ -43,12 +43,12 @@ extension ParserFilesRobot on WorkbenchRobot {
     await tapLabel('Export');
     await tapInDialog('Export ${testDongleParsers.length} parsers');
     logEvent('Wait until the file is written to where the save dialog chose');
-    final exported = find.text('Exported ${testDongleParsers.length} parsers');
-    for (var attempt = 0; attempt < 50 && exported.evaluate().isEmpty; attempt++) {
+    final exported = spotText('Exported ${testDongleParsers.length} parsers', exact: true);
+    for (var attempt = 0; attempt < 50 && exported.snapshot().discovered.isEmpty; attempt++) {
       await tester.runAsync(() => Future<void>.delayed(const Duration(milliseconds: 20)));
       await tester.pump();
     }
-    spotText('Exported ${testDongleParsers.length} parsers', exact: true).existsOnce();
+    exported.existsOnce();
     final content = await tester.runAsync(File(path).readAsString);
     expect(jsonEncode(decodeParserFile(content!)), jsonEncode(testDongleParsers));
   }
