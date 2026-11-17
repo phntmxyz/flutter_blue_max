@@ -38,26 +38,6 @@ class const ParserEditorPage({
   State<ParserEditorPage> createState() => _ParserEditorPageState();
 }
 
-/// Form state of one field; controllers keep partially typed numbers intact.
-class _FieldDraft() {
-  final name = TextEditingController();
-  final offset = TextEditingController(text: '0');
-  final length = TextEditingController(text: '1');
-  final scale = TextEditingController(text: '1');
-  final add = TextEditingController(text: '0');
-  final unit = TextEditingController();
-  final record = TextEditingController();
-  final bit = TextEditingController(text: '0');
-  final bits = TextEditingController();
-  AdvertisementFieldType type = AdvertisementFieldType.uint8;
-
-  void dispose() {
-    for (final controller in [name, offset, length, scale, add, unit, record, bit, bits]) {
-      controller.dispose();
-    }
-  }
-}
-
 class _ParserEditorPageState() extends State<ParserEditorPage> {
   final _form = GlobalKey<FormState>();
   final _name = TextEditingController();
@@ -589,5 +569,25 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         ),
       ),
     );
+  }
+}
+
+/// Form state of one field; controllers keep partially typed numbers intact.
+class _FieldDraft() {
+  final name = TextEditingController();
+  final offset = TextEditingController(text: '0');
+  final length = TextEditingController(text: '1');
+  final scale = TextEditingController(text: '1');
+  final add = TextEditingController(text: '0');
+  final unit = TextEditingController();
+  final record = TextEditingController();
+  final bit = TextEditingController(text: '0');
+  final bits = TextEditingController();
+  AdvertisementFieldType type = AdvertisementFieldType.uint8;
+
+  void dispose() {
+    for (final controller in [name, offset, length, scale, add, unit, record, bit, bits]) {
+      controller.dispose();
+    }
   }
 }
