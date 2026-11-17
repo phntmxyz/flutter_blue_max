@@ -208,9 +208,10 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                       child: const Text('Request MTU'),
                     ),
                     OutlinedButton(
-                      onPressed: available && !c.busy(Operation.bond)
-                          ? () => c.run(Operation.bond, device.createBond)
-                          : null,
+                      onPressed: (() {
+                        if (!available || c.busy(Operation.bond)) return null;
+                        return () => c.run(Operation.bond, device.createBond);
+                      })(),
                       child: const Text('Create bond'),
                     ),
                   ],

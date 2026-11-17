@@ -46,16 +46,21 @@ class const GattService({super.key, required final BluetoothService service}) ex
         if (known == null || own)
           Align(
             alignment: Alignment.centerLeft,
-            child: TextButton.icon(
-              onPressed: () async {
-                await CatalogEditorPage.open(
-                  context,
-                  initial: known ?? KnownService.fromDiscovered(service),
-                  previous: own ? known : null,
+            child: Builder(
+              builder: (context) {
+                if (own) {
+                  return TextButton.icon(
+                    onPressed: () => CatalogEditorPage.open(context, previous: known),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit catalog entry'),
+                  );
+                }
+                return TextButton.icon(
+                  onPressed: () => CatalogEditorPage.open(context, initial: KnownService.fromDiscovered(service)),
+                  icon: const Icon(Icons.bookmark_add_outlined, size: 18),
+                  label: const Text('Add to catalog'),
                 );
               },
-              icon: Icon(own ? Icons.edit_outlined : Icons.bookmark_add_outlined, size: 18),
-              label: Text(own ? 'Edit catalog entry' : 'Add to catalog'),
             ),
           ),
         for (final characteristic in service.characteristics)

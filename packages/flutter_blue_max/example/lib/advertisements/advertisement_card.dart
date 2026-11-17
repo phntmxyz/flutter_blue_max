@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:provider/provider.dart';
@@ -105,21 +106,23 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
             style: Theme.of(context).textTheme.bodySmall,
           ),
           const SizedBox(height: 14),
-          () {
-            final enabled = c.ready && !c.busy(Operation.scan);
-            if (tracking) {
-              return FilledButton.icon(
-                onPressed: enabled ? c.stopTracking : null,
-                icon: const Icon(Icons.stop_rounded),
-                label: const Text('Stop tracking'),
+          Builder(
+            builder: (context) {
+              final enabled = c.ready && !c.busy(Operation.scan);
+              if (tracking) {
+                return FilledButton.icon(
+                  onPressed: enabled ? c.stopTracking : null,
+                  icon: const Icon(Icons.stop_rounded),
+                  label: const Text('Stop tracking'),
+                );
+              }
+              return OutlinedButton.icon(
+                onPressed: enabled ? () => c.trackAdvertisements(device) : null,
+                icon: const Icon(Icons.timeline_rounded),
+                label: const Text('Track advertisements'),
               );
-            }
-            return OutlinedButton.icon(
-              onPressed: enabled ? () => c.trackAdvertisements(device) : null,
-              icon: const Icon(Icons.timeline_rounded),
-              label: const Text('Track advertisements'),
-            );
-          }(),
+            },
+          ),
           if (tracking) ...[const SizedBox(height: 14), const LinearProgressIndicator(minHeight: 2)],
           if (tracker != null) ...[
             const SizedBox(height: 14),
@@ -156,84 +159,117 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
                 ),
               ],
             ),
-            if (tracker.history.isEmpty)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 20),
-                child: Text('Waiting for the first advertisement…'),
-              )
-            else
-              ...() {
-                final search = _query.trim().toLowerCase();
-                final rows =
-                    [
-                      for (final entry in tracker.history)
-                        if (!_changesOnly || entry.changed)
-                          (
-                            entry: entry,
-                            time: entry.time.toIso8601String().substring(11, 23),
-                            parsed: parsedValues(entry.data, parsers),
-                          ),
-                    ].where((row) {
-                      if (_parsedOnly && row.parsed.isEmpty) {
-                        return false;
-                      }
-                      if (search.isEmpty) {
-                        return true;
-                      }
-                      final searchable = [
-                        row.time,
-                        '${row.entry.rssi} dBm',
-                        ...describeAdvertisement(row.entry.data, parsers: parsers),
-                      ].join('\n').toLowerCase();
-                      return searchable.contains(search);
-                    }).toList();
-                return [
-                  Padding(
-                    padding: const EdgeInsets.only(top: 10),
-                    child: Text(
-                      '${rows.length} of ${tracker.history.length} recent advertisements',
-                      style: Theme.of(context).textTheme.labelMedium,
-                    ),
-                  ),
-                  // Parsed values appear on every row; the full payload only on the newest and on changes.
-                  for (final (index, row) in rows.take(AdvertisementCard.visibleEntries).indexed)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 10),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            '${row.time} · ${row.entry.rssi} dBm'
-                            '${row.entry.interval == null ? '' : ' · +${row.entry.interval!.inMilliseconds} ms'}',
-                            style: mono,
-                          ),
-                          if (index == 0 || row.entry.changed)
-                            Container(
-                              width: double.infinity,
-                              margin: const EdgeInsets.only(top: 4),
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: row.entry.changed
-                                    ? Theme.of(context).colorScheme.tertiaryContainer
-                                    : Theme.of(context).colorScheme.surfaceContainerHigh,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: SelectableText(
-                                describeAdvertisement(row.entry.data, parsers: parsers).join('\n'),
-                                style: mono,
-                              ),
-                            )
-                          else
-                            for (final value in row.parsed)
-                              Text('  ↳ $value', style: mono.copyWith(color: Theme.of(context).colorScheme.primary)),
-                        ],
-                      ),
-                    ),
-                ];
-              }(),
+            AdvertisementHistory(
+              tracker: tracker,
+              parsers: parsers,
+              query: _query,
+              changesOnly: _changesOnly,
+              parsedOnly: _parsedOnly,
+            ),
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Filtered recent tracker rows within AdvertisementCard.
+class const AdvertisementHistory({
+  super.key,
+  required final AdvertisementTracker tracker,
+  required final List<AdvertisementParser> parsers,
+  required final String query,
+  required final bool changesOnly,
+  required final bool parsedOnly,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
+    if (tracker.history.isEmpty) {
+      return const Padding(
+        padding: EdgeInsets.symmetric(vertical: 20),
+        child: Text('Waiting for the first advertisement…'),
+      );
+    }
+    final search = query.trim().toLowerCase();
+    final rows =
+        [
+          for (final entry in tracker.history)
+            if (!changesOnly || entry.changed)
+              (
+                entry: entry,
+                time: entry.time.toIso8601String().substring(11, 23),
+                parsed: parsedValues(entry.data, parsers),
+              ),
+        ].where((row) {
+          if (parsedOnly && row.parsed.isEmpty) {
+            return false;
+          }
+          if (search.isEmpty) {
+            return true;
+          }
+          final searchable = [
+            row.time,
+            '${row.entry.rssi} dBm',
+            ...describeAdvertisement(row.entry.data, parsers: parsers),
+          ].join('\n').toLowerCase();
+          return searchable.contains(search);
+        }).toList();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.only(top: 10),
+          child: Text(
+            '${rows.length} of ${tracker.history.length} recent advertisements',
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        ),
+        // Parsed values appear on every row; the full payload only on the newest and on changes.
+        for (final (index, row) in rows.take(AdvertisementCard.visibleEntries).indexed)
+          Padding(
+            padding: const EdgeInsets.only(top: 10),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '${row.time} · ${row.entry.rssi} dBm'
+                  '${row.entry.interval == null ? '' : ' · +${row.entry.interval!.inMilliseconds} ms'}',
+                  style: mono,
+                ),
+                Builder(
+                  builder: (context) {
+                    if (index == 0 || row.entry.changed) {
+                      final Color background;
+                      if (row.entry.changed) {
+                        background = Theme.of(context).colorScheme.tertiaryContainer;
+                      } else {
+                        background = Theme.of(context).colorScheme.surfaceContainerHigh;
+                      }
+                      return Container(
+                        width: double.infinity,
+                        margin: const EdgeInsets.only(top: 4),
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(8)),
+                        child: SelectableText(
+                          describeAdvertisement(row.entry.data, parsers: parsers).join('\n'),
+                          style: mono,
+                        ),
+                      );
+                    }
+                    return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        for (final value in row.parsed)
+                          Text('  ↳ $value', style: mono.copyWith(color: Theme.of(context).colorScheme.primary)),
+                      ],
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }

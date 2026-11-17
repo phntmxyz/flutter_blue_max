@@ -185,12 +185,11 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       setInputError(draft.offset, _offsetError(draft.offset.text));
       final record = _hexNumber(draft.record.text);
       final recordBits = _recordType.size * 8;
-      setInputError(
-        draft.record,
-        _records && (record == null || record < 0 || record >= 1 << recordBits)
-            ? 'Enter a $recordBits-bit hex type.'
-            : null,
-      );
+      String? recordError;
+      if (_records && (record == null || record < 0 || record >= 1 << recordBits)) {
+        recordError = 'Enter a $recordBits-bit hex type.';
+      }
+      setInputError(draft.record, recordError);
       final variable = draft.type.size == null;
       final length = int.tryParse(draft.length.text.trim());
       setInputError(draft.length, variable && (length == null || length < 1) ? 'Enter 1 or more.' : null);
@@ -319,45 +318,58 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               },
             ),
             const SizedBox(height: 16),
-            ReactiveTextField<String>(
-              key: ObjectKey(_key),
-              formControl: _key,
-              decoration: InputDecoration(
-                labelText: _source == AdvertisementSource.manufacturer ? 'Company ID (hex)' : 'Service UUID',
-                hintText: _source == AdvertisementSource.manufacturer ? '0xFFFF' : '180f',
-              ),
-              validationMessages: inputValidationMessages,
+            Builder(
+              builder: (context) {
+                if (_source == AdvertisementSource.manufacturer) {
+                  return ReactiveTextField<String>(
+                    key: ObjectKey(_key),
+                    formControl: _key,
+                    decoration: const InputDecoration(labelText: 'Company ID (hex)', hintText: '0xFFFF'),
+                    validationMessages: inputValidationMessages,
+                  );
+                }
+                return ReactiveTextField<String>(
+                  key: ObjectKey(_key),
+                  formControl: _key,
+                  decoration: const InputDecoration(labelText: 'Service UUID', hintText: '180f'),
+                  validationMessages: inputValidationMessages,
+                );
+              },
             ),
             const SizedBox(height: 16),
             Text('Sample from this device', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
-            if (sample == null)
-              Text(
-                'The latest advertisement has no payload for this source. '
-                'Offsets count from the first byte after the company ID.',
-                style: Theme.of(context).textTheme.bodySmall,
-              )
-            else
-              Wrap(
-                spacing: 4,
-                runSpacing: 4,
-                children: [
-                  for (final (offset, byte) in sample.indexed)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceContainerHigh,
-                        borderRadius: BorderRadius.circular(6),
+            Builder(
+              builder: (context) {
+                if (sample == null) {
+                  return Text(
+                    'The latest advertisement has no payload for this source. '
+                    'Offsets count from the first byte after the company ID.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  );
+                }
+                return Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  children: [
+                    for (final (offset, byte) in sample.indexed)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceContainerHigh,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Column(
+                          children: [
+                            Text('$offset', style: Theme.of(context).textTheme.labelSmall),
+                            Text(PayloadCodec.hex([byte]), style: mono),
+                          ],
+                        ),
                       ),
-                      child: Column(
-                        children: [
-                          Text('$offset', style: Theme.of(context).textTheme.labelSmall),
-                          Text(PayloadCodec.hex([byte]), style: mono),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
+                  ],
+                );
+              },
+            ),
             const SizedBox(height: 20),
             Text('Match', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
@@ -627,47 +639,56 @@ class const ParserFieldCard({
                     ),
                   ),
                 ],
-                if (variable)
-                  SizedBox(
-                    width: 96,
-                    child: ReactiveTextField<String>(
-                      key: ObjectKey(draft.length),
-                      formControl: draft.length,
-                      keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Bytes'),
-                      validationMessages: inputValidationMessages,
-                    ),
-                  )
-                else ...[
-                  SizedBox(
-                    width: 96,
-                    child: ReactiveTextField<String>(
-                      key: ObjectKey(draft.scale),
-                      formControl: draft.scale,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      decoration: const InputDecoration(labelText: 'Scale'),
-                      validationMessages: inputValidationMessages,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 96,
-                    child: ReactiveTextField<String>(
-                      key: ObjectKey(draft.add),
-                      formControl: draft.add,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                      decoration: const InputDecoration(labelText: 'Add'),
-                      validationMessages: inputValidationMessages,
-                    ),
-                  ),
-                  SizedBox(
-                    width: 96,
-                    child: ReactiveTextField<String>(
-                      key: ObjectKey(draft.unit),
-                      formControl: draft.unit,
-                      decoration: const InputDecoration(labelText: 'Unit', hintText: '°C'),
-                    ),
-                  ),
-                ],
+                Builder(
+                  builder: (context) {
+                    if (variable) {
+                      return SizedBox(
+                        width: 96,
+                        child: ReactiveTextField<String>(
+                          key: ObjectKey(draft.length),
+                          formControl: draft.length,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(labelText: 'Bytes'),
+                          validationMessages: inputValidationMessages,
+                        ),
+                      );
+                    }
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: 96,
+                          child: ReactiveTextField<String>(
+                            key: ObjectKey(draft.scale),
+                            formControl: draft.scale,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(labelText: 'Scale'),
+                            validationMessages: inputValidationMessages,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 96,
+                          child: ReactiveTextField<String>(
+                            key: ObjectKey(draft.add),
+                            formControl: draft.add,
+                            keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
+                            decoration: const InputDecoration(labelText: 'Add'),
+                            validationMessages: inputValidationMessages,
+                          ),
+                        ),
+                        SizedBox(
+                          width: 96,
+                          child: ReactiveTextField<String>(
+                            key: ObjectKey(draft.unit),
+                            formControl: draft.unit,
+                            decoration: const InputDecoration(labelText: 'Unit', hintText: '°C'),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ],
             ),
           ],

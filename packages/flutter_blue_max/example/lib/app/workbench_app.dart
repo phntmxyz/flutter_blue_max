@@ -213,9 +213,11 @@ class const AdapterBanner() extends StatelessWidget {
             // Only an off adapter needs the Android enable request.
             if (context.read<WorkbenchController>().adapter == BluetoothAdapterState.off)
               TextButton(
-                onPressed: context.read<WorkbenchController>().busy(Operation.adapter)
-                    ? null
-                    : context.read<WorkbenchController>().turnOn,
+                onPressed: (() {
+                  final controller = context.read<WorkbenchController>();
+                  if (controller.busy(Operation.adapter)) return null;
+                  return controller.turnOn;
+                })(),
                 child: const Text('Turn on Bluetooth'),
               ),
           ],

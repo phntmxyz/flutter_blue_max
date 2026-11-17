@@ -115,16 +115,14 @@ class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>
     }
   }
 
-  Map<String, dynamic> toJson() => {
-    'uuid': uuid.str128,
-    'name': name,
-    'properties': properties == null
-        ? null
-        : [
-            for (final property in GattProperty.values)
-              if (properties!.contains(property)) property.name,
-          ],
-  };
+  Map<String, dynamic> toJson() {
+    List<String>? propertyNames;
+    final expected = properties;
+    if (expected != null) {
+      propertyNames = GattProperty.values.where(expected.contains).map((p) => p.name).toList();
+    }
+    return {'uuid': uuid.str128, 'name': name, 'properties': propertyNames};
+  }
 
   /// True when nothing is expected or [reported] are exactly the expected properties.
   bool matches(CharacteristicProperties reported) {

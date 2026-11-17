@@ -417,9 +417,12 @@ class const AdvertisementField(
     }
     final scaled = value * scale + add;
     final integerType = type != AdvertisementFieldType.float32le && type != AdvertisementFieldType.float32be;
-    final text = integerType && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()
-        ? '${scaled.round()}'
-        : scaled.toStringAsFixed(_decimals);
+    final String text;
+    if (integerType && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()) {
+      text = '${scaled.round()}';
+    } else {
+      text = scaled.toStringAsFixed(_decimals);
+    }
     return unit.isEmpty ? text : '$text $unit';
   }
 

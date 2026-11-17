@@ -216,10 +216,13 @@ class const GattTitle({super.key, required final Widget title, final bool? expec
     return Row(
       children: [
         if (expected != null) ...[
-          Icon(
-            expected! ? Icons.check_circle_rounded : Icons.error_outline_rounded,
-            size: 16,
-            color: expected! ? colors.primary : colors.error,
+          Builder(
+            builder: (context) {
+              if (expected!) {
+                return Icon(Icons.check_circle_rounded, size: 16, color: colors.primary);
+              }
+              return Icon(Icons.error_outline_rounded, size: 16, color: colors.error);
+            },
           ),
           const SizedBox(width: 6),
         ],
