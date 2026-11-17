@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/gatt/gatt_catalog.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
+import 'package:provider/provider.dart';
 
 const _characteristicNoun = ('characteristic', 'characteristics');
 
@@ -13,6 +14,7 @@ const _characteristicNoun = ('characteristic', 'characteristics');
 class const CatalogPanel({super.key, required final WorkbenchController controller}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => c.catalog);
     final c = controller;
     return ListView(
       padding: const EdgeInsets.all(24),

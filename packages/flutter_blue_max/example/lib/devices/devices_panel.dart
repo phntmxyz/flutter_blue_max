@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
 import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
+import 'package:provider/provider.dart';
 
 /// Adapts discovery and inspection from a two-pane desktop layout to a phone.
 class const DevicesPanel({super.key, required final WorkbenchController controller, final bool active = true})
@@ -28,6 +29,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => c.deviceState);
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 850;

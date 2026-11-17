@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
+import 'package:provider/provider.dart';
 
 /// The receiving role waits for peers; it does not open a channel to a selected device.
 class const L2capServerPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
@@ -15,6 +16,7 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => c.serverState);
     final c = widget.controller;
     final incoming = c.channelSessions.where((session) => session.incoming).toList();
     final connectedCount = incoming.where((session) => !session.closed).length;

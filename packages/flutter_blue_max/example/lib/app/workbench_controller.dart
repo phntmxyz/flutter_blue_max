@@ -78,6 +78,45 @@ class WorkbenchController({
 
   List<String> get logs => List.unmodifiable(_logs);
 
+  /// Immutable snapshots for panel selectors. Copy mutable collections so a prior selection cannot change in place.
+  List<Object?> get deviceState => [
+    adapter,
+    localName,
+    List.of(scanResults),
+    List.of(systemDevices),
+    connectingDevice,
+    selected,
+    connected,
+    scanning,
+    tracking,
+    advertisementTracker?.count,
+    query,
+    rssi,
+    mtu,
+    Map.of(_services),
+    List.of(_parsers),
+    List.of(_catalog),
+    _busy.where((o) => o != Operation.server && !_incomingOperation(o)).toList(),
+    _channelState(incoming: false),
+  ];
+
+  /// The server does not observe discovery, RSSI, GATT or activity changes.
+  List<Object?> get serverState => [
+    adapter,
+    serverPsm,
+    _busy.where((o) => o == Operation.server || _incomingOperation(o)).toList(),
+    _channelState(incoming: true),
+  ];
+
+  bool _incomingOperation(Operation operation) =>
+      _channels.values.any((s) => s.incoming && operation == Operation.channel(s));
+
+  List<Object?> _channelState({required bool incoming}) => [
+    for (final s in _channels.values)
+      if (s.incoming == incoming)
+        [s.channel, s.closed, s.transmitted, s.received, List.of(s.lastReceived), List.of(s.history)],
+  ];
+
   /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
   List<AdvertisementParser> get parsers => List.unmodifiable(_parsers);
   List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>

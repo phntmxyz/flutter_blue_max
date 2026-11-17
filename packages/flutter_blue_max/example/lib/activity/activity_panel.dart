@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:provider/provider.dart';
 
 /// Searchable session output includes native diagnostics and payload previews.
 class const ActivityPanel({super.key, required final WorkbenchController controller}) extends StatefulWidget {
@@ -13,6 +14,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => c.logs);
     final lines = widget.controller.logs.reversed
         .where((line) => line.toLowerCase().contains(_query.toLowerCase()))
         .toList();

@@ -7,11 +7,13 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
+import 'package:provider/provider.dart';
 
 /// Manages every saved parser, including those bound to devices that are not nearby.
 class const ParsersPanel({super.key, required final WorkbenchController controller}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) => c.parsers);
     final c = controller;
     return ListView(
       padding: const EdgeInsets.all(24),
