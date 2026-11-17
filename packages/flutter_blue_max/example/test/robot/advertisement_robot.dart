@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -78,6 +79,7 @@ extension AdvertisementRobot on WorkbenchRobot {
     await _enter('Parser name', 'Climate');
     await _enter('Bytes (hex)', '10');
     await _enter('Field name', 'Temperature');
+    spot<ParserFieldCard>().existsOnce();
     await _enter('Offset', '1');
     await tapLabel('uint8');
     await tapLabel('int16 BE');

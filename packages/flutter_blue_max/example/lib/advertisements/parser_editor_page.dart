@@ -45,7 +45,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
   final _match = TextEditingController();
   final _matchOffset = TextEditingController(text: '0');
   final _recordOffset = TextEditingController(text: '0');
-  final _fields = <_FieldDraft>[];
+  final _fields = <ParserFieldDraft>[];
   AdvertisementSource _source = AdvertisementSource.manufacturer;
   bool _records = false;
   RecordTypeFormat _recordType = RecordTypeFormat.uint8;
@@ -77,7 +77,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       _deviceOnly = initial.device != null;
       for (final field in initial.fields) {
         _fields.add(
-          _FieldDraft()
+          ParserFieldDraft()
             ..name.text = field.name
             ..offset.text = '${field.offset}'
             ..length.text = '${field.length}'
@@ -100,7 +100,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       _source = AdvertisementSource.service;
       _key.text = data.serviceData.keys.first.str;
     }
-    _fields.add(_FieldDraft());
+    _fields.add(ParserFieldDraft());
   }
 
   @override
@@ -183,9 +183,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
     }
   }
 
-  String? _offsetError(String? value) {
-    final offset = int.tryParse(value?.trim() ?? '');
-    return offset == null || offset < 0 ? 'Enter 0 or more.' : null;
+  void _removeField(ParserFieldDraft draft) {
+    setState(() => _fields.remove(draft));
+    WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
   }
 
   @override
@@ -387,10 +387,20 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               ),
             const SizedBox(height: 12),
             Text('Fields', style: Theme.of(context).textTheme.titleSmall),
-            for (final draft in _fields) ...[const SizedBox(height: 12), _fieldCard(draft)],
+            for (final draft in _fields) ...[
+              const SizedBox(height: 12),
+              ParserFieldCard(
+                key: ObjectKey(draft),
+                draft: draft,
+                records: _records,
+                recordType: _recordType,
+                onRemove: _fields.length > 1 ? () => _removeField(draft) : null,
+                onTypeChanged: (type) => setState(() => draft.type = type),
+              ),
+            ],
             const SizedBox(height: 12),
             OutlinedButton.icon(
-              onPressed: () => setState(() => _fields.add(_FieldDraft())),
+              onPressed: () => setState(() => _fields.add(ParserFieldDraft())),
               icon: const Icon(Icons.add),
               label: const Text('Add field'),
             ),
@@ -411,8 +421,50 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       ),
     );
   }
+}
 
-  Widget _fieldCard(_FieldDraft draft) {
+/// Form state of one field; controllers keep partially typed numbers intact.
+class ParserFieldDraft() {
+  final name = TextEditingController();
+  final offset = TextEditingController(text: '0');
+  final length = TextEditingController(text: '1');
+  final scale = TextEditingController(text: '1');
+  final add = TextEditingController(text: '0');
+  final unit = TextEditingController();
+  final record = TextEditingController();
+  final bit = TextEditingController(text: '0');
+  final bits = TextEditingController();
+  AdvertisementFieldType type = AdvertisementFieldType.uint8;
+
+  void dispose() {
+    for (final controller in [name, offset, length, scale, add, unit, record, bit, bits]) {
+      controller.dispose();
+    }
+  }
+}
+
+String _companyText(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
+
+String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
+
+int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
+
+String? _offsetError(String? value) {
+  final offset = int.tryParse(value?.trim() ?? '');
+  return offset == null || offset < 0 ? 'Enter 0 or more.' : null;
+}
+
+/// One keyed field card within ParserEditorPage; its page owns the draft controllers.
+class const ParserFieldCard({
+  super.key,
+  required final ParserFieldDraft draft,
+  required final bool records,
+  required final RecordTypeFormat recordType,
+  required final VoidCallback? onRemove,
+  required final ValueChanged<AdvertisementFieldType> onTypeChanged,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
     final variable = draft.type.size == null;
     return Card(
       child: Padding(
@@ -428,18 +480,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                     validator: (value) => (value ?? '').trim().isEmpty ? 'Enter a name.' : null,
                   ),
                 ),
-                IconButton(
-                  tooltip: 'Remove field',
-                  onPressed: _fields.length > 1
-                      ? () {
-                          return setState(() {
-                            _fields.remove(draft);
-                            draft.dispose();
-                          });
-                        }
-                      : null,
-                  icon: const Icon(Icons.delete_outline),
-                ),
+                IconButton(tooltip: 'Remove field', onPressed: onRemove, icon: const Icon(Icons.delete_outline)),
               ],
             ),
             const SizedBox(height: 12),
@@ -447,7 +488,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               spacing: 12,
               runSpacing: 12,
               children: [
-                if (_records)
+                if (records)
                   SizedBox(
                     width: 140,
                     child: TextFormField(
@@ -455,7 +496,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       decoration: const InputDecoration(labelText: 'Record type (hex)', hintText: '02'),
                       validator: (value) {
                         final record = _hexNumber(value ?? '');
-                        final bits = _recordType.size * 8;
+                        final bits = recordType.size * 8;
                         return record == null || record < 0 || record >= 1 << bits
                             ? 'Enter a $bits-bit hex type.'
                             : null;
@@ -463,11 +504,11 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                     ),
                   ),
                 SizedBox(
-                  width: _records ? 140 : 96,
+                  width: records ? 140 : 96,
                   child: TextFormField(
                     controller: draft.offset,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: _records ? 'Offset in value' : 'Offset'),
+                    decoration: InputDecoration(labelText: records ? 'Offset in value' : 'Offset'),
                     validator: _offsetError,
                   ),
                 ),
@@ -481,7 +522,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       for (final type in AdvertisementFieldType.values)
                         DropdownMenuItem(value: type, child: Text(type.label)),
                     ],
-                    onChanged: (value) => setState(() => draft.type = value!),
+                    onChanged: (value) {
+                      if (value != null) onTypeChanged(value);
+                    },
                   ),
                 ),
                 if (draft.type.unsigned) ...[
@@ -572,29 +615,3 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
     );
   }
 }
-
-/// Form state of one field; controllers keep partially typed numbers intact.
-class _FieldDraft() {
-  final name = TextEditingController();
-  final offset = TextEditingController(text: '0');
-  final length = TextEditingController(text: '1');
-  final scale = TextEditingController(text: '1');
-  final add = TextEditingController(text: '0');
-  final unit = TextEditingController();
-  final record = TextEditingController();
-  final bit = TextEditingController(text: '0');
-  final bits = TextEditingController();
-  AdvertisementFieldType type = AdvertisementFieldType.uint8;
-
-  void dispose() {
-    for (final controller in [name, offset, length, scale, add, unit, record, bit, bits]) {
-      controller.dispose();
-    }
-  }
-}
-
-String _companyText(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
-
-String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
-
-int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
