@@ -25,7 +25,11 @@ class WorkbenchController({
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _watched = <DeviceIdentifier>{};
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
+  // Native callbacks still identify channels by peer and PSM.
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
+  final _channelSessions = <(DeviceIdentifier, int, bool), ChannelSession>{};
+  StreamSubscription<L2CapChannelConnected>? _acceptSubscription;
+  Future<void>? _serverWork;
   final _busy = <Operation>{};
 
   /// Characteristics subscribed on web per peer, where no CCCD event reports it; cleared when the link drops.
@@ -100,10 +104,10 @@ class WorkbenchController({
   ];
 
   bool _incomingOperation(Operation operation) =>
-      _channels.values.any((s) => s.incoming && operation == Operation.channel(s));
+      _channelSessions.values.any((s) => s.incoming && operation == Operation.channel(s));
 
   List<Object?> _channelState({required bool incoming}) => [
-    for (final s in _channels.values)
+    for (final s in _channelSessions.values)
       if (s.incoming == incoming)
         [s.channel, s.closed, s.transmitted, s.received, List.of(s.lastReceived), List.of(s.history)],
   ];
@@ -123,7 +127,7 @@ class WorkbenchController({
   List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((s) => !s.closed));
 
   /// Closed channels keep their diagnostics available until the device session resets.
-  List<ChannelSession> get channelSessions => List.unmodifiable(_channels.values);
+  List<ChannelSession> get channelSessions => List.unmodifiable(_channelSessions.values);
   List<BluetoothService> get services => _services[selected?.remoteId] ?? [];
   List<BluetoothDevice> get connectedDevices => FlutterBlueMax.connectedDevices;
   ScanResult? get selectedAdvertisement => scanResults.where((r) => r.device == selected).firstOrNull;
@@ -213,17 +217,15 @@ class WorkbenchController({
         _update();
       }),
     );
-    _subscriptions.add(
-      FlutterBlueMax.onL2capConnected.listen((event) {
-        if (event.psm == serverPsm || _startingServer) {
-          final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
-          _trackChannel(channel, incoming: true);
-          log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
-        } else {
-          unawaited(_closeUnownedChannel(BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm)));
-        }
-      }),
-    );
+    _acceptSubscription = FlutterBlueMax.onL2capConnected.listen((event) {
+      final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
+      if (event.psm == serverPsm || _startingServer) {
+        _trackChannel(channel, incoming: true);
+        log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
+      } else {
+        unawaited(_closeUnownedChannel(channel));
+      }
+    });
     _subscriptions.add(
       FlutterBlueMax.onL2capReceived.listen((event) {
         final session = _channels[(event.remoteId, event.psm)];
@@ -502,7 +504,7 @@ class WorkbenchController({
     await selected!.requestMtu(value);
   });
 
-  Future<void> startServer({required bool secure}) => run(Operation.server, () async {
+  Future<void> startServer({required bool secure}) => _runServer(() async {
     if (!supportsL2cap) {
       throw const _Unsupported('L2CAP is not available on this platform.');
     }
@@ -519,11 +521,11 @@ class WorkbenchController({
     } finally {
       _startingServer = false;
     }
+    serverPsm = psm;
     if (_disposed || !ready) {
-      await FlutterBlueMax.stopL2capServer(psm);
+      await _stopServer(psm);
       return;
     }
-    serverPsm = psm;
     await Future.wait(
       channels.where((s) => s.incoming && s.channel.psm != psm).map((s) => _closeUnownedChannel(s.channel)),
     );
@@ -533,9 +535,13 @@ class WorkbenchController({
   Future<void> _closeUnownedChannel(BluetoothL2capChannel channel) async {
     try {
       await channel.close();
-      _channels[(channel.deviceId, channel.psm)]?.markClosed();
+      final session = _channels[(channel.deviceId, channel.psm)];
+      if (session != null && session.incoming) {
+        session.markClosed();
+      }
       _update();
     } catch (exception, stackTrace) {
+      developer.log('Closing late L2CAP accept', name: 'workbench', error: exception, stackTrace: stackTrace);
       if (_disposed) {
         return;
       }
@@ -543,15 +549,33 @@ class WorkbenchController({
       _trackChannel(channel, incoming: true);
       error = 'Closing late L2CAP accept: $exception';
       log('ERROR $error');
-      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     }
   }
 
-  Future<void> stopServer() => run(Operation.server, () async {
+  Future<void> stopServer() => _runServer(() async {
     final psm = serverPsm;
-    if (psm == null) {
+    if (psm != null) {
+      await _stopServer(psm);
+    }
+  });
+
+  Future<void> _runServer(Future<void> Function() action) async {
+    if (_disposed || busy(Operation.server)) {
       return;
     }
+    final done = Completer<void>();
+    _serverWork = done.future;
+    try {
+      await run(Operation.server, action);
+    } finally {
+      if (identical(_serverWork, done.future)) {
+        _serverWork = null;
+      }
+      done.complete();
+    }
+  }
+
+  Future<void> _stopServer(int psm) async {
     await FlutterBlueMax.stopL2capServer(psm);
     serverPsm = null;
     // Unpublishing on Apple stops accepting peers but leaves accepted streams open.
@@ -563,7 +587,7 @@ class WorkbenchController({
         s.markClosed();
       }),
     );
-  });
+  }
 
   /// Binds an outgoing channel to the inspected peer, never to later device selection.
   Future<void> openChannel(int psm, {required BluetoothDevice device, required bool secure}) =>
@@ -583,13 +607,14 @@ class WorkbenchController({
             // A secure handshake can drop the link transiently; a disconnect the
             // user requested meanwhile must not be undone by the retry.
             final userDisconnected = (_disconnectRequests[device.remoteId] ?? 0) != disconnects;
-            if (_disposed || !ready || userDisconnected || _isUnsupported(error)) {
+            if (_disposed || !ready || userDisconnected || device.isConnected || _isUnsupported(error)) {
               Error.throwWithStackTrace(error, stackTrace);
             }
             log('L2CAP open failed; retrying once: $error');
             developer.log('L2CAP open failed; retrying', name: 'workbench', error: error, stackTrace: stackTrace);
-            if (!device.isConnected) {
-              await device.connect(mtu: null);
+            await device.connect(mtu: null);
+            if (_disposed || !ready || (_disconnectRequests[device.remoteId] ?? 0) != disconnects) {
+              Error.throwWithStackTrace(error, stackTrace);
             }
             return await device.openL2CapChannel(psm, secure: secure).orUnsupported();
           }
@@ -663,11 +688,16 @@ class WorkbenchController({
   }
 
   void _trackChannel(BluetoothL2capChannel channel, {required bool incoming}) {
-    final session = _channels.putIfAbsent((
+    final nativeKey = (channel.deviceId, channel.psm);
+    final session = _channelSessions.putIfAbsent((
       channel.deviceId,
       channel.psm,
+      incoming,
     ), () => ChannelSession(channel, incoming: incoming));
-    session.reopen(channel, incoming: incoming);
+    // The plugin can route only one active session for a peer and PSM.
+    _channels[nativeKey]?.markClosed();
+    _channels[nativeKey] = session;
+    session.reopen(channel);
   }
 
   /// Reports errors once and prevents duplicate submissions of the same action.
@@ -755,19 +785,38 @@ class WorkbenchController({
   }
 
   Future<void> _shutdown() async {
-    final psm = serverPsm;
+    await _cleanup(() async {
+      try {
+        // Keep the accept subscription alive through an in-flight start or stop
+        // and through unpublishing. Apple leaves accepted channels open.
+        await _serverWork;
+        final psm = serverPsm;
+        if (psm != null) {
+          await _stopServer(psm);
+        }
+      } finally {
+        await _acceptSubscription?.cancel();
+      }
+    });
     final cleanup = <Future<void> Function()>[
       if (scanning) FlutterBlueMax.stopScan,
-      for (final session in channels) session.channel.close,
-      if (psm != null) () => FlutterBlueMax.stopL2capServer(psm),
+      for (final session in channels)
+        () async {
+          await session.channel.close();
+          session.markClosed();
+        },
       for (final id in _watched) () => BluetoothDevice(remoteId: id).disconnect(),
     ];
     for (final action in cleanup) {
-      try {
-        await action();
-      } catch (exception, stackTrace) {
-        developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
-      }
+      await _cleanup(action);
+    }
+  }
+
+  Future<void> _cleanup(Future<void> Function() action) async {
+    try {
+      await action();
+    } catch (exception, stackTrace) {
+      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     }
   }
 }

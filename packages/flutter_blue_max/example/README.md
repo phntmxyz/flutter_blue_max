@@ -71,7 +71,9 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
   **Local server** accepts incoming channels and displays its assigned PSM.
   Peer discovery and PSM exchange must be provided separately; starting this server does not advertise a GATT peripheral.
   Channels have separate hex/UTF-8 editors, TX/RX counters, buffered reads, test traffic and a history of the latest 200 receive entries.
-  Closing a channel retains its diagnostics until the device session resets; received chunks are not application message boundaries.
+  Diagnostics survive closure and reopen for the same peer, PSM and direction until the workbench closes.
+  Incoming and outgoing diagnostics stay in their respective panels.
+  Receive entries show chunks of bytes from the channel stream or buffer, which may split or combine application messages.
 - **Activity:** search, copy or clear the latest 500 log entries, including the original errors when an operation fails.
 
 The layout adapts to phones and desktops, supports light/dark themes and keeps Bluetooth sessions across workspace navigation.

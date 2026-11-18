@@ -2,11 +2,9 @@ import 'package:clock/clock.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 /// UI state for one L2CAP channel, retained by the workbench controller.
-/// Reopening the same remote peer and PSM reuses this session, so byte totals
-/// and [history] accumulate across reconnects until the workbench is disposed.
-class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
-  BluetoothL2capChannel _channel = channel;
-  bool _incoming = incoming;
+/// Reopening the same remote peer, PSM and direction reuses this session, so
+/// byte totals and [history] accumulate until the workbench is disposed.
+class ChannelSession(var BluetoothL2capChannel _channel, {required final bool incoming}) {
   bool _closed = false;
   int _transmitted = 0;
   int _received = 0;
@@ -15,7 +13,6 @@ class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
   static const maxHistoryEntries = 200;
 
   BluetoothL2capChannel get channel => _channel;
-  bool get incoming => _incoming;
 
   /// Retained after closure so the UI can still inspect receipts and totals.
   bool get closed => _closed;
@@ -31,9 +28,8 @@ class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
   void markClosed() => _closed = true;
 
   /// Replaces the native handle without losing diagnostics from earlier openings.
-  void reopen(BluetoothL2capChannel channel, {required bool incoming}) {
+  void reopen(BluetoothL2capChannel channel) {
     _channel = channel;
-    _incoming = incoming;
     _closed = false;
   }
 
@@ -61,7 +57,7 @@ class ChannelSession(BluetoothL2capChannel channel, {required bool incoming}) {
     }
   }
 
-  (DeviceIdentifier, int) get key => (channel.deviceId, channel.psm);
+  (DeviceIdentifier, int, bool) get key => (channel.deviceId, channel.psm, incoming);
 }
 
 /// A timestamped payload displayed in a channel card's receive history.

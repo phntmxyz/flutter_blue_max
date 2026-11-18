@@ -539,6 +539,58 @@ void main() {
     expect(controller.channels.single.channel.deviceId, const DeviceIdentifier('early'));
   });
 
+  test('a failed listener start closes provisional accepts and permits a new start', () async {
+    final (:controller, :platform) = await _setup();
+    final pending = Completer<int>();
+    platform.pendingServer = pending;
+    final starting = controller.startServer(secure: true);
+    await _until(() => platform.listenRequests.isNotEmpty);
+
+    const remoteId = DeviceIdentifier('provisional');
+    platform.accepted.add(L2CapChannelConnected(remoteId: remoteId, psm: 135));
+    final provisional = controller.channels.single;
+    pending.completeError(StateError('Publishing failed'));
+    await starting;
+
+    expect(controller.serverPsm, isNull);
+    expect(controller.error, contains('Publishing failed'));
+    expect(provisional.closed, isTrue);
+    expect(platform.closeRequests.single.remoteId, remoteId.str);
+    expect(platform.closeRequests.single.psm, 135);
+
+    platform.pendingServer = null;
+    await controller.startServer(secure: true);
+    expect(controller.serverPsm, 129);
+    expect(controller.channels, isEmpty);
+    expect(controller.error, isNull);
+  });
+
+  test('disposal closes a peer accepted while the listener is stopping', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    await controller.startServer(secure: true);
+    final stopping = Completer<void>();
+    final finishStop = Completer<void>();
+    platform.overrideStopL2capServer = (request) async {
+      expect(request.psm, 129);
+      stopping.complete();
+      await finishStop.future;
+    };
+
+    controller.dispose();
+    try {
+      await stopping.future;
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('during-stop'), psm: 129));
+      expect(platform.closeRequests, isEmpty);
+    } finally {
+      finishStop.complete();
+    }
+    await _until(() => platform.closeRequests.isNotEmpty);
+    expect(platform.closeRequests.single.remoteId, 'during-stop');
+    expect(platform.closeRequests.single.psm, 129);
+    expect(controller.channels, isEmpty);
+    expect(controller.serverPsm, isNull);
+  });
+
   test('disposal stops the scan, closes channels, stops the server and disconnects peers', () async {
     final (:controller, :platform) = await _setup(dispose: false);
     final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:07');
@@ -717,6 +769,24 @@ void main() {
       expect(platform.connectRequests.length, connections + 1);
       expect(c.channels.single.channel.deviceId, peer.remoteId);
       expect(peer.isConnected, isTrue);
+    });
+
+    test('a rejected channel open does not retry while the peer remains connected', () async {
+      final (:controller, :platform) = await _setup();
+      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:53');
+      controller.select(peer);
+      await controller.connect();
+      platform.overrideOpenL2CapChannel = (request) {
+        platform.openRequests.add(request);
+        return Future<void>.error(StateError('Peer rejected the channel'));
+      };
+
+      await controller.openChannel(131, device: peer, secure: true);
+
+      expect(platform.openRequests, hasLength(1));
+      expect(peer.isConnected, isTrue);
+      expect(controller.channels, isEmpty);
+      expect(controller.error, contains('Peer rejected the channel'));
     });
 
     test('channel open does not reconnect a peer the user disconnected while opening', () async {
@@ -918,6 +988,38 @@ void main() {
         expect(c.channelSessions.single.history, hasLength(3));
       });
     }
+
+    test('opposite channel directions retain independent diagnostics for the same peer and PSM', () async {
+      final (:controller, :platform) = await _setup();
+      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:56');
+      controller.select(peer);
+      await controller.connect();
+      await controller.startServer(secure: true);
+
+      await controller.openChannel(129, device: peer, secure: true);
+      final outgoing = controller.channels.single;
+      platform.received.add(L2CapChannelData(remoteId: peer.remoteId, psm: 129, value: [1, 2]));
+      await controller.send(outgoing, [3]);
+      await controller.closeChannel(outgoing);
+
+      platform.accepted.add(L2CapChannelConnected(remoteId: peer.remoteId, psm: 129));
+      final incoming = controller.channels.single;
+      platform.received.add(L2CapChannelData(remoteId: peer.remoteId, psm: 129, value: [4]));
+      await controller.closeChannel(incoming);
+
+      await controller.openChannel(129, device: peer, secure: true);
+      expect(controller.channels, [outgoing]);
+      expect(controller.channelSessions, [outgoing, incoming]);
+      expect(outgoing.incoming, isFalse);
+      expect(outgoing.received, 2);
+      expect(outgoing.transmitted, 1);
+      expect(outgoing.history.single.bytes, [1, 2]);
+      expect(incoming.incoming, isTrue);
+      expect(incoming.closed, isTrue);
+      expect(incoming.received, 1);
+      expect(incoming.transmitted, 0);
+      expect(incoming.history.single.bytes, [4]);
+    });
 
     test('outgoing channels reopen after closing and retain the original 200-entry history', () async {
       final fixture = await _setup();
