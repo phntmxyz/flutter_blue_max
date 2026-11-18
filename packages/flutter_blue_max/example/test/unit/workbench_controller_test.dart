@@ -24,6 +24,98 @@ final _platform = FakeBluetoothPlatform();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  test('a new workbench starts with no discoveries after scanning stops', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    await controller.scan();
+    platform.advertise();
+    await _until(() => controller.scanResults.isNotEmpty);
+    await controller.scan();
+    controller.dispose();
+
+    final next = WorkbenchController();
+    addTearDown(next.dispose);
+    await next.start();
+    expect(next.scanResults, isEmpty);
+  });
+
+  test('the device snapshot changes when an unselected peer disconnects', () async {
+    final (:controller, :platform) = await _setup();
+    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:45');
+    controller.select(peer);
+    await controller.connect();
+    await _until(() => controller.rssi != null);
+    controller.select(BluetoothDevice.fromId('AA:BB:CC:DD:EE:46'));
+    final before = controller.deviceState;
+
+    await platform.disconnect(BmDisconnectRequest(remoteId: peer.remoteId));
+    await _until(() => !controller.connectedDevices.contains(peer));
+
+    expect(controller.deviceState, isNot(equals(before)));
+  });
+
+  test('link loss clears measurements before a reconnect with no new RSSI', () async {
+    final (:controller, :platform) = await _setup();
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:47');
+    controller.select(device);
+    await controller.connect();
+    await _until(() => controller.rssi == -47);
+    expect(controller.mtu, isNotNull);
+
+    await controller.disconnect();
+    await _until(() => controller.rssi == null);
+    expect(controller.mtu, isNull);
+
+    platform.overrideReadRssi = (_) => Future<bool>.error(StateError('No new sample'));
+    await controller.connect();
+    await _until(() => controller.logs.any((line) => line.contains('No new sample')));
+    expect(controller.rssi, isNull);
+  });
+
+  test('a service reset retires pending discovery and a new discovery yields a read-only list', () async {
+    final (:controller, :platform) = await _setup();
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:48');
+    controller.select(device);
+    await controller.connect();
+    final requested = Completer<BmDiscoverServicesRequest>();
+    final release = Completer<bool>();
+    platform.overrideDiscoverServices = (request) {
+      requested.complete(request);
+      return release.future;
+    };
+
+    final discovery = controller.discover();
+    final request = await requested.future;
+    platform.serviceResets.add(BmBluetoothDevice(remoteId: device.remoteId, platformName: ''));
+    await _until(() => controller.logs.any((line) => line.contains('Services changed')));
+    platform.overrideDiscoverServices = null;
+    await platform.discoverServices(request);
+    release.complete(true);
+    await discovery;
+    expect(controller.services, isEmpty);
+
+    await controller.discover();
+    expect(controller.services, hasLength(1));
+    expect(controller.services.clear, throwsUnsupportedError);
+  });
+
+  test('Linux workbench declines per-peer tracking and leaves MTU unavailable', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.linux;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    final (:controller, :platform) = await _setup();
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:44');
+    controller.select(device);
+    await controller.connect();
+    await _until(() => controller.rssi != null);
+
+    await controller.trackAdvertisements(device);
+
+    expect(controller.supportsMtu, isFalse);
+    expect(controller.mtu, isNull);
+    expect(platform.scanStarts, 0);
+    expect(controller.advertisementTracker, isNull);
+    expect(controller.error, contains('not supported'));
+  });
+
   test('dispose does not start tracking after a slow scan stop', () async {
     final (:controller, :platform) = await _setup(dispose: false);
     await controller.scan();

@@ -29,8 +29,6 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   void initState() {
     super.initState();
     if (kIsWeb) {
-      // Web Bluetooth reports no CCCD writes, so the cached descriptor value would only reset the flag.
-      _notifying = context.read<WorkbenchController>().subscribedOnWeb(widget.characteristic);
       return;
     }
     _notifying = widget.characteristic.isNotifying;
@@ -66,12 +64,12 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final c = widget.characteristic;
     final controller = context.read<WorkbenchController>();
     await controller.run(Operation.characteristic(c), () async {
-      final notify = !_notifying;
+      final notify = !(kIsWeb ? controller.subscribedOnWeb(c) : _notifying);
+      final generation = controller.connectionGeneration(c.device);
       await c.setNotifyValue(notify);
       // Web Bluetooth does not publish a CCCD event, so keep its subscription in the session.
       if (kIsWeb) {
-        controller.setSubscribedOnWeb(c, subscribed: notify);
-        if (mounted) setState(() => _notifying = notify);
+        controller.setSubscribedOnWeb(c, subscribed: notify, generation: generation);
       }
       if (c.properties.read) await c.read();
     });
@@ -82,7 +80,11 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final c = widget.characteristic;
     final p = c.properties;
     final operation = Operation.characteristic(c);
-    final enabled = !context.read<WorkbenchController>().busy(operation) && c.device.isConnected;
+    final enabled =
+        !context.select<WorkbenchController, bool>((controller) => controller.busy(operation)) && c.device.isConnected;
+    final notifying = kIsWeb
+        ? context.select<WorkbenchController, bool>((controller) => controller.subscribedOnWeb(c))
+        : _notifying;
     final service = context.read<WorkbenchController>().knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
     final isTestEntry = service?.test ?? false;
@@ -174,7 +176,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       label: const Text('Write'),
                     ),
                   if (p.notify || p.indicate)
-                    SubscribeButton(notifying: _notifying, onPressed: enabled ? _toggleNotifications : null),
+                    SubscribeButton(notifying: notifying, onPressed: enabled ? _toggleNotifications : null),
                 ],
               ),
               if (_writing) ...[

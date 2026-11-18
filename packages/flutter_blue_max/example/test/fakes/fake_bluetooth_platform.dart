@@ -8,6 +8,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final connections = StreamController<BmConnectionStateResponse>.broadcast(sync: true);
   final advertisements = StreamController<BmScanResponse>.broadcast(sync: true);
   final discoveries = StreamController<BmDiscoverServicesResult>.broadcast(sync: true);
+  final serviceResets = StreamController<BmBluetoothDevice>.broadcast(sync: true);
   final characteristicValues = StreamController<BmCharacteristicData>.broadcast(sync: true);
   final characteristicWritten = StreamController<BmCharacteristicData>.broadcast(sync: true);
   final characteristicWrites = <BmWriteCharacteristicRequest>[];
@@ -288,6 +289,8 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   Stream<BmScanResponse> get onScanResponse => advertisements.stream;
   @override
   Stream<BmDiscoverServicesResult> get onDiscoveredServices => discoveries.stream;
+  @override
+  Stream<BmBluetoothDevice> get onServicesReset => serviceResets.stream;
   @override
   Stream<BmCharacteristicData> get onCharacteristicReceived => characteristicValues.stream;
   @override

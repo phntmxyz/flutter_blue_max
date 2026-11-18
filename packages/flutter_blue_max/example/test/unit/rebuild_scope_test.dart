@@ -67,6 +67,12 @@ void main() {
     for (final type in panels) {
       expect(builds[type] ?? 0, type == DevicesPanel ? greaterThan(0) : 0, reason: '$type scan rebuild count');
     }
+    // A new sample for the same peer should update its visible name and RSSI.
+    spotText('Test peripheral', exact: true).existsOnce();
+    platform.advertise(name: 'Updated peripheral', rssi: -63);
+    await tester.pump();
+    spotText('Updated peripheral', exact: true).existsOnce();
+
     await robot.tapLabel('Stop scan');
     builds.clear();
     await robot.controller.startServer(secure: true);

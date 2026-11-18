@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
@@ -87,7 +89,8 @@ extension DiagnosticsRobot on WorkbenchRobot {
 
   Future<void> requestMtuAndCreateBond() async {
     final device = FakeAndroidDevice(remoteId: controller.selected!.remoteId);
-    controller.selected = device;
+    controller.select(device);
+    await idle();
     logEvent('Reject MTU values outside 23–517 and input that is no number');
     await tapLabel('Request MTU');
     final field = spot<Dialog>().spot<TextField>()..existsOnce();
@@ -105,7 +108,13 @@ extension DiagnosticsRobot on WorkbenchRobot {
       logEvent('Request boundary MTU $mtu');
       await tapLabel('Request MTU');
       await act.enterText(field, '$mtu');
+      if (mtu == 23) {
+        tester.view.physicalSize = const Size(390, 844);
+        await idle();
+      }
       await tapInDialog('Request');
+      tester.view.physicalSize = const Size(1200, 850);
+      await idle();
       spot<Dialog>().doesNotExist();
       expect(device.mtuRequests.last, mtu);
     }
@@ -122,10 +131,23 @@ extension DiagnosticsRobot on WorkbenchRobot {
     }
 
     await openBatteryLevel();
-    await tapLabel('Subscribe');
-    logEvent('Collapse and reopen the service, which rebuilds the characteristic tile');
-    await tapLabel('180F');
-    await openBatteryLevel();
+    final pending = Completer<bool>();
+    platform.overrideSetNotifyValue = (request) {
+      platform.notifyRequests.add(request);
+      return pending.future;
+    };
+    try {
+      await tapLabel('Subscribe');
+      expect(platform.notifyRequests.single.enable, isTrue);
+      logEvent('Reopen the characteristic row before the browser confirms the subscription');
+      await tapLabel('180F');
+      await openBatteryLevel();
+      spotText('Subscribe', exact: true).existsOnce();
+    } finally {
+      platform.overrideSetNotifyValue = null;
+      pending.complete(false);
+      await idle();
+    }
     spotText('Unsubscribe', exact: true).existsOnce();
     logEvent('Select another device and come back');
     await selectPeripheral(name: 'Other peripheral');

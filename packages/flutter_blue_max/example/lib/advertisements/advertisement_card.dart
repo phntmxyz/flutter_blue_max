@@ -68,62 +68,64 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
               describeAdvertisement(advertisement.advertisementData, parsers: parsers).join('\n'),
               style: mono,
             ),
-          const Divider(height: 32),
-          Text('Parsers', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            'Parsers for the payloads of this device. Manage all parsers in the Library tab.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          for (final parser in relevant)
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(parser.name),
-              subtitle: Text(parser.summary),
-              trailing: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  IconButton(
-                    tooltip: 'Edit parser',
-                    onPressed: () => _editParser(previous: parser),
-                    icon: const Icon(Icons.edit_outlined),
-                  ),
-                  IconButton(
-                    tooltip: 'Remove parser',
-                    onPressed: () => c.removeParser(parser),
-                    icon: const Icon(Icons.delete_outline),
-                  ),
-                ],
-              ),
+          if (c.supportsAdvertisementTracking) ...[
+            const Divider(height: 32),
+            Text('Parsers', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Parsers for the payloads of this device. Manage all parsers in the Library tab.',
+              style: Theme.of(context).textTheme.bodySmall,
             ),
-          const SizedBox(height: 8),
-          OutlinedButton.icon(onPressed: _editParser, icon: const Icon(Icons.add), label: const Text('Add parser')),
-          const Divider(height: 32),
-          Text('Tracker', style: Theme.of(context).textTheme.titleSmall),
-          const SizedBox(height: 4),
-          Text(
-            'Scans for this device only, including repeated advertisements. Connecting stops the scan.',
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          const SizedBox(height: 14),
-          Builder(
-            builder: (context) {
-              final enabled = c.ready && !c.busy(Operation.scan);
-              if (tracking) {
-                return FilledButton.icon(
-                  onPressed: enabled ? c.stopTracking : null,
-                  icon: const Icon(Icons.stop_rounded),
-                  label: const Text('Stop tracking'),
+            for (final parser in relevant)
+              ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text(parser.name),
+                subtitle: Text(parser.summary),
+                trailing: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    IconButton(
+                      tooltip: 'Edit parser',
+                      onPressed: () => _editParser(previous: parser),
+                      icon: const Icon(Icons.edit_outlined),
+                    ),
+                    IconButton(
+                      tooltip: 'Remove parser',
+                      onPressed: () => c.removeParser(parser),
+                      icon: const Icon(Icons.delete_outline),
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            OutlinedButton.icon(onPressed: _editParser, icon: const Icon(Icons.add), label: const Text('Add parser')),
+            const Divider(height: 32),
+            Text('Tracker', style: Theme.of(context).textTheme.titleSmall),
+            const SizedBox(height: 4),
+            Text(
+              'Scans for this device only, including repeated advertisements. Connecting stops the scan.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 14),
+            Builder(
+              builder: (context) {
+                final enabled = c.ready && !c.busy(Operation.scan);
+                if (tracking) {
+                  return FilledButton.icon(
+                    onPressed: enabled ? c.stopTracking : null,
+                    icon: const Icon(Icons.stop_rounded),
+                    label: const Text('Stop tracking'),
+                  );
+                }
+                return OutlinedButton.icon(
+                  onPressed: enabled ? () => c.trackAdvertisements(device) : null,
+                  icon: const Icon(Icons.timeline_rounded),
+                  label: const Text('Track advertisements'),
                 );
-              }
-              return OutlinedButton.icon(
-                onPressed: enabled ? () => c.trackAdvertisements(device) : null,
-                icon: const Icon(Icons.timeline_rounded),
-                label: const Text('Track advertisements'),
-              );
-            },
-          ),
-          if (tracking) ...[const SizedBox(height: 14), const LinearProgressIndicator(minHeight: 2)],
+              },
+            ),
+            if (tracking) ...[const SizedBox(height: 14), const LinearProgressIndicator(minHeight: 2)],
+          ],
           if (tracker != null) ...[
             const SizedBox(height: 14),
             Wrap(

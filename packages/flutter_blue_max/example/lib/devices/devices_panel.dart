@@ -153,7 +153,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     }
                     return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text('Disconnected'));
                   }(),
-                  if (!kIsWeb && c.connected) Chip(label: Text('MTU ${c.mtu ?? device.mtuNow} B')),
+                  if (c.supportsMtu && c.connected && c.mtu != null) Chip(label: Text('MTU ${c.mtu} B')),
                   if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
                 ],
               ),
@@ -204,7 +204,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     ),
                   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
                     OutlinedButton(
-                      onPressed: available ? () => _mtuDialog(context) : null,
+                      onPressed: available ? () => _mtuDialog(context, c, device) : null,
                       child: const Text('Request MTU'),
                     ),
                     OutlinedButton(
@@ -282,13 +282,15 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
     );
   }
 
-  Future<void> _mtuDialog(BuildContext context) async {
+  Future<void> _mtuDialog(BuildContext context, WorkbenchController controller, BluetoothDevice device) async {
+    final initialMtu = controller.mtu ?? device.mtuNow;
+    final generation = controller.connectionGeneration(device);
     final value = await showDialog<int>(
       context: context,
-      builder: (_) => MtuRequestDialog(initialMtu: controller.mtu ?? controller.selected!.mtuNow),
+      builder: (_) => MtuRequestDialog(initialMtu: initialMtu),
     );
     if (value != null) {
-      await controller.requestMtu(value);
+      await controller.requestMtu(device, value, generation: generation);
     }
   }
 }

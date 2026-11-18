@@ -51,7 +51,9 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
   Native platforms also expose advertisement data, RSSI and system-connected devices; Android adds bonding and MTU requests.
   Known services and characteristics are named from [a catalog](lib/gatt/known_service.dart), others by their User Description (`2901`), which discovery reads.
   The services of the FBM test dongle firmware are checked as well: characteristics with exactly the expected properties show as **Test · …**, missing or deviating ones are reported.
-  On native platforms, **Track advertisements** in a device's **Advertisement** card scans only that device and keeps its latest 200 advertisements with RSSI, intervals and payload changes; the history can be filtered by text, changed payloads or parsed values.
+  On Android, iOS and macOS, **Track advertisements** in a device's **Advertisement** card scans only that device and keeps its latest 200 advertisements with RSSI, intervals and payload changes.
+  The history can be filtered by text, changed payloads or parsed values.
+  Linux displays discovery advertisements with no continuous per-peer tracking or MTU reading.
 - **Library → Parsers:** define how manufacturer or service data is read as named values, optionally bound to one device; parsed values appear below the raw data and in the tracker history.
   Fields sit at fixed offsets, or, with the **Records** layout, in type–length–value records such as BTHome, where each field names its record type and frames may carry only some of them.
   Unsigned fields can read a bit range, and every numeric value is shown as raw × scale + add.

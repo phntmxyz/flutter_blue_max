@@ -25,6 +25,8 @@ class WorkbenchController({
   final _subscriptions = <StreamSubscription<dynamic>>[];
   final _watched = <DeviceIdentifier>{};
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
+  final _serviceGenerations = <DeviceIdentifier, int>{};
+  final _connectionGenerations = <DeviceIdentifier, int>{};
   // Native callbacks still identify channels by peer and PSM.
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
   final _channelSessions = <(DeviceIdentifier, int, bool), ChannelSession>{};
@@ -57,6 +59,7 @@ class WorkbenchController({
   /// The local Bluetooth name shown alongside nearby devices.
   String? localName;
   List<ScanResult> scanResults = [];
+  int _scanRevision = 0;
 
   /// The most recent tracking session, kept after the scan stops for inspection.
   AdvertisementTracker? advertisementTracker;
@@ -77,8 +80,9 @@ class WorkbenchController({
   List<Object?> get deviceState => [
     adapter,
     localName,
-    List.of(scanResults),
+    _scanRevision,
     List.of(systemDevices),
+    List.of(connectedDevices),
     connectingDevice,
     selected,
     connected,
@@ -143,14 +147,26 @@ class WorkbenchController({
   bool subscribedOnWeb(BluetoothCharacteristic c) =>
       _webSubscriptions[c.remoteId]?.contains(Operation.characteristic(c)) ?? false;
 
-  void setSubscribedOnWeb(BluetoothCharacteristic c, {required bool subscribed}) {
+  void setSubscribedOnWeb(BluetoothCharacteristic c, {required bool subscribed, required int generation}) {
+    if (!_isCurrentConnection(c.device, generation)) {
+      return;
+    }
     final subscriptions = _webSubscriptions.putIfAbsent(c.remoteId, () => {});
     if (subscribed) {
       subscriptions.add(Operation.characteristic(c));
     } else {
       subscriptions.remove(Operation.characteristic(c));
     }
+    _update();
   }
+
+  bool get supportsAdvertisementTracking =>
+      !kIsWeb &&
+      (defaultTargetPlatform == TargetPlatform.android ||
+          defaultTargetPlatform == TargetPlatform.iOS ||
+          defaultTargetPlatform == TargetPlatform.macOS);
+
+  bool get supportsMtu => supportsL2cap;
 
   /// The current web and Linux backends do not implement L2CAP.
   bool get supportsL2cap =>
@@ -191,7 +207,8 @@ class WorkbenchController({
     final libraries = Future.wait([parserLibrary.load(), catalogLibrary.load()]);
     _subscriptions.add(FlutterBlueMax.logs.listen(log));
     _subscriptions.add(
-      FlutterBlueMax.scanResults.listen((r) {
+      FlutterBlueMax.onScanResults.listen((r) {
+        _scanRevision++;
         final tracker = _trackingScan ? advertisementTracker : null;
         if (tracker == null) {
           scanResults = r;
@@ -263,7 +280,11 @@ class WorkbenchController({
           for (final session in _channels.values) {
             session.markClosed();
           }
-          _services.clear();
+          for (final remoteId in _watched) {
+            _invalidateConnection(remoteId);
+          }
+          rssi = null;
+          mtu = null;
           serverPsm = null;
         }
         _update();
@@ -300,11 +321,11 @@ class WorkbenchController({
   void select(BluetoothDevice device) {
     selected = device;
     rssi = null;
-    mtu = device.mtuNow;
+    mtu = supportsMtu && device.isConnected ? device.mtuNow : null;
     if (_watched.add(device.remoteId)) {
       _subscriptions.add(
         device.onServicesReset.listen((_) {
-          _services.remove(device.remoteId);
+          _invalidateServices(device.remoteId);
           log('Services changed on ${nameOf(device)}. Discover services again.');
         }),
       );
@@ -316,9 +337,15 @@ class WorkbenchController({
           final lostConnection = wasConnected && state == BluetoothConnectionState.disconnected;
           wasConnected = state == BluetoothConnectionState.connected;
           if (lostConnection) {
-            _services.remove(device.remoteId);
-            _webSubscriptions.remove(device.remoteId);
+            _invalidateConnection(device.remoteId);
+            if (selected == device) {
+              rssi = null;
+              mtu = null;
+            }
             _closeOutgoingChannels(device.remoteId);
+          }
+          if (state == BluetoothConnectionState.connected && selected == device && supportsMtu) {
+            mtu = device.mtuNow;
           }
           log(
             '${nameOf(device)}: ${state.name}'
@@ -331,7 +358,7 @@ class WorkbenchController({
       );
       _subscriptions.add(
         device.mtu.listen((value) {
-          if (selected == device) {
+          if (selected == device && device.isConnected && supportsMtu) {
             mtu = value;
             _update();
           }
@@ -342,6 +369,22 @@ class WorkbenchController({
       unawaited(_readRssiAutomatically(device));
     }
     _update();
+  }
+
+  int connectionGeneration(BluetoothDevice device) => _connectionGenerations[device.remoteId] ?? 0;
+
+  bool _isCurrentConnection(BluetoothDevice device, int generation) =>
+      !_disposed && device.isConnected && connectionGeneration(device) == generation;
+
+  void _invalidateConnection(DeviceIdentifier remoteId) {
+    _connectionGenerations.update(remoteId, (generation) => generation + 1, ifAbsent: () => 1);
+    _webSubscriptions.remove(remoteId);
+    _invalidateServices(remoteId);
+  }
+
+  void _invalidateServices(DeviceIdentifier remoteId) {
+    _serviceGenerations.update(remoteId, (generation) => generation + 1, ifAbsent: () => 1);
+    _services.remove(remoteId);
   }
 
   /// Toggles scanning: a running scan is stopped rather than restarted.
@@ -372,6 +415,9 @@ class WorkbenchController({
 
   /// Reports every advertisement of one peer until stopped, replacing any running scan.
   Future<void> trackAdvertisements(BluetoothDevice device) => run(Operation.scan, () async {
+    if (!supportsAdvertisementTracking) {
+      throw const _Unsupported('Continuous per-peer advertisements are unavailable.');
+    }
     if (scanning) {
       await FlutterBlueMax.stopScan();
     }
@@ -440,24 +486,29 @@ class WorkbenchController({
   /// Discovers services and also reads their Characteristic User Description descriptors.
   Future<void> discover() => run(Operation.discover, () async {
     final device = selected!;
+    final remoteId = device.remoteId;
+    final generation = _serviceGenerations[remoteId];
     final result = await device.discoverServices();
-    if (device.isConnected) {
-      _services[device.remoteId] = result;
-      log('${result.length} services discovered on ${nameOf(device)}');
-      _update();
-      await _readUserDescriptions(device, result);
+    if (!_hasCurrentServices(device, generation)) {
+      return;
     }
+    _services[remoteId] = List.unmodifiable(result);
+    log('${result.length} services discovered on ${nameOf(device)}');
+    await _readUserDescriptions(device, result, generation);
   });
 
+  bool _hasCurrentServices(BluetoothDevice device, int? generation) =>
+      !_disposed && device.isConnected && generation == _serviceGenerations[device.remoteId];
+
   /// Labels characteristics the GATT catalog does not know. A failed read only loses that label.
-  Future<void> _readUserDescriptions(BluetoothDevice device, List<BluetoothService> services) async {
+  Future<void> _readUserDescriptions(BluetoothDevice device, List<BluetoothService> services, int? generation) async {
     for (final service in services) {
       for (final characteristic in service.characteristics) {
         for (final descriptor in characteristic.descriptors) {
           if (descriptor.uuid != userDescriptionUuid) {
             continue;
           }
-          if (!device.isConnected) {
+          if (!_hasCurrentServices(device, generation)) {
             return;
           }
           try {
@@ -485,8 +536,9 @@ class WorkbenchController({
   }
 
   Future<void> _refreshRssi(BluetoothDevice device) async {
+    final generation = connectionGeneration(device);
     final value = await device.readRssi();
-    if (selected == device) {
+    if (selected == device && _isCurrentConnection(device, generation)) {
       rssi = value;
       _update();
     }
@@ -500,8 +552,10 @@ class WorkbenchController({
     await run(Operation.rssi(device), () => _refreshRssi(device));
   }
 
-  Future<void> requestMtu(int value) => run(Operation.mtu, () async {
-    await selected!.requestMtu(value);
+  Future<void> requestMtu(BluetoothDevice device, int value, {required int generation}) => run(Operation.mtu, () async {
+    if (_isCurrentConnection(device, generation)) {
+      await device.requestMtu(value);
+    }
   });
 
   Future<void> startServer({required bool secure}) => _runServer(() async {
