@@ -331,15 +331,20 @@ void main() {
     expect(request.withRemoteIds, [device.remoteId.str]);
     expect(request.continuousUpdates, isTrue);
     expect(controller.tracking, isTrue);
+    final originalBytes = [1];
     platform.advertise(
       rssi: -60,
       manufacturerData: {
-        0x59: [1],
+        0x59: originalBytes,
+        0x5a: [7],
       },
     );
+    await Future<void>.delayed(Duration.zero);
+    originalBytes[0] = 9;
     platform.advertise(
       rssi: -40,
       manufacturerData: {
+        0x5a: [7],
         0x59: [1],
       },
     );
@@ -347,6 +352,7 @@ void main() {
       rssi: -50,
       manufacturerData: {
         0x59: [2],
+        0x5a: [7],
       },
     );
     platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
@@ -357,6 +363,9 @@ void main() {
     expect((tracker.minRssi, tracker.maxRssi), (-60, -40));
     expect(tracker.payloadChanges, 1);
     expect(tracker.history.map((entry) => entry.changed), [true, false, true]);
+    expect(tracker.history.last.data.manufacturerData[0x59], [1]);
+    expect(tracker.history.clear, throwsUnsupportedError);
+    expect(tracker.history.last.data.manufacturerData[0x59]!.clear, throwsUnsupportedError);
     expect(describeAdvertisement(tracker.history.first.data).join('\n'), contains('Manufacturer 0x59: 02'));
     expect(tracker.averageInterval, isNotNull);
     expect(controller.scanResults.map((result) => result.device.remoteId.str), {

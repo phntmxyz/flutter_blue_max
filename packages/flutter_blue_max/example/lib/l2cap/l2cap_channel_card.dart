@@ -47,25 +47,7 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
             SelectableText(PayloadCodec.hex(session.lastReceived), style: const TextStyle(fontFamily: 'monospace')),
             Text(PayloadCodec.text(session.lastReceived), maxLines: 4, overflow: TextOverflow.ellipsis),
           ],
-          ExpansionTile(
-            expandedCrossAxisAlignment: CrossAxisAlignment.start,
-            tilePadding: EdgeInsets.zero,
-            title: const Text('Receive history'),
-            subtitle: Text('${session.history.length} entries · buffer reads can repeat streamed bytes'),
-            children: [
-              for (final entry in session.history)
-                ListTile(
-                  title: Text('${entry.source.label} · ${entry.time.toIso8601String()} · ${entry.bytes.length} B'),
-                  subtitle: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      SelectableText(PayloadCodec.hex(entry.bytes)),
-                      SelectableText(PayloadCodec.text(entry.bytes)),
-                    ],
-                  ),
-                ),
-            ],
-          ),
+          _ReceiveHistory(receipts: session.history),
           if (!session.closed) ...[
             const SizedBox(height: 16),
             PayloadEditor(enabled: idle, onSend: (bytes) => context.read<WorkbenchController>().send(session, bytes)),
@@ -101,6 +83,39 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
           ],
         ],
       ),
+    );
+  }
+}
+
+/// Payload formatting is deferred until the history expansion is visible.
+class const _ReceiveHistory({required final List<ChannelReceipt> receipts}) extends StatefulWidget {
+  @override
+  State<_ReceiveHistory> createState() => _ReceiveHistoryState();
+}
+
+class _ReceiveHistoryState() extends State<_ReceiveHistory> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final receipts = widget.receipts;
+    return ExpansionTile(
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      tilePadding: EdgeInsets.zero,
+      title: const Text('Receive history'),
+      subtitle: Text('${receipts.length} entries · buffer reads can repeat streamed bytes'),
+      onExpansionChanged: (expanded) => setState(() => _expanded = expanded),
+      children: [
+        if (_expanded)
+          for (final entry in receipts)
+            ListTile(
+              title: Text('${entry.source.label} · ${entry.time.toIso8601String()} · ${entry.bytes.length} B'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [SelectableText(entry.hex), SelectableText(entry.text)],
+              ),
+            ),
+      ],
     );
   }
 }

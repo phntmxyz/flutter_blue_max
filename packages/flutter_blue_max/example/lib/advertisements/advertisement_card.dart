@@ -17,12 +17,18 @@ class const AdvertisementCard({super.key, required final BluetoothDevice device}
 }
 
 class _AdvertisementCardState() extends State<AdvertisementCard> {
-  String _query = '';
+  final _query = TextEditingController();
   bool _changesOnly = false;
   bool _parsedOnly = false;
 
   WorkbenchController get c => context.read<WorkbenchController>();
   BluetoothDevice get device => widget.device;
+
+  @override
+  void dispose() {
+    _query.dispose();
+    super.dispose();
+  }
 
   Future<void> _editParser({AdvertisementParser? previous}) => ParserEditorPage.open(
     context,
@@ -108,7 +114,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
             ),
             const SizedBox(height: 14),
             Builder(
-              builder: (context) {
+              builder: (_) {
                 final enabled = c.ready && !c.busy(Operation.scan);
                 if (tracking) {
                   return FilledButton.icon(
@@ -141,7 +147,8 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
             ),
             const SizedBox(height: 14),
             TextField(
-              onChanged: (value) => setState(() => _query = value),
+              controller: _query,
+              onChanged: (_) => setState(() {}),
               decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list), hintText: 'Filter history'),
             ),
             const SizedBox(height: 10),
@@ -164,7 +171,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
             AdvertisementHistory(
               tracker: tracker,
               parsers: parsers,
-              query: _query,
+              query: _query.text,
               changesOnly: _changesOnly,
               parsedOnly: _parsedOnly,
             ),
@@ -187,7 +194,8 @@ class const AdvertisementHistory({
   @override
   Widget build(BuildContext context) {
     const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
-    if (tracker.history.isEmpty) {
+    final history = tracker.history;
+    if (history.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
         child: Text('Waiting for the first advertisement…'),
@@ -196,7 +204,7 @@ class const AdvertisementHistory({
     final search = query.trim().toLowerCase();
     final rows =
         [
-          for (final entry in tracker.history)
+          for (final entry in history)
             if (!changesOnly || entry.changed)
               (
                 entry: entry,
@@ -223,7 +231,7 @@ class const AdvertisementHistory({
         Padding(
           padding: const EdgeInsets.only(top: 10),
           child: Text(
-            '${rows.length} of ${tracker.history.length} recent advertisements',
+            '${rows.length} of ${history.length} recent advertisements',
             style: Theme.of(context).textTheme.labelMedium,
           ),
         ),

@@ -1,5 +1,6 @@
 import 'package:clock/clock.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 
 /// UI state for one L2CAP channel, retained by the workbench controller.
 /// Reopening the same remote peer, PSM and direction reuses this session, so
@@ -8,8 +9,7 @@ class ChannelSession(var BluetoothL2capChannel _channel, {required final bool in
   bool _closed = false;
   int _transmitted = 0;
   int _received = 0;
-  List<int> _lastReceived = [];
-  final _history = <ChannelReceipt>[];
+  List<ChannelReceipt> _history = const [];
   static const maxHistoryEntries = 200;
 
   BluetoothL2capChannel get channel => _channel;
@@ -22,8 +22,8 @@ class ChannelSession(var BluetoothL2capChannel _channel, {required final bool in
 
   /// Streamed bytes only; buffer snapshots may repeat them and do not count twice.
   int get received => _received;
-  List<int> get lastReceived => List.unmodifiable(_lastReceived);
-  List<ChannelReceipt> get history => List.unmodifiable(_history);
+  List<int> get lastReceived => _history.firstOrNull?.bytes ?? const [];
+  List<ChannelReceipt> get history => _history;
 
   void markClosed() => _closed = true;
 
@@ -50,22 +50,19 @@ class ChannelSession(var BluetoothL2capChannel _channel, {required final bool in
   }
 
   void _record(List<int> bytes, {required ReceiveSource source}) {
-    _lastReceived = List.of(bytes);
-    _history.insert(0, ChannelReceipt(time: clock.now(), source: source, bytes: List.unmodifiable(bytes)));
-    if (_history.length > maxHistoryEntries) {
-      _history.removeLast();
-    }
+    final receipt = ChannelReceipt(time: clock.now(), source: source, payload: bytes);
+    _history = List.unmodifiable([receipt, ..._history.take(maxHistoryEntries - 1)]);
   }
 
   (DeviceIdentifier, int, bool) get key => (channel.deviceId, channel.psm, incoming);
 }
 
 /// A timestamped payload displayed in a channel card's receive history.
-class const ChannelReceipt({
-  required final DateTime time,
-  required final ReceiveSource source,
-  required final List<int> bytes,
-});
+class ChannelReceipt({required final DateTime time, required final ReceiveSource source, required List<int> payload}) {
+  final List<int> bytes = List.unmodifiable(payload);
+  late final String hex = PayloadCodec.hex(bytes);
+  late final String text = PayloadCodec.text(bytes);
+}
 
 /// Distinguishes pushed data from buffer snapshots, which may repeat streamed bytes.
 enum ReceiveSource(final String label) {

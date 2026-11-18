@@ -150,6 +150,10 @@ extension AdvertisementRobot on WorkbenchRobot {
     spotText('1 of 4 recent advertisements', exact: true).existsOnce();
     spotText('Climate · Temperature: 25.000 °C').existsAtLeastOnce();
     await tapLabel('Stop tracking');
+    await tapLabel('Advertisement');
+    await tapLabel('Advertisement');
+    expect(_field('Filter history').snapshotWidget().controller!.text, '25.000');
+    spotText('1 of 4 recent advertisements', exact: true).existsOnce();
   }
 
   Future<void> removeParser() async {

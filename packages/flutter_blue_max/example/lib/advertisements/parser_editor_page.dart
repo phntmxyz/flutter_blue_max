@@ -326,7 +326,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             ),
             const SizedBox(height: 16),
             Builder(
-              builder: (context) {
+              builder: (_) {
                 if (_source == AdvertisementSource.manufacturer) {
                   return ReactiveTextField<String>(
                     key: ObjectKey(_key),
@@ -648,7 +648,7 @@ class const ParserFieldCard({
                   ),
                 ],
                 Builder(
-                  builder: (context) {
+                  builder: (_) {
                     if (variable) {
                       return SizedBox(
                         width: 96,

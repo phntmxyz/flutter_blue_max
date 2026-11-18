@@ -111,8 +111,7 @@ class WorkbenchController({
 
   List<Object?> _channelState({required bool incoming}) => [
     for (final s in _channelSessions.values)
-      if (s.incoming == incoming)
-        [s.channel, s.closed, s.transmitted, s.received, List.of(s.lastReceived), List.of(s.history)],
+      if (s.incoming == incoming) [s.channel, s.closed, s.transmitted, s.received, s.history],
   ];
 
   /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.

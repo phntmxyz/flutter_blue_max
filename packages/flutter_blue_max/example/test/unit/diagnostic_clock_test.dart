@@ -15,7 +15,16 @@ void main() {
   test('channel receipt timestamps use the scoped clock', () {
     final channel = BluetoothL2capChannel(deviceId: const DeviceIdentifier('clock'), psm: 129);
     final session = ChannelSession(channel, incoming: true);
-    withClock(Clock.fixed(time), () => session.onStreamed([1]));
-    expect(session.history.single.time, time);
+    final payload = [1];
+    withClock(Clock.fixed(time), () => session.onStreamed(payload));
+    final first = session.history;
+    payload[0] = 2;
+    expect(first.single.time, time);
+    expect(first.single.bytes, [1]);
+    expect(first.single.bytes.clear, throwsUnsupportedError);
+    expect(session.history, same(first));
+    session.onStreamed(payload);
+    expect(first, hasLength(1));
+    expect(session.history, hasLength(2));
   });
 }
