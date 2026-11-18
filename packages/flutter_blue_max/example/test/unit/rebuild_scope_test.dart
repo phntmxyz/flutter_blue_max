@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/activity/activity_panel.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_example/library/library_panel.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:provider/provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spot/spot.dart';
 
 import '../fakes/fake_bluetooth_platform.dart';
@@ -18,6 +21,44 @@ void main() {
   setUpAll(() async {
     FlutterBlueMaxPlatform.instance = platform;
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
+  });
+
+  testWidgets('rebinding a workbench retires only the controllers it owns', (tester) async {
+    SharedPreferences.setMockInitialValues({});
+    final injected = WorkbenchController();
+    addTearDown(injected.dispose);
+
+    WorkbenchController boundController() => tester.element(spot<DevicesPanel>().finder).read<WorkbenchController>();
+
+    await tester.pumpWidget(const WorkbenchApp());
+    await tester.pumpAndSettle();
+    final first = boundController();
+
+    await tester.pumpWidget(WorkbenchApp(controller: injected));
+    await tester.pumpAndSettle();
+    expect(boundController(), same(injected));
+    expect(() => ChangeNotifier.debugAssertNotDisposed(first), throwsFlutterError);
+
+    await tester.pumpWidget(const WorkbenchApp());
+    await tester.pumpAndSettle();
+    final last = boundController();
+    expect(last, isNot(same(first)));
+    expect(last, isNot(same(injected)));
+    expect(ChangeNotifier.debugAssertNotDisposed(injected), isTrue);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+    expect(() => ChangeNotifier.debugAssertNotDisposed(last), throwsFlutterError);
+    expect(ChangeNotifier.debugAssertNotDisposed(injected), isTrue);
+  });
+
+  testWidgets('navigation stays reachable in a short wide workbench', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 230));
+    expect(tester.takeException(), isNull);
+    await robot.tapLabel('Activity');
+    spot<ActivityPanel>().existsOnce();
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets('the adapter banner updates while remaining mounted', (tester) async {
@@ -54,8 +95,8 @@ void main() {
     for (final type in panels) {
       expect(builds[type] ?? 0, type == ActivityPanel ? 10 : 0, reason: '$type log rebuild count');
     }
-    expect(find.byType(ActivityPanel, skipOffstage: false), findsOneWidget);
-    expect(find.byType(ActivityPanel), findsNothing, reason: 'Activity is not the visible tab');
+    spotAllWidgets().spot<ActivityPanel>().existsOnce();
+    spot<ActivityPanel>().doesNotExist();
 
     // 2) A single scan-result batch from the fake platform.
     builds.clear();

@@ -24,14 +24,37 @@ class const WorkbenchApp({
 }
 
 class _WorkbenchAppState() extends State<WorkbenchApp> {
-  late final _controller = widget.controller ?? WorkbenchController();
+  late WorkbenchController _controller;
+  Future<void> _bindingReady = Future.value();
   int _destination = 0;
   ThemeMode _themeMode = ThemeMode.dark;
 
   @override
   void initState() {
     super.initState();
+    _controller = widget.controller ?? WorkbenchController();
     unawaited(_controller.start());
+  }
+
+  @override
+  void didUpdateWidget(WorkbenchApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.controller, widget.controller) || identical(_controller, widget.controller)) {
+      return;
+    }
+    final previous = _controller;
+    if (oldWidget.controller == null) {
+      previous.dispose();
+      _bindingReady = _bindingReady.then((_) => previous.shutdownComplete);
+    }
+    final next = _controller = widget.controller ?? WorkbenchController();
+    unawaited(
+      _bindingReady.then((_) async {
+        if (mounted && identical(_controller, next)) {
+          await next.start();
+        }
+      }),
+    );
   }
 
   @override
@@ -45,6 +68,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
+      key: ObjectKey(_controller),
       providers: [
         ChangeNotifierProvider.value(value: _controller),
         ChangeNotifierProvider.value(value: _controller.parserLibrary),
@@ -126,7 +150,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                   children: [
                     const Divider(height: 1),
                     if (!c.ready) const AdapterBanner(),
-                    if (c.error != null) ErrorBanner(message: c.error!, onDismiss: c.dismissError),
+                    if (c.error != null) ErrorBanner(message: Text(c.error!), onDismiss: c.dismissError),
                     Expanded(
                       child: Row(
                         children: [
@@ -135,6 +159,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                               selectedIndex: _destination,
                               onDestinationSelected: (index) => setState(() => _destination = index),
                               labelType: NavigationRailLabelType.all,
+                              scrollable: true,
                               destinations: [
                                 const NavigationRailDestination(
                                   icon: Icon(Icons.radar_rounded),
@@ -274,7 +299,7 @@ ThemeData _theme(Brightness brightness) {
 }
 
 /// Session error banner above the selected destination, with an explicit dismissal action.
-class const ErrorBanner({super.key, required final String message, required final VoidCallback onDismiss})
+class const ErrorBanner({super.key, required final Widget message, required final VoidCallback onDismiss})
     extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -285,11 +310,11 @@ class const ErrorBanner({super.key, required final String message, required fina
       child: Row(
         children: [
           Expanded(
-            child: Text(
-              message,
+            child: DefaultTextStyle.merge(
               maxLines: 3,
               overflow: TextOverflow.ellipsis,
               style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+              child: message,
             ),
           ),
           IconButton(tooltip: 'Dismiss error', onPressed: onDismiss, icon: const Icon(Icons.close)),

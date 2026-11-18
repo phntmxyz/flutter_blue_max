@@ -53,6 +53,36 @@ void main() {
     expect(controller.deviceState, isNot(equals(before)));
   });
 
+  test('unselected peers keep listeners only while connected or busy', () async {
+    final (:controller, :platform) = await _setup();
+    final first = BluetoothDevice.fromId('AA:BB:CC:DD:EE:41');
+    final second = BluetoothDevice.fromId('AA:BB:CC:DD:EE:42');
+    final reset = BmBluetoothDevice(remoteId: first.remoteId, platformName: '');
+    int changes() => controller.logs.where((line) => line.contains('Services changed')).length;
+
+    controller.select(first);
+    controller.select(second);
+    platform.serviceResets.add(reset);
+    await Future<void>.delayed(Duration.zero);
+    expect(changes(), 0);
+
+    controller.select(first);
+    await controller.connect();
+    controller.select(second);
+    platform.serviceResets.add(reset);
+    await _until(() => changes() == 1);
+
+    await platform.disconnect(BmDisconnectRequest(remoteId: first.remoteId));
+    await Future<void>.delayed(Duration.zero);
+    platform.serviceResets.add(reset);
+    await Future<void>.delayed(Duration.zero);
+    expect(changes(), 1);
+
+    controller.select(first);
+    platform.serviceResets.add(reset);
+    await _until(() => changes() == 2);
+  });
+
   test('link loss clears measurements before a reconnect with no new RSSI', () async {
     final (:controller, :platform) = await _setup();
     final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:47');
@@ -114,6 +144,32 @@ void main() {
     expect(platform.scanStarts, 0);
     expect(controller.advertisementTracker, isNull);
     expect(controller.error, contains('not supported'));
+  });
+
+  test('dispose stops tracking that was queued behind a native scan stop', () async {
+    final (:controller, :platform) = await _setup(dispose: false);
+    await controller.scan();
+    await _until(() => controller.scanning);
+    final stopping = Completer<void>();
+    final release = Completer<void>();
+    platform.overrideStopScan = (_) async {
+      if (!stopping.isCompleted) {
+        stopping.complete();
+        await release.future;
+      }
+      return true;
+    };
+    final externalStop = FlutterBlueMax.stopScan();
+    await stopping.future;
+    await _until(() => !controller.scanning);
+    final tracking = controller.trackAdvertisements(BluetoothDevice.fromId('AA:BB:CC:DD:EE:01'));
+    await _until(() => controller.advertisementTracker != null);
+    controller.dispose();
+    release.complete();
+    await externalStop;
+    await tracking;
+    await controller.shutdownComplete;
+    expect(FlutterBlueMax.isScanningNow, isFalse);
   });
 
   test('dispose does not start tracking after a slow scan stop', () async {
@@ -1177,16 +1233,16 @@ Future<({WorkbenchController controller, FakeBluetoothPlatform platform})> _setu
   configure?.call(_platform);
   FlutterBlueMaxPlatform.instance = _platform;
   final controller = WorkbenchController(saveList: saveList);
-  await controller.start();
-  await Future<void>.delayed(Duration.zero);
-  _platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
-  await Future<void>.delayed(Duration.zero);
   if (dispose) {
     addTearDown(() async {
       controller.dispose();
       await Future<void>.delayed(Duration.zero);
     });
   }
+  await controller.start();
+  await Future<void>.delayed(Duration.zero);
+  _platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
+  await Future<void>.delayed(Duration.zero);
   return (controller: controller, platform: _platform);
 }
 

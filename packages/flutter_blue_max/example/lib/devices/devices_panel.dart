@@ -89,7 +89,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
     final device = c.selected;
     if (device == null) {
       return Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -208,7 +208,9 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     ),
                     OutlinedButton(
                       onPressed: (() {
-                        if (!available || c.busy(Operation.bond)) return null;
+                        if (!available || c.busy(Operation.bond)) {
+                          return null;
+                        }
                         return () => c.run(Operation.bond, device.createBond);
                       })(),
                       child: const Text('Create bond'),
