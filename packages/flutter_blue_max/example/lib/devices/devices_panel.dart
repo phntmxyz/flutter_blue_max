@@ -30,7 +30,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) => c.deviceState);
+    final selected = context.select((WorkbenchController c) => c.selected);
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 850;
@@ -42,7 +42,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
           },
         );
         final detail = DeviceDetails(
-          key: ValueKey(context.read<WorkbenchController>().selected?.remoteId),
+          key: ValueKey(selected?.remoteId),
           onBack: wide ? null : () => setState(() => _showDetails = false),
         );
         if (wide) {
@@ -65,7 +65,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
               setState(() => _showDetails = false);
             }
           },
-          child: _showDetails && context.read<WorkbenchController>().selected != null ? detail : list,
+          child: _showDetails && selected != null ? detail : list,
         );
       },
     );
@@ -111,8 +111,23 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
         ),
       );
     }
-    final available = c.connected && c.ready && !c.busy(Operation.connection);
-    final advertisement = c.selectedAdvertisement;
+    final header = context.select(
+      (WorkbenchController c) => (
+        name: c.nameOf(device),
+        connected: c.connected,
+        ready: c.ready,
+        connectingDevice: c.connectingDevice,
+        rssi: c.rssi,
+        mtu: c.mtu,
+        allowsConnection: c.selectedAdvertisement?.advertisementData.connectable ?? true,
+        showAdvertisement: c.selectedAdvertisement != null || c.advertisementTracker?.remoteId == device.remoteId,
+        connectionBusy: c.busy(Operation.connection),
+        cancelling: c.busy(Operation.cancelConnection),
+        readingRssi: c.busy(Operation.rssi(device)),
+        bonding: c.busy(Operation.bond),
+      ),
+    );
+    final available = header.connected && header.ready && !header.connectionBusy;
     return CustomScrollView(
       key: ValueKey(device.remoteId),
       slivers: [
@@ -129,7 +144,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     label: const Text('Devices'),
                   ),
                 ),
-              Text(c.nameOf(device), style: Theme.of(context).textTheme.headlineMedium),
+              Text(header.name, style: Theme.of(context).textTheme.headlineMedium),
               const SizedBox(height: 8),
               Row(
                 children: [
@@ -147,13 +162,13 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 runSpacing: 8,
                 children: [
                   () {
-                    if (c.connected) {
+                    if (header.connected) {
                       return const Chip(avatar: Icon(Icons.link, size: 16), label: Text('Connected'));
                     }
                     return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text('Disconnected'));
                   }(),
-                  if (c.supportsMtu && c.connected && c.mtu != null) Chip(label: Text('MTU ${c.mtu} B')),
-                  if (c.rssi != null && c.connected) Chip(label: Text('${c.rssi} dBm')),
+                  if (c.supportsMtu && header.connected && header.mtu != null) Chip(label: Text('MTU ${header.mtu} B')),
+                  if (header.rssi != null && header.connected) Chip(label: Text('${header.rssi} dBm')),
                 ],
               ),
               const SizedBox(height: 16),
@@ -162,25 +177,24 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 runSpacing: 10,
                 children: [
                   () {
-                    final isConnectingThisPeer = c.connectingDevice == device;
-                    final connectionIdle = !c.busy(Operation.connection);
-                    final allowsConnection = advertisement?.advertisementData.connectable ?? true;
-                    final canConnect = c.ready && connectionIdle && (c.connected || allowsConnection);
+                    final isConnectingThisPeer = header.connectingDevice == device;
+                    final connectionIdle = !header.connectionBusy;
+                    final canConnect = header.ready && connectionIdle && (header.connected || header.allowsConnection);
                     if (isConnectingThisPeer) {
                       return FilledButton.icon(
-                        onPressed: c.busy(Operation.cancelConnection) ? null : c.cancelConnect,
-                        icon: Icon(c.connected ? Icons.link_off : Icons.link),
+                        onPressed: header.cancelling ? null : c.cancelConnect,
+                        icon: Icon(header.connected ? Icons.link_off : Icons.link),
                         label: const Text('Cancel connection'),
                       );
                     }
                     if (!connectionIdle) {
                       return FilledButton.icon(
                         onPressed: null,
-                        icon: Icon(c.connected ? Icons.link_off : Icons.link),
+                        icon: Icon(header.connected ? Icons.link_off : Icons.link),
                         label: const Text('Working…'),
                       );
                     }
-                    if (c.connected) {
+                    if (header.connected) {
                       return FilledButton.icon(
                         onPressed: canConnect ? c.disconnect : null,
                         icon: const Icon(Icons.link_off),
@@ -195,7 +209,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                   }(),
                   if (!kIsWeb)
                     OutlinedButton.icon(
-                      onPressed: available && !c.busy(Operation.rssi(device)) ? c.readRssi : null,
+                      onPressed: available && !header.readingRssi ? c.readRssi : null,
                       icon: const Icon(Icons.signal_cellular_alt),
                       label: const Text('Read RSSI'),
                     ),
@@ -206,7 +220,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                     ),
                     OutlinedButton(
                       onPressed: (() {
-                        if (!available || c.busy(Operation.bond)) {
+                        if (!available || header.bonding) {
                           return null;
                         }
                         return () => c.run(Operation.bond, device.createBond);
@@ -217,8 +231,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 ],
               ),
               const SizedBox(height: 28),
-              if (!kIsWeb && (advertisement != null || c.advertisementTracker?.remoteId == device.remoteId))
-                AdvertisementCard(device: device),
+              if (!kIsWeb && header.showAdvertisement) AdvertisementCard(device: device),
             ],
           ),
         ),
@@ -242,46 +255,9 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(24, 0, 24, 24),
           sliver: SliverToBoxAdapter(
-            child: (() {
-              if (_l2cap && c.supportsL2cap) {
-                return DeviceL2capPanel(key: ValueKey(device.remoteId), device: device);
-              }
-              return WorkbenchCard(
-                title: const Text('GATT explorer'),
-                icon: Icons.account_tree_outlined,
-                subtitle: const Text(
-                  'Discover services after connecting. '
-                  'Only operations supported by each characteristic are shown.',
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (c.busy(Operation.discover))
-                      OutlinedButton.icon(
-                        onPressed: null,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Discovering…'),
-                      )
-                    else
-                      OutlinedButton.icon(
-                        onPressed: available ? c.discover : null,
-                        icon: const Icon(Icons.refresh_rounded),
-                        label: const Text('Discover services'),
-                      ),
-                    if (c.services.isEmpty)
-                      const Padding(
-                        padding: EdgeInsets.symmetric(vertical: 20),
-                        child: Text('No services discovered in this connection.'),
-                      ),
-                    for (final service in c.services)
-                      GattService(
-                        key: ValueKey('${device.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
-                        service: service,
-                      ),
-                  ],
-                ),
-              );
-            })(),
+            child: _l2cap && c.supportsL2cap
+                ? DeviceL2capPanel(key: ValueKey(device.remoteId), device: device)
+                : const GattExplorer(),
           ),
         ),
       ],
@@ -301,6 +277,61 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
   }
 }
 
+/// The selected peer's services and discovery controls.
+class const GattExplorer() extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final c = context.read<WorkbenchController>();
+    context.select<WorkbenchController, Object?>(
+      (c) => [
+        c.selected,
+        c.connected,
+        c.ready,
+        c.busy(Operation.connection),
+        c.busy(Operation.discover),
+        c.services,
+        c.catalog,
+      ],
+    );
+    final available = c.connected && c.ready && !c.busy(Operation.connection);
+    return WorkbenchCard(
+      title: const Text('GATT explorer'),
+      icon: Icons.account_tree_outlined,
+      subtitle: const Text(
+        'Discover services after connecting. '
+        'Only operations supported by each characteristic are shown.',
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (c.busy(Operation.discover))
+            OutlinedButton.icon(
+              onPressed: null,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Discovering…'),
+            )
+          else
+            OutlinedButton.icon(
+              onPressed: available ? c.discover : null,
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Discover services'),
+            ),
+          if (c.services.isEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 20),
+              child: Text('No services discovered in this connection.'),
+            ),
+          for (final service in c.services)
+            GattService(
+              key: ValueKey('${service.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
+              service: service,
+            ),
+        ],
+      ),
+    );
+  }
+}
+
 /// Discovery column in the Devices destination; coordinates scan state and selection.
 class const DeviceDiscoveryList({
   super.key,
@@ -309,6 +340,7 @@ class const DeviceDiscoveryList({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
+    context.select((WorkbenchController c) => c.discoveryState);
     final c = context.read<WorkbenchController>();
     final results = c.visibleDevices;
     return RefreshIndicator(

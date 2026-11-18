@@ -374,6 +374,14 @@ void main() {
       await robot.exerciseNotificationsAndDescriptors();
     });
 
+    testWidgets('an unread GATT value differs from a successfully read empty value', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.scanForPeripheral();
+      await robot.inspectPeripheral();
+      await robot.inspectEmptyGattValue();
+    });
+
     testWidgets('known GATT services are named and test services checked against the dongle', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));

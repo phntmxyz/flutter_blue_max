@@ -114,6 +114,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     overrideDiscoverServices = null;
     overrideListenL2CapChannel = null;
     overrideReadCharacteristic = null;
+    characteristicReadValue = const [0x64];
     overrideWriteCharacteristic = null;
     overrideStopL2capServer = null;
     overrideOpenL2CapChannel = null;
@@ -518,6 +519,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   }
 
   Future<bool> Function(BmReadCharacteristicRequest request)? overrideReadCharacteristic;
+  List<int> characteristicReadValue = const [0x64];
 
   @override
   Future<bool> readCharacteristic(BmReadCharacteristicRequest request) async {
@@ -533,7 +535,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         characteristicUuid: request.characteristicUuid,
         primaryServiceUuid: request.primaryServiceUuid,
         instanceId: request.instanceId,
-        value: [0x64],
+        value: characteristicReadValue,
         success: true,
         errorCode: 0,
         errorString: '',

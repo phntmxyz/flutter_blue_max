@@ -21,19 +21,27 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   bool _withoutResponse = false;
   bool _writing = false;
   bool _notifying = false;
-  late final Stream<List<int>> _values = widget.characteristic.lastValueStream;
+  late final ValueListenable<List<int>?> _value;
 
   StreamSubscription<List<int>>? _notificationChanges;
+  StreamSubscription<List<int>>? _descriptionChanges;
 
   @override
   void initState() {
     super.initState();
-    if (kIsWeb) {
-      return;
+    _value = context.read<WorkbenchController>().observeCharacteristic(widget.characteristic);
+    if (!kIsWeb) {
+      _notifying = widget.characteristic.isNotifying;
     }
-    _notifying = widget.characteristic.isNotifying;
     for (final descriptor in widget.characteristic.descriptors) {
-      if (descriptor.uuid == Guid('2902')) {
+      if (descriptor.uuid == userDescriptionUuid && _descriptionChanges == null) {
+        _descriptionChanges = descriptor.lastValueStream.skip(1).listen((_) {
+          if (mounted) {
+            setState(() {});
+          }
+        });
+      }
+      if (!kIsWeb && descriptor.uuid == Guid('2902') && _notificationChanges == null) {
         // CCCD events may arrive after the operation future and also after direct writes.
         _notificationChanges = descriptor.lastValueStream.listen((value) {
           if (mounted) {
@@ -42,7 +50,6 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
             });
           }
         });
-        break;
       }
     }
   }
@@ -50,6 +57,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   @override
   void dispose() {
     unawaited(_notificationChanges?.cancel());
+    unawaited(_descriptionChanges?.cancel());
     super.dispose();
   }
 
@@ -126,10 +134,9 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              StreamBuilder<List<int>>(
-                stream: _values,
-                builder: (context, snapshot) {
-                  final bytes = snapshot.data ?? [];
+              ValueListenableBuilder<List<int>?>(
+                valueListenable: _value,
+                builder: (context, bytes, _) {
                   return Container(
                     width: double.infinity,
                     padding: const EdgeInsets.all(14),
@@ -140,14 +147,18 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('${bytes.length} bytes', style: Theme.of(context).textTheme.labelSmall),
-                        const SizedBox(height: 6),
-                        SelectableText(
-                          bytes.isEmpty ? 'Empty' : PayloadCodec.hex(bytes),
-                          style: const TextStyle(fontFamily: 'monospace'),
-                        ),
-                        if (bytes.isNotEmpty)
-                          Text(PayloadCodec.text(bytes), maxLines: 3, overflow: TextOverflow.ellipsis),
+                        if (bytes == null)
+                          const Text('No value yet')
+                        else ...[
+                          Text('${bytes.length} bytes', style: Theme.of(context).textTheme.labelSmall),
+                          const SizedBox(height: 6),
+                          SelectableText(
+                            bytes.isEmpty ? 'Empty' : PayloadCodec.hex(bytes),
+                            style: const TextStyle(fontFamily: 'monospace'),
+                          ),
+                          if (bytes.isNotEmpty)
+                            Text(PayloadCodec.text(bytes), maxLines: 3, overflow: TextOverflow.ellipsis),
+                        ],
                       ],
                     ),
                   );
@@ -255,7 +266,7 @@ class _DescriptorState() extends State<GattDescriptorTile> {
   Widget build(BuildContext context) {
     final d = widget.descriptor;
     final operation = Operation.descriptor(d);
-    final enabled = !context.read<WorkbenchController>().busy(operation) && d.device.isConnected;
+    final enabled = !context.select((WorkbenchController c) => c.busy(operation)) && d.device.isConnected;
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),

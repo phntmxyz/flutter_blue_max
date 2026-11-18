@@ -183,6 +183,31 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     expect(platform.characteristicWrites.last.writeType, BmWriteType.withoutResponse);
   }
 
+  Future<void> inspectEmptyGattValue() async {
+    Future<void> showValue() async {
+      await tapLabel('180F');
+      await tapLabel('2A19');
+    }
+
+    await showValue();
+    spotText('No value yet', exact: true).existsOnce();
+    spotText('0 bytes', exact: true).doesNotExist();
+    platform.characteristicReadValue = [];
+    await tapLabel('Read');
+    spotText('0 bytes', exact: true).existsOnce();
+    spotText('Empty', exact: true).existsOnce();
+    spotText('No value yet', exact: true).doesNotExist();
+
+    await tapLabel('180F');
+    await showValue();
+    spotText('0 bytes', exact: true).existsOnce();
+    await tapLabel('Disconnect');
+    await connectSelected();
+    await tapLabel('Discover services');
+    await showValue();
+    spotText('No value yet', exact: true).existsOnce();
+  }
+
   Future<void> startServer() => tapLabel('Start server');
   Future<void> stopServer() => tapLabel('Stop server');
   Future<void> turnOffEncryption() => tapLabel('Require encryption');

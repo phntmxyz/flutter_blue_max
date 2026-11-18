@@ -45,12 +45,12 @@ void main() {
     await controller.connect();
     await _until(() => controller.rssi != null);
     controller.select(BluetoothDevice.fromId('AA:BB:CC:DD:EE:46'));
-    final before = controller.deviceState;
+    final before = controller.discoveryState;
 
     await platform.disconnect(BmDisconnectRequest(remoteId: peer.remoteId));
     await _until(() => !controller.connectedDevices.contains(peer));
 
-    expect(controller.deviceState, isNot(equals(before)));
+    expect(controller.discoveryState, isNot(equals(before)));
   });
 
   test('unselected peers keep listeners only while connected or busy', () async {

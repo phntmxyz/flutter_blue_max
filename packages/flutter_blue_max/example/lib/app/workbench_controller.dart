@@ -28,6 +28,7 @@ class WorkbenchController({
   final _services = <DeviceIdentifier, List<BluetoothService>>{};
   final _serviceGenerations = <DeviceIdentifier, int>{};
   final _connectionGenerations = <DeviceIdentifier, int>{};
+  final _characteristicValues = <DeviceIdentifier, Map<Operation, _CharacteristicValue>>{};
   // Native callbacks still identify channels by peer and PSM.
   final _channels = <(DeviceIdentifier, int), ChannelSession>{};
   final _channelSessions = <(DeviceIdentifier, int, bool), ChannelSession>{};
@@ -79,28 +80,31 @@ class WorkbenchController({
   List<String> get logs => List.unmodifiable(_activity.value.map((entry) => entry.text));
   ValueListenable<List<ActivityEntry>> get activity => _activity;
 
-  /// Immutable snapshots for panel selectors.
-  /// Copy mutable collections so a prior selection cannot change in place.
-  List<Object?> get deviceState => [
+  /// Scan results compare by peer ID, so the revision also captures changes to a peer's data.
+  List<Object?> get discoveryState => [
     adapter,
     localName,
     _scanRevision,
     List.of(systemDevices),
     List.of(connectedDevices),
-    connectingDevice,
     selected,
-    connected,
     scanning,
-    tracking,
-    advertisementTracker?.count,
     query,
-    rssi,
-    mtu,
-    Map.of(_services),
-    parserLibrary.parsers,
-    catalogLibrary.catalog,
-    _busy.where((o) => o != Operation.server && !_incomingOperation(o)).toList(),
-    _channelState(incoming: false),
+    busy(Operation.scan),
+  ];
+
+  /// Snapshot outgoing traffic and operations for the inspected peer only.
+  List<Object?> outgoingChannelState(DeviceIdentifier peer) => [
+    for (final session in _channelSessions.values)
+      if (!session.incoming && session.channel.deviceId == peer)
+        [
+          session.channel,
+          session.closed,
+          session.transmitted,
+          session.received,
+          session.history,
+          busy(Operation.channel(session)),
+        ],
   ];
 
   /// The server does not observe discovery, RSSI, GATT or activity changes.
@@ -108,15 +112,15 @@ class WorkbenchController({
     adapter,
     serverPsm,
     _busy.where((o) => o == Operation.server || _incomingOperation(o)).toList(),
-    _channelState(incoming: true),
+    _incomingChannelState,
   ];
 
   bool _incomingOperation(Operation operation) =>
       _channelSessions.values.any((s) => s.incoming && operation == Operation.channel(s));
 
-  List<Object?> _channelState({required bool incoming}) => [
+  List<Object?> get _incomingChannelState => [
     for (final s in _channelSessions.values)
-      if (s.incoming == incoming) [s.channel, s.closed, s.transmitted, s.received, s.history],
+      if (s.incoming) [s.channel, s.closed, s.transmitted, s.received, s.history],
   ];
 
   /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
@@ -145,6 +149,14 @@ class WorkbenchController({
 
   /// Matches the typed operation passed to [run], including any device/channel scope.
   bool busy(Operation operation) => _busy.contains(operation);
+
+  /// Retains observations for an inspected characteristic until its service cache is retired.
+  ValueListenable<List<int>?> observeCharacteristic(BluetoothCharacteristic characteristic) {
+    final values = _characteristicValues.putIfAbsent(characteristic.remoteId, () => {});
+    return values
+        .putIfAbsent(Operation.characteristic(characteristic), () => _CharacteristicValue(characteristic, _streamError))
+        .value;
+  }
 
   /// Whether this workbench subscribed to [c] on web, which reports no subscription state itself.
   bool subscribedOnWeb(BluetoothCharacteristic c) =>
@@ -411,6 +423,16 @@ class WorkbenchController({
   void _invalidateServices(DeviceIdentifier remoteId) {
     _serviceGenerations.update(remoteId, (generation) => generation + 1, ifAbsent: () => 1);
     _services.remove(remoteId);
+    _retireCharacteristicValues(remoteId);
+  }
+
+  void _retireCharacteristicValues(DeviceIdentifier remoteId) {
+    final values = _characteristicValues.remove(remoteId);
+    if (values != null) {
+      for (final observation in values.values) {
+        observation.dispose();
+      }
+    }
   }
 
   /// Toggles scanning: a running scan is stopped rather than restarted.
@@ -883,6 +905,9 @@ class WorkbenchController({
     parserLibrary.dispose();
     catalogLibrary.dispose();
     _activity.dispose();
+    for (final peer in _characteristicValues.keys.toList()) {
+      _retireCharacteristicValues(peer);
+    }
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
@@ -945,6 +970,25 @@ class WorkbenchController({
   }
 }
 
+class _CharacteristicValue(BluetoothCharacteristic characteristic, void Function(Object, StackTrace) onError) {
+  this {
+    final cached = characteristic.lastValue;
+    value = ValueNotifier(cached.isEmpty ? null : List.unmodifiable(cached));
+    // The first sample is the cache seed. A subsequent empty event is a real payload.
+    _updates = characteristic.lastValueStream
+        .skip(1)
+        .listen((bytes) => value.value = List.unmodifiable(bytes), onError: onError);
+  }
+
+  late final ValueNotifier<List<int>?> value;
+  late final StreamSubscription<List<int>> _updates;
+
+  void dispose() {
+    unawaited(_updates.cancel());
+    value.dispose();
+  }
+}
+
 /// Identifies an operation for [WorkbenchController.run] and [WorkbenchController.busy].
 /// Operations with a [scope], such as one channel, run independently of each other.
 class const Operation._(final _OperationKind _kind, [final Object? scope, final String? _detail]) {
@@ -964,7 +1008,13 @@ class const Operation._(final _OperationKind _kind, [final Object? scope, final 
   new rssi(BluetoothDevice device) : this._(_OperationKind.rssi, device.remoteId);
   new channel(ChannelSession session) : this._(_OperationKind.channel, session.key);
   new characteristic(BluetoothCharacteristic c)
-    : this._(_OperationKind.characteristic, (c.remoteId, c.serviceUuid, c.uuid, c.instanceId), c.uuid.toString());
+    : this._(_OperationKind.characteristic, (
+        c.remoteId,
+        c.primaryServiceUuid,
+        c.serviceUuid,
+        c.uuid,
+        c.instanceId,
+      ), c.uuid.toString());
   new descriptor(BluetoothDescriptor d)
     : this._(_OperationKind.descriptor, (
         d.remoteId,

@@ -39,6 +39,19 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
 
   @override
   Widget build(BuildContext context) {
+    context.select<WorkbenchController, Object?>((c) {
+      final tracker = c.advertisementTracker;
+      final peerTracker = tracker?.remoteId == device.remoteId ? tracker : null;
+      return [
+        ObjectKey(c.selectedAdvertisement),
+        peerTracker,
+        peerTracker?.count,
+        c.tracking,
+        c.ready,
+        c.busy(Operation.scan),
+        c.parsers,
+      ];
+    });
     final advertisement = c.selectedAdvertisement;
     final parsers = c.parsersFor(device.remoteId);
     final tracker = c.advertisementTracker?.remoteId == device.remoteId ? c.advertisementTracker : null;

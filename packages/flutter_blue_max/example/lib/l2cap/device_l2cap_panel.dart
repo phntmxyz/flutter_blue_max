@@ -32,6 +32,16 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
   Widget build(BuildContext context) {
     final c = context.read<WorkbenchController>();
     final device = widget.device;
+    context.select<WorkbenchController, Object?>(
+      (c) => [
+        device.isConnected,
+        c.ready,
+        c.busy(Operation.open),
+        c.busy(Operation.connection),
+        c.nameOf(device),
+        c.outgoingChannelState(device.remoteId),
+      ],
+    );
     final connected = device.isConnected;
     final sessions = c.channelSessions.where((s) => !s.incoming && s.channel.deviceId == device.remoteId);
     final connectionReady = connected && c.ready;

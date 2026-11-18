@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/activity/activity_panel.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
@@ -73,7 +74,16 @@ void main() {
     spot<AdapterBanner>().spotText('Bluetooth is off.').doesNotExist();
   });
 
-  const panels = [DevicesPanel, L2capServerPanel, LibraryPanel, ActivityLog];
+  const panels = [
+    DevicesPanel,
+    DeviceDiscoveryList,
+    DeviceDetails,
+    AdvertisementCard,
+    GattExplorer,
+    L2capServerPanel,
+    LibraryPanel,
+    ActivityLog,
+  ];
 
   testWidgets('logs and discovery rebuild only the panels that use them', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
@@ -106,7 +116,7 @@ void main() {
     await tester.pump();
 
     for (final type in panels) {
-      expect(builds[type] ?? 0, type == DevicesPanel ? greaterThan(0) : 0, reason: '$type scan rebuild count');
+      expect(builds[type] ?? 0, type == DeviceDiscoveryList ? greaterThan(0) : 0, reason: '$type scan rebuild count');
     }
     // A new sample for the same peer should update its visible name and RSSI.
     spotText('Test peripheral', exact: true).existsOnce();
@@ -115,6 +125,38 @@ void main() {
     spotText('Updated peripheral', exact: true).existsOnce();
 
     await robot.tapLabel('Stop scan');
+    await robot.selectPeripheral(name: 'Updated peripheral');
+    await robot.tapLabel('Advertisement');
+    await robot.tapLabel('Track advertisements');
+    builds.clear();
+    platform.advertise(name: 'Updated peripheral', rssi: -64);
+    await robot.idle();
+    expect(builds[AdvertisementCard], greaterThan(0));
+    expect(builds[DeviceDiscoveryList], greaterThan(0));
+    expect(builds[DevicesPanel] ?? 0, 0);
+    expect(builds[DeviceDetails] ?? 0, 0);
+    expect(builds[GattExplorer] ?? 0, 0);
+    spotText('-64 dBm · Connectable · Tracking 1', exact: true).existsOnce();
+
+    await robot.tapLabel('Stop tracking');
+    final inspector = spot<DeviceDetails>().spot<Scrollable>().withChild(spot<SliverPadding>())..existsOnce();
+    await tester.scrollUntilVisible(spotText('Connect', exact: true).finder, -200, scrollable: inspector.finder);
+    await robot.tapLabel('Advertisement');
+    await robot.connectSelected();
+    await robot.tapLabel('Discover services');
+    spotText('Battery', exact: true).existsOnce();
+    platform.overrideReadRssi = (request) async {
+      platform.rssiValues.add(
+        BmReadRssiResult(remoteId: request.remoteId, rssi: -52, success: true, errorCode: 0, errorString: ''),
+      );
+      return true;
+    };
+    builds.clear();
+    await robot.tapLabel('Read RSSI');
+    spot<DeviceDetails>().spotText('-52 dBm', exact: true).existsOnce();
+    expect(builds[DeviceDetails], greaterThan(0));
+    expect(builds[GattExplorer] ?? 0, 0);
+
     builds.clear();
     await robot.controller.startServer(secure: true);
     await tester.pump();
