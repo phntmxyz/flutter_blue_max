@@ -12,9 +12,10 @@ void main() {
 
   test('malformed JSON retains the decoder reason, source and position', () {
     const text = '{"parsers": [\n?]}';
-    late FormatException original;
+    final FormatException original;
     try {
       jsonDecode(text);
+      fail('Expected the malformed fixture to fail JSON decoding');
     } on FormatException catch (exception) {
       original = exception;
     }

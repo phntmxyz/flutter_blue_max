@@ -55,7 +55,9 @@ For a custom service, add its UUID to `webOptionalServices` in [the scan call](l
   The history can be filtered by text, changed payloads or parsed values.
   Linux displays discovery advertisements with no continuous per-peer tracking or MTU reading.
 - **Library → Parsers:** define how manufacturer or service data is read as named values, optionally bound to one device; parsed values appear below the raw data and in the tracker history.
-  Fields sit at fixed offsets, or, with the **Records** layout, in type–length–value records such as BTHome, where each field names its record type and frames may carry only some of them.
+  Fields sit at fixed offsets or are grouped by record type in the **Records** layout.
+  For BTHome, choose **Type, value** because the record size comes from the configured fields.
+  Parsing stops when it encounters a record type with an unknown size.
   Unsigned fields can read a bit range, and every numeric value is shown as raw × scale + add.
   Encrypted payloads and values computed from several fields are not supported.
   Parsers are saved locally (shared preferences, browser local storage on web); first launches start with the status and sensor frames of the FBM test dongle firmware (manufacturer data `0xFFFF`), which **Add test dongle parsers** restores.

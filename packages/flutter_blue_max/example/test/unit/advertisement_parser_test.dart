@@ -44,6 +44,76 @@ void main() {
     ],
   );
 
+  test('service-data parser imports reject empty UUIDs and accept explicit UUIDs', () {
+    final json = sensor.toJson();
+    for (final input in ['', '   ']) {
+      expect(() => AdvertisementParser.fromJson({...json, 'serviceUuid': input}), throwsFormatException);
+    }
+    expect(AdvertisementParser.fromJson(json).serviceUuid, Guid('fff0'));
+  });
+
+  test('parser imports enforce the record ID width used by the editor', () {
+    for (final type in RecordTypeFormat.values) {
+      final maxId = (1 << (8 * type.size)) - 1;
+      final parser = {...sensor.toJson(), 'records': RecordFormat(type: type).toJson()};
+      final field = sensor.fields.first.toJson();
+      Map<String, dynamic> fixture(int? id) => {
+        ...parser,
+        'fields': [
+          {...field, 'record': id},
+        ],
+      };
+      for (final id in [null, -1, maxId + 1]) {
+        expect(type.canReadId(id), isFalse);
+        expect(() => AdvertisementParser.fromJson(fixture(id)), throwsFormatException);
+      }
+      expect(type.canReadId(maxId), isTrue);
+      expect(AdvertisementParser.fromJson(fixture(maxId)).fields.single.record, maxId);
+    }
+  });
+
+  test('large offsets and sizes report short payloads without overflow', () {
+    final large = int.tryParse('9223372036854775807') ?? 0x1fffffffffffff;
+    final field = AdvertisementField('Far away', large, AdvertisementFieldType.hex, length: large, record: 1);
+    expect(field.format([1, 2]), 'too short (2 B)');
+
+    final pattern = AdvertisementParser(
+      name: 'Pattern',
+      source: AdvertisementSource.manufacturer,
+      companyId: 1,
+      matchOffset: large,
+      match: [1, 2],
+      fields: [field],
+    );
+    expect(pattern.read(companyId: 1, bytes: [1, 2]), isEmpty);
+
+    final implied = AdvertisementParser(
+      name: 'Implied',
+      source: AdvertisementSource.manufacturer,
+      companyId: 1,
+      records: const RecordFormat(length: RecordLength.implied),
+      fields: [field],
+    );
+    expect(implied.read(companyId: 1, bytes: [1, 2]), ['Implied · record 0x01 truncated at 0']);
+  });
+
+  test('numeric displays preserve a fractional add value', () {
+    const field = AdvertisementField('Value', 0, AdvertisementFieldType.uint8, scale: 2, add: 0.125);
+    expect(field.format([1]), '2.125');
+  });
+
+  test('length-first records distinguish invalid sizes from missing header bytes', () {
+    const parser = AdvertisementParser(
+      name: 'AD',
+      source: AdvertisementSource.manufacturer,
+      companyId: 1,
+      records: RecordFormat(type: RecordTypeFormat.uint16le, length: RecordLength.beforeType),
+      fields: [],
+    );
+    expect(parser.read(companyId: 1, bytes: [1, 2]), ['AD · record header truncated at 0']);
+    expect(parser.read(companyId: 1, bytes: [1, 2, 3]), ['AD · record length 1 is smaller than the 2-byte type at 0']);
+  });
+
   test('legacy parser fields default later optional settings without accepting malformed values', () {
     final parser = AdvertisementParser.fromJson({
       'name': 'Legacy',

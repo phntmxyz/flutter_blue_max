@@ -33,14 +33,14 @@ class const AdvertisementParser({
   factory fromPick(RequiredPick data) {
     final AdvertisementParser parser;
     try {
-      final serviceUuid = _nullableString(data('serviceUuid'));
+      final serviceUuid = _nullableString(data('serviceUuid'))?.trim();
       final records = data('records');
       final device = _nullableString(data('device'));
       parser = AdvertisementParser(
         name: data('name').asStringOrThrow(),
         source: AdvertisementSource.values.byName(data('source').asStringOrThrow()),
         companyId: _nullableInt(data('companyId')),
-        serviceUuid: serviceUuid == null ? null : Guid(serviceUuid),
+        serviceUuid: serviceUuid == null || serviceUuid.isEmpty ? null : Guid(serviceUuid),
         match: List<int>.unmodifiable(_intListOrEmpty(data('match'))),
         matchOffset: _intOrDefault(data('matchOffset'), 0),
         records: records.value == null ? null : RecordFormat.fromPick(records.required()),
@@ -63,6 +63,16 @@ class const AdvertisementParser({
     }
     if (parser.matchOffset < 0 || parser.match.any((byte) => byte < 0 || byte > 0xff)) {
       throw FormatException('Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}');
+    }
+    final recordType = parser.records?.type;
+    if (recordType != null) {
+      for (final field in parser.fields) {
+        if (!recordType.canReadId(field.record)) {
+          throw FormatException(
+            'Invalid parser ${parser.name}: ${field.name} needs a ${recordType.size * 8}-bit record ID',
+          );
+        }
+      }
     }
     return parser;
   }
@@ -117,10 +127,12 @@ class const AdvertisementParser({
     for (final field in fields) {
       final record = field.record;
       if (record != null) {
-        sizes[record] = max(sizes[record] ?? 0, field.offset + field.size);
+        // A value cannot fill the entire payload because each record has a header.
+        final extent = _fits(field.offset, field.size, bytes.length) ? field.offset + field.size : bytes.length;
+        sizes[record] = max(sizes[record] ?? 0, extent);
       }
     }
-    final (:values, :problem) = records.split(bytes, sizes);
+    final (:values, :problem) = records._split(bytes, sizes);
     // Fields of records absent from this frame are left out: many sensors send one value per frame.
     return [
       for (final field in fields)
@@ -130,7 +142,7 @@ class const AdvertisementParser({
   }
 
   bool _matches(List<int> bytes) {
-    if (matchOffset + match.length > bytes.length) {
+    if (!_fits(matchOffset, match.length, bytes.length)) {
       return false;
     }
     for (var i = 0; i < match.length; i++) {
@@ -179,6 +191,9 @@ enum RecordTypeFormat(final String label, final int size) {
   uint16le('2 bytes LE', 2),
   uint16be('2 bytes BE', 2);
 
+  bool canReadId(int? id) => id != null && id >= 0 && id < 1 << (size * 8);
+
+  /// The caller must ensure that [size] bytes are available at [offset].
   int read(List<int> bytes, int offset) => switch (this) {
     uint8 => bytes[offset],
     uint16le => bytes[offset] | bytes[offset + 1] << 8,
@@ -201,7 +216,8 @@ enum RecordLength(final String label) {
   implied('Type, value'),
 }
 
-/// A payload that continues as a sequence of type–length–value records, e.g. BTHome.
+/// A payload that continues as a sequence of typed records.
+/// BTHome uses [RecordLength.implied] and stops at an ID whose value size is unknown.
 /// Fields then name their record type, so their position in the payload does not matter.
 class const RecordFormat({
   /// Where the first record starts.
@@ -234,9 +250,11 @@ class const RecordFormat({
 
   /// The value of each record type in [bytes], keeping the first of repeated types.
   /// [sizes] gives the value size per type for [RecordLength.implied].
-  /// [problem] explains why splitting stopped before the end of the payload.
-  ({Map<int, List<int>> values, String? problem}) split(List<int> bytes, Map<int, int> sizes) {
+  /// The result includes the reason if splitting stopped early.
+  ({Map<int, List<int>> values, String? problem}) _split(List<int> bytes, Map<int, int> sizes) {
     final values = <int, List<int>>{};
+    ({Map<int, List<int>> values, String? problem}) result([String? problem]) =>
+        (values: Map.unmodifiable(values), problem: problem);
     var position = offset;
     while (position < bytes.length) {
       final int recordType;
@@ -244,8 +262,8 @@ class const RecordFormat({
       final int size;
       switch (length) {
         case RecordLength.afterType:
-          if (position + type.size + 1 > bytes.length) {
-            return (values: values, problem: 'record header truncated at $position');
+          if (!_fits(position, type.size + 1, bytes.length)) {
+            return result('record header truncated at $position');
           }
           recordType = type.read(bytes, position);
           start = position + type.size + 1;
@@ -253,33 +271,36 @@ class const RecordFormat({
         case RecordLength.beforeType:
           // A zero length ends the records, as padding does in advertising data.
           if (bytes[position] == 0) {
-            return (values: values, problem: null);
+            return result();
           }
-          if (bytes[position] < type.size || position + 1 + type.size > bytes.length) {
-            return (values: values, problem: 'record header truncated at $position');
+          if (!_fits(position, type.size + 1, bytes.length)) {
+            return result('record header truncated at $position');
+          }
+          if (bytes[position] < type.size) {
+            return result('record length ${bytes[position]} is smaller than the ${type.size}-byte type at $position');
           }
           recordType = type.read(bytes, position + 1);
           start = position + 1 + type.size;
           size = bytes[position] - type.size;
         case RecordLength.implied:
-          if (position + type.size > bytes.length) {
-            return (values: values, problem: 'record header truncated at $position');
+          if (!_fits(position, type.size, bytes.length)) {
+            return result('record header truncated at $position');
           }
           recordType = type.read(bytes, position);
           start = position + type.size;
           final known = sizes[recordType];
           if (known == null) {
-            return (values: values, problem: 'unknown record ${type.format(recordType)} at $position');
+            return result('unknown record ${type.format(recordType)} at $position');
           }
           size = known;
       }
-      if (start + size > bytes.length) {
-        return (values: values, problem: 'record ${type.format(recordType)} truncated at $position');
+      if (!_fits(start, size, bytes.length)) {
+        return result('record ${type.format(recordType)} truncated at $position');
       }
-      values.putIfAbsent(recordType, () => bytes.sublist(start, start + size));
+      values.putIfAbsent(recordType, () => List.unmodifiable(bytes.getRange(start, start + size)));
       position = start + size;
     }
-    return (values: values, problem: null);
+    return result();
   }
 
   String get summary => 'records from $offset · ${length.label} · type ${type.label}';
@@ -340,7 +361,7 @@ class const AdvertisementField(
       );
     }
     final bits = field.bits;
-    if (bits != null && (!field.type.unsigned || bits < 1 || field.bit + bits > field.size * 8)) {
+    if (bits != null && (!field.type.unsigned || bits < 1 || !_fits(field.bit, bits, field.size * 8))) {
       throw FormatException(
         'Invalid parser field ${field.name}: $bits bits from bit ${field.bit} of ${field.type.label}',
       );
@@ -372,7 +393,7 @@ class const AdvertisementField(
 
   /// Short payloads are reported per field, so one malformed frame never hides the others.
   String format(List<int> bytes) {
-    if (offset < 0 || size < 1 || offset + size > bytes.length) {
+    if (size < 1 || !_fits(offset, size, bytes.length)) {
       return 'too short (${bytes.length} B)';
     }
     final slice = bytes.sublist(offset, offset + size);
@@ -406,7 +427,7 @@ class const AdvertisementField(
       if (!type.unsigned) {
         return 'bits need an unsigned type';
       }
-      if (bit < 0 || bits < 1 || bit + bits > size * 8) {
+      if (bits < 1 || !_fits(bit, bits, size * 8)) {
         return 'bits beyond ${size * 8}-bit value';
       }
       final shifted = raw.toInt() >> bit;
@@ -421,14 +442,14 @@ class const AdvertisementField(
     if (integerType && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()) {
       text = '${scaled.round()}';
     } else {
-      text = scaled.toStringAsFixed(_decimals);
+      text = scaled.toStringAsFixed(max(_scaleDecimals, _addDecimals));
     }
     return unit.isEmpty ? text : '$text $unit';
   }
 
   /// Enough decimals to show one step of the scale: 0.1 → 1, 0.005 and 1/256 → 3.
   /// Unscaled floats keep two.
-  int get _decimals {
+  int get _scaleDecimals {
     // A zero or non-finite scale has no step to show; validation rejects it, but a preview may still see it.
     if (scale == 1 || scale == 0 || !scale.isFinite) {
       return 2;
@@ -436,7 +457,18 @@ class const AdvertisementField(
     // The epsilon absorbs rounding, e.g. -log10(0.001) = 2.9999999999999996.
     return (-log(scale.abs()) / ln10 - 1e-9).ceil().clamp(1, 6);
   }
+
+  int get _addDecimals {
+    for (var places = 0; places < 6; places++) {
+      if (double.parse(add.toStringAsFixed(places)) == add) {
+        return places;
+      }
+    }
+    return 6;
+  }
 }
+
+bool _fits(int offset, int size, int limit) => offset >= 0 && offset <= limit && size >= 0 && size <= limit - offset;
 
 /// Human-readable advertisement fields; without parsers also the identity used to detect payload changes.
 /// Parsed values follow the payload they were read from.
@@ -471,11 +503,15 @@ int _intOrDefault(Pick value, int fallback) => _nullableInt(value) ?? fallback;
 double _doubleOrDefault(Pick value, double fallback) => value.value == null ? fallback : value.asDoubleOrThrow();
 String _stringOrDefault(Pick value, String fallback) => _nullableString(value) ?? fallback;
 List<int> _intListOrEmpty(Pick value) {
-  if (value.value == null) return const [];
+  if (value.value == null) {
+    return const [];
+  }
   return value.asListOrThrow((it) => it.asIntOrThrow());
 }
 
 T _enumOrDefault<T extends Enum>(Pick value, List<T> values, T fallback) {
-  if (value.value == null) return fallback;
+  if (value.value == null) {
+    return fallback;
+  }
   return values.byName(value.asStringOrThrow());
 }

@@ -16,4 +16,6 @@ void setInputError(AbstractControl<dynamic> control, String? message) {
   control.setErrors({'input': message}, markAsDirty: false);
 }
 
-final inputValidationMessages = <String, ValidationMessageFunction>{'input': (error) => error as String};
+const inputValidationMessages = <String, ValidationMessageFunction>{'input': _inputValidationMessage};
+
+String _inputValidationMessage(Object error) => error as String;

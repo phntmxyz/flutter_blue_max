@@ -145,8 +145,12 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
   int? get _companyId => _hexNumber(_key.text);
 
   Guid? get _serviceUuid {
+    final input = _key.text.trim();
+    if (input.isEmpty) {
+      return null;
+    }
     try {
-      return Guid(_key.text.trim());
+      return Guid(input);
     } on Object {
       return null;
     }
@@ -166,7 +170,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
     String? keyError;
     if (_source == AdvertisementSource.manufacturer) {
       final id = _companyId;
-      if (id == null || id < 0 || id > 0xffff) keyError = 'Enter a 16-bit hex company ID.';
+      if (id == null || id < 0 || id > 0xffff) {
+        keyError = 'Enter a 16-bit hex company ID.';
+      }
     } else if (_serviceUuid == null) {
       keyError = 'Enter a 16, 32 or 128-bit UUID.';
     }
@@ -186,7 +192,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       final record = _hexNumber(draft.record.text);
       final recordBits = _recordType.size * 8;
       String? recordError;
-      if (_records && (record == null || record < 0 || record >= 1 << recordBits)) {
+      if (_records && !_recordType.canReadId(record)) {
         recordError = 'Enter a $recordBits-bit hex type.';
       }
       setInputError(draft.record, recordError);
@@ -205,7 +211,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       if (draft.type.unsigned && draft.bits.text.trim().isNotEmpty) {
         final available = draft.type.size! * 8 - (int.tryParse(draft.bit.text.trim()) ?? 0);
         final bits = int.tryParse(draft.bits.text.trim());
-        if (bits == null || bits < 1 || bits > available) bitsError = 'Enter 1 to $available.';
+        if (bits == null || bits < 1 || bits > available) {
+          bitsError = 'Enter 1 to $available.';
+        }
       }
       setInputError(draft.bits, bitsError);
     }
@@ -214,27 +222,26 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
 
   /// Preview and Save use the same model validation, including hidden-field rules.
   AdvertisementParser? _build() {
-    if (!_form.valid) return null;
-    final fields = <AdvertisementField>[];
-    for (final draft in _fields) {
+    if (!_form.valid) {
+      return null;
+    }
+    final fields = _fields.map((draft) {
       final variable = draft.type.size == null;
       final bits = draft.bits.text.trim();
       final ranged = draft.type.unsigned && bits.isNotEmpty;
-      fields.add(
-        AdvertisementField(
-          draft.name.text.trim(),
-          int.tryParse(draft.offset.text.trim())!,
-          draft.type,
-          length: variable ? int.tryParse(draft.length.text.trim())! : 1,
-          scale: variable ? 1 : double.tryParse(draft.scale.text.trim())!,
-          add: variable ? 0 : double.tryParse(draft.add.text.trim())!,
-          unit: draft.unit.text.trim(),
-          record: _records ? _hexNumber(draft.record.text) : null,
-          bit: ranged ? int.tryParse(draft.bit.text.trim())! : 0,
-          bits: ranged ? int.tryParse(bits) : null,
-        ),
+      return AdvertisementField(
+        draft.name.text.trim(),
+        int.tryParse(draft.offset.text.trim())!,
+        draft.type,
+        length: variable ? int.tryParse(draft.length.text.trim())! : 1,
+        scale: variable ? 1 : double.tryParse(draft.scale.text.trim())!,
+        add: variable ? 0 : double.tryParse(draft.add.text.trim())!,
+        unit: draft.unit.text.trim(),
+        record: _records ? _hexNumber(draft.record.text) : null,
+        bit: ranged ? int.tryParse(draft.bit.text.trim())! : 0,
+        bits: ranged ? int.tryParse(bits) : null,
       );
-    }
+    });
     RecordFormat? records;
     if (_records) {
       records = RecordFormat(
@@ -244,7 +251,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       );
     }
     // This codec is the sole throwing input parser; unexpected construction errors propagate.
-    List<int> match;
+    final List<int> match;
     try {
       match = PayloadCodec.decode(_match.text, hex: true);
     } on FormatException {
@@ -405,8 +412,9 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             Text('Layout', style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Fixed offsets read every field at its position. Records split the payload into type–length–value '
-              'records, as in BTHome; fields then name their record type.',
+              'Fixed offsets read fields at fixed positions. In Records mode, each field names a record type. '
+              'For BTHome choose Type, value. Its record size comes from the configured fields, and parsing stops '
+              'when it reaches a type whose size is unknown.',
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
