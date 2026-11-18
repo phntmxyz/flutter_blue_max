@@ -34,7 +34,7 @@ class const ParserEditorPage({
       ),
     );
     if (parser != null) {
-      await controller.saveParser(parser, previous: previous);
+      await controller.save(parser, previous: previous);
     }
   }
 

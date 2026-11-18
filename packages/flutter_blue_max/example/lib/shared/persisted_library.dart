@@ -37,6 +37,7 @@ class PersistedLibrary<T>({
                 '$resetAction removes them. ${stored?.problem?.message ?? ''}',
             'ERROR loading $label: $entries unreadable: ${stored?.problem?.message}',
             error: stored?.problem,
+            stackTrace: stored?.problemStack,
           ),
         );
       }
@@ -68,6 +69,8 @@ class PersistedLibrary<T>({
     items.remove(item);
   });
 
+  /// Restores defaults and discards entries that could not be decoded.
+  /// Use only after the user agrees to replace an unreadable or newer-format library.
   Future<void> reset() async {
     if (!_hasLoaded) {
       await load();
@@ -81,42 +84,47 @@ class PersistedLibrary<T>({
   }
 
   /// Feature-specific import policy can change the list only after its initial load.
-  @protected
-  Future<R> change<R>(R Function(List<T> items) action) async {
+  Future<LibraryChange<R>> change<R>(R Function(List<T> items) action) async {
     if (!_hasLoaded) {
       await load();
     }
     final result = action(_items);
-    await _persist();
-    return result;
+    final saved = await _persist();
+    return LibraryChange(result, saved: saved);
   }
 
-  Future<void> _persist() {
-    _notify();
+  Future<bool> _persist() {
     if (_storeUnreadable) {
+      _notify();
       onProblem(
         LibraryProblem(
           'Saving $label: the stored $label could not be read, so changes are not saved. $resetAction replaces them.',
           'ERROR saving $label: stored value unreadable',
         ),
       );
-      return Future.value();
+      return Future.value(false);
     }
     final snapshot = List<Object?>.of(_items);
     final unreadable = List<Object?>.of(_unreadable);
-    return _writes = _writes.then((_) => write(key, snapshot, unreadable: unreadable)).catchError((
-      Object exception,
-      StackTrace stackTrace,
-    ) {
-      onProblem(
-        LibraryProblem(
-          'Saving $label: $exception',
-          'ERROR saving $label: $exception',
-          error: exception,
-          stackTrace: stackTrace,
-        ),
-      );
+    final saved = _writes.then((_) async {
+      try {
+        await write(key, snapshot, unreadable: unreadable);
+        return true;
+      } catch (exception, stackTrace) {
+        onProblem(
+          LibraryProblem(
+            'Saving $label: $exception',
+            'ERROR saving $label: $exception',
+            error: exception,
+            stackTrace: stackTrace,
+          ),
+        );
+        return false;
+      }
     });
+    _writes = saved;
+    _notify();
+    return saved;
   }
 
   void _notify() {
@@ -129,6 +137,9 @@ class PersistedLibrary<T>({
     super.dispose();
   }
 }
+
+/// An in-memory change and whether its snapshot was written to storage.
+class const LibraryChange<R>(final R value, {required final bool saved});
 
 /// Error state for the shell and activity log without coupling storage to a Bluetooth controller.
 class const LibraryProblem(

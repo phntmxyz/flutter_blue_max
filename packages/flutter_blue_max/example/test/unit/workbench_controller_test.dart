@@ -378,7 +378,7 @@ void main() {
       SharedPreferences.setMockInitialValues({parserStoreKey: future});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.error, contains('newer format'));
-      await controller.saveParser(testDongleParsers.first);
+      await controller.parserLibrary.save(testDongleParsers.first);
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(parserStoreKey), future);
     });
@@ -387,11 +387,10 @@ void main() {
       SharedPreferences.setMockInitialValues({parserStoreKey: jsonEncode(testDongleParsers)});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.parsers, hasLength(testDongleParsers.length));
-      await controller.removeParser(controller.parsers.last);
+      await controller.parserLibrary.remove(controller.parsers.last);
       final preferences = await SharedPreferences.getInstance();
-      final envelope = jsonDecode(preferences.getString(parserStoreKey)!) as Map<String, dynamic>;
-      expect(envelope['version'], 1);
-      expect(envelope['items'], hasLength(1));
+      final envelope = jsonDecode(preferences.getString(parserStoreKey)!);
+      expect(envelope, allOf(containsPair('version', 1), containsPair('items', hasLength(1))));
       expect((await loadParsers())!.items, hasLength(1));
     });
 
@@ -404,7 +403,7 @@ void main() {
     test('changes survive a restart, including removing every parser', () async {
       final (:controller, platform: _) = await _setup();
       for (final parser in controller.parsers.skip(1).toList()) {
-        await controller.removeParser(parser);
+        await controller.parserLibrary.remove(parser);
       }
       const climate = AdvertisementParser(
         name: 'Climate',
@@ -413,14 +412,14 @@ void main() {
         device: DeviceIdentifier('AA:BB:CC:DD:EE:01'),
         fields: [AdvertisementField('Temperature', 1, AdvertisementFieldType.int16be, scale: 0.005, unit: '°C')],
       );
-      await controller.saveParser(climate, previous: controller.parsers.first);
+      await controller.parserLibrary.save(climate, previous: controller.parsers.first);
 
       final restarted = await _setup(resetStorage: false);
       final restored = restarted.controller.parsers.single;
       expect(jsonEncode(restored), jsonEncode(climate));
       expect(restored.appliesTo(const DeviceIdentifier('AA:BB:CC:DD:EE:02')), isFalse);
 
-      await restarted.controller.removeParser(restored);
+      await restarted.controller.parserLibrary.remove(restored);
       final emptied = await _setup(resetStorage: false);
       expect(emptied.controller.parsers, isEmpty, reason: 'Deleting the examples must not bring them back');
     });
@@ -431,12 +430,12 @@ void main() {
       final battery = KnownService(Guid('180f'), 'Pack', test: true, [
         KnownCharacteristic(Guid('2a19'), 'Charge', properties: {GattProperty.read, GattProperty.notify}),
       ]);
-      await controller.saveCatalogService(battery);
+      await controller.catalogLibrary.save(battery);
       expect(controller.knownService(Guid('180f'))?.name, 'Pack');
 
       final restarted = await _setup(resetStorage: false);
       expect(jsonEncode(restarted.controller.catalog.single), jsonEncode(battery));
-      await restarted.controller.removeCatalogService(restarted.controller.catalog.single);
+      await restarted.controller.catalogLibrary.remove(restarted.controller.catalog.single);
       expect(restarted.controller.knownService(Guid('180f'))?.name, 'Battery');
       final emptied = await _setup(resetStorage: false);
       expect(emptied.controller.catalog, isEmpty);
@@ -454,10 +453,12 @@ void main() {
       final thermostat = KnownService(Guid('fff0'), 'Thermostat', [KnownCharacteristic(Guid('fff1'), 'Level')]);
       final renamed = KnownService(Guid('fff0'), 'Room thermostat', thermostat.characteristics);
       final lamp = KnownService(Guid('ffe0'), 'Lamp', []);
-      final first = await controller.addCatalogServices([thermostat]);
-      expect([first.added, first.replaced, first.present], [1, 0, 0]);
-      final next = await controller.addCatalogServices([renamed, lamp, lamp]);
-      expect([next.added, next.replaced, next.present], [1, 1, 1]);
+      final first = await controller.catalogLibrary.addCatalogServices([thermostat]);
+      expect(first.saved, isTrue);
+      expect([first.value.added, first.value.replaced, first.value.present], [1, 0, 0]);
+      final next = await controller.catalogLibrary.addCatalogServices([renamed, lamp, lamp]);
+      expect(next.saved, isTrue);
+      expect([next.value.added, next.value.replaced, next.value.present], [1, 1, 1]);
       expect(controller.catalog.map((s) => s.name), ['Room thermostat', 'Lamp']);
     });
 
@@ -465,7 +466,7 @@ void main() {
       SharedPreferences.setMockInitialValues({catalogStoreKey: '[{"name": "Broken"}]'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.error, startsWith('Loading GATT catalog'));
-      await controller.resetCatalog();
+      await controller.catalogLibrary.reset();
       final stored = await loadCatalog();
       expect(stored?.items, isEmpty);
       expect(stored?.unreadable, isEmpty);
@@ -473,9 +474,9 @@ void main() {
 
     test('restoring the examples adds only missing ones', () async {
       final (:controller, platform: _) = await _setup();
-      await controller.removeParser(controller.parsers.first);
-      await controller.addParsers(testDongleParsers);
-      await controller.addParsers(testDongleParsers);
+      await controller.parserLibrary.remove(controller.parsers.first);
+      await controller.parserLibrary.addParsers(testDongleParsers);
+      await controller.parserLibrary.addParsers(testDongleParsers);
       expect(controller.parsers, hasLength(testDongleParsers.length));
     });
 
@@ -487,7 +488,9 @@ void main() {
         companyId: 0x1234,
         fields: [],
       );
-      expect(await controller.addParsers([testDongleParsers.first, own, own]), 1);
+      final imported = await controller.parserLibrary.addParsers([testDongleParsers.first, own, own]);
+      expect(imported.saved, isTrue);
+      expect(imported.value, 1);
       expect(controller.parsers.map((parser) => parser.name), [...testDongleParsers.map((p) => p.name), 'Own']);
     });
 
@@ -495,7 +498,7 @@ void main() {
       SharedPreferences.setMockInitialValues({parserStoreKey: '[{"name": "Broken"}]'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.parsers, isEmpty);
-      await controller.resetParsers();
+      await controller.parserLibrary.reset();
       expect(jsonEncode(controller.parsers), jsonEncode(testDongleParsers));
       final stored = await loadParsers();
       expect(jsonEncode(stored?.items), jsonEncode(testDongleParsers));
@@ -514,8 +517,8 @@ void main() {
       expect(controller.parsers.single.name, testDongleParsers.first.name);
       expect(controller.error, contains('1 stored entry could not be read'));
 
-      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
-      await controller.removeParser(controller.parsers.single);
+      await controller.catalogLibrary.save(KnownService(Guid('ffe0'), 'Lamp', []));
+      await controller.parserLibrary.remove(controller.parsers.single);
       final catalog = await loadCatalog();
       expect(catalog?.items.map((s) => s.name), ['Own', 'Lamp']);
       expect(catalog?.unreadable, [broken]);
@@ -527,12 +530,12 @@ void main() {
     test('a store that is not a list is never overwritten by an ordinary save', () async {
       SharedPreferences.setMockInitialValues({catalogStoreKey: '{"not": "a list"}'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
-      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
+      await controller.catalogLibrary.save(KnownService(Guid('ffe0'), 'Lamp', []));
       expect(controller.error, contains('changes are not saved'));
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(catalogStoreKey), '{"not": "a list"}');
 
-      await controller.resetCatalog();
+      await controller.catalogLibrary.reset();
       expect((await loadCatalog())?.items, isEmpty);
     });
 
@@ -548,13 +551,13 @@ void main() {
         },
       );
 
-      await controller.removeParser(controller.parsers.first);
+      await controller.parserLibrary.remove(controller.parsers.first);
       expect(controller.error, 'Saving parsers: Bad state: disk full');
       expect(controller.logs.last, contains('ERROR saving parsers'));
 
       fail = false;
-      await controller.saveCatalogService(KnownService(Guid('ffe0'), 'Lamp', []));
-      expect(saved[catalogStoreKey], hasLength(1));
+      await controller.parserLibrary.remove(controller.parsers.single);
+      expect(saved[parserStoreKey], isEmpty);
     });
 
     test('a slow save never overwrites a newer one', () async {
@@ -570,8 +573,8 @@ void main() {
         },
       );
 
-      final first = controller.removeParser(controller.parsers.first);
-      final second = controller.removeParser(controller.parsers.first);
+      final first = controller.parserLibrary.remove(controller.parsers.first);
+      final second = controller.parserLibrary.remove(controller.parsers.first);
       slow.complete();
       await Future.wait([first, second]);
 

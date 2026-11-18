@@ -28,7 +28,7 @@ extension GattCatalogRobot on WorkbenchRobot {
       KnownCharacteristic(Guid('fff1'), '', properties: {}),
       KnownCharacteristic(Guid('fff2'), 'Valid', properties: {GattProperty.read}),
     ]);
-    await controller.saveCatalogService(service);
+    await controller.catalogLibrary.save(service);
     await tapLabel('Library');
     await tapLabel('GATT catalog');
     await tapLabel('Two characteristics');

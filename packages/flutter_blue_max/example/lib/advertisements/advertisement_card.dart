@@ -91,7 +91,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
                     ),
                     IconButton(
                       tooltip: 'Remove parser',
-                      onPressed: () => c.removeParser(parser),
+                      onPressed: () => c.parserLibrary.remove(parser),
                       icon: const Icon(Icons.delete_outline),
                     ),
                   ],

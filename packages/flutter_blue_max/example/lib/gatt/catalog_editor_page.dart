@@ -37,7 +37,7 @@ class const CatalogEditorPage({
       ),
     );
     if (service != null) {
-      await controller.saveCatalogService(service, previous: previous);
+      await controller.save(service, previous: previous);
     }
   }
 

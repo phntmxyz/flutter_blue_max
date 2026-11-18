@@ -8,7 +8,6 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
@@ -93,8 +92,8 @@ class WorkbenchController({
     rssi,
     mtu,
     Map.of(_services),
-    parserLibrary.items,
-    catalogLibrary.items,
+    parserLibrary.parsers,
+    catalogLibrary.catalog,
     _busy.where((o) => o != Operation.server && !_incomingOperation(o)).toList(),
     _channelState(incoming: false),
   ];
@@ -117,16 +116,16 @@ class WorkbenchController({
   ];
 
   /// Global parsers, saved across launches; [parsersFor] narrows them to one peer.
-  List<AdvertisementParser> get parsers => parserLibrary.items;
+  List<AdvertisementParser> get parsers => parserLibrary.parsers;
   List<AdvertisementParser> parsersFor(DeviceIdentifier remoteId) =>
-      parserLibrary.items.where((parser) => parser.appliesTo(remoteId)).toList();
+      parserLibrary.parsers.where((parser) => parser.appliesTo(remoteId)).toList();
 
   /// The user's own GATT catalog services, saved across launches.
-  List<KnownService> get catalog => catalogLibrary.items;
+  List<KnownService> get catalog => catalogLibrary.catalog;
 
   /// The user's own entries replace built-in ones with the same UUID.
   KnownService? knownService(Guid uuid) =>
-      catalogLibrary.items.where((s) => s.uuid == uuid).firstOrNull ?? builtInService(uuid);
+      catalogLibrary.catalog.where((s) => s.uuid == uuid).firstOrNull ?? builtInService(uuid);
 
   List<ChannelSession> get channels => List.unmodifiable(_channels.values.where((s) => !s.closed));
 
@@ -776,20 +775,6 @@ class WorkbenchController({
       _update();
     }
   }
-
-  /// Replaces [previous] in place so the display order stays stable while editing.
-  Future<void> saveParser(AdvertisementParser parser, {AdvertisementParser? previous}) =>
-      parserLibrary.saveParser(parser, previous: previous);
-  Future<void> removeParser(AdvertisementParser parser) => parserLibrary.removeParser(parser);
-  Future<int> addParsers(List<AdvertisementParser> parsers) => parserLibrary.addParsers(parsers);
-  Future<void> resetParsers() => parserLibrary.resetParsers();
-  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) =>
-      catalogLibrary.saveCatalogService(service, previous: previous);
-  Future<void> removeCatalogService(KnownService service) => catalogLibrary.removeCatalogService(service);
-  KnownService? catalogServiceReplacedBy(KnownService service) => catalogLibrary.catalogServiceReplacedBy(service);
-  Future<CatalogImportResult> addCatalogServices(List<KnownService> services) =>
-      catalogLibrary.addCatalogServices(services);
-  Future<void> resetCatalog() => catalogLibrary.resetCatalog();
 
   void dismissError() {
     error = null;

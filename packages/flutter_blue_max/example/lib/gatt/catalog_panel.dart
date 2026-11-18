@@ -83,7 +83,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
                 label: const Text('Edit'),
               ),
               TextButton.icon(
-                onPressed: () => c.removeCatalogService(service),
+                onPressed: () => c.remove(service),
                 icon: const Icon(Icons.delete_outline, size: 18),
                 label: const Text('Remove'),
               ),
@@ -141,7 +141,11 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     if (chosen == null) {
       return;
     }
-    final result = await controller.addCatalogServices(chosen);
+    final change = await controller.addCatalogServices(chosen);
+    if (!change.saved) {
+      return;
+    }
+    final result = change.value;
     final added = result.added;
     final replaced = result.replaced;
     final present = result.present;
@@ -188,7 +192,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
       action: 'Reset',
     );
     if (confirmed) {
-      await controller.resetCatalog();
+      await controller.reset();
     }
   }
 

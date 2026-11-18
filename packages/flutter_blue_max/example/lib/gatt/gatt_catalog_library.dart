@@ -1,25 +1,51 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/persisted_library.dart';
+import 'package:flutter_blue_max_example/shared/stored_list.dart';
 
 /// Owns the user's saved catalog independently of Bluetooth; imports replace by UUID.
-class GattCatalogLibrary({required super.onProblem, super.write, super.read = loadCatalog})
-    extends PersistedLibrary<KnownService> {
-  this : super(key: catalogStoreKey, label: 'GATT catalog', resetAction: 'Reset catalog', resetNoun: 'catalog');
-  List<KnownService> get catalog => items;
-  Future<void> saveCatalogService(KnownService service, {KnownService? previous}) => save(service, previous: previous);
-  Future<void> removeCatalogService(KnownService service) => remove(service);
-  Future<void> resetCatalog() => reset();
+class GattCatalogLibrary({
+  required void Function(LibraryProblem) onProblem,
+  Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) write = saveStoredList,
+  Future<StoredList<KnownService>?> Function() read = loadCatalog,
+}) extends ChangeNotifier {
+  final _store = PersistedLibrary<KnownService>(
+    key: catalogStoreKey,
+    label: 'GATT catalog',
+    resetAction: 'Reset catalog',
+    resetNoun: 'catalog',
+    read: read,
+    write: write,
+    onProblem: onProblem,
+  );
+
+  this {
+    _store.addListener(notifyListeners);
+  }
+
+  List<KnownService> get catalog => _store.items;
+  Future<void> load() => _store.load();
+  Future<void> save(KnownService service, {KnownService? previous}) => _store.save(service, previous: previous);
+  Future<void> remove(KnownService service) => _store.remove(service);
+  Future<void> reset() => _store.reset();
+
+  @override
+  void dispose() {
+    _store.dispose();
+    super.dispose();
+  }
 
   KnownService? catalogServiceReplacedBy(KnownService service) {
-    final own = items.where((s) => s.uuid == service.uuid).firstOrNull;
+    final own = catalog.where((s) => s.uuid == service.uuid).firstOrNull;
     return own == null || jsonEncode(own) == jsonEncode(service) ? null : own;
   }
 
-  Future<CatalogImportResult> addCatalogServices(List<KnownService> services) => change((items) {
+  /// Reports the in-memory counts and whether the resulting catalog was saved.
+  Future<LibraryChange<CatalogImportResult>> addCatalogServices(List<KnownService> services) => _store.change((items) {
     var added = 0;
     var replaced = 0;
     var present = 0;

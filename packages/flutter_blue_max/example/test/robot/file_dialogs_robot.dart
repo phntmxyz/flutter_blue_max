@@ -20,7 +20,7 @@ enum LibraryFile() {
 extension FileDialogsRobot on WorkbenchRobot {
   Future<void> _openFileLibrary(LibraryFile library) async {
     if (library == LibraryFile.catalog) {
-      await controller.saveCatalogService(KnownService(Guid('fff0'), 'Sensor', []));
+      await controller.catalogLibrary.save(KnownService(Guid('fff0'), 'Sensor', []));
     }
     await tapLabel('Library');
     if (library == LibraryFile.catalog) await tapLabel('GATT catalog');

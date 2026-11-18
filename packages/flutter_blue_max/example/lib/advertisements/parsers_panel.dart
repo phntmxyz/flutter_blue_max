@@ -87,7 +87,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
                   ),
                   IconButton(
                     tooltip: 'Remove parser',
-                    onPressed: () => c.removeParser(parser),
+                    onPressed: () => c.remove(parser),
                     icon: const Icon(Icons.delete_outline),
                   ),
                 ],
@@ -126,7 +126,11 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
     if (chosen == null) {
       return;
     }
-    final added = await controller.addParsers(chosen);
+    final change = await controller.addParsers(chosen);
+    if (!change.saved) {
+      return;
+    }
+    final added = change.value;
     final present = chosen.length - added;
     if (context.mounted) {
       tell(
@@ -175,7 +179,7 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
       action: 'Reset',
     );
     if (confirmed) {
-      await controller.resetParsers();
+      await controller.reset();
     }
   }
 }

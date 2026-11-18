@@ -42,7 +42,7 @@ void main() {
       };
       await Future<void>.delayed(Duration.zero);
       expect(writes, isEmpty);
-      loading.complete(const StoredList([1, 2]));
+      loading.complete(StoredList([1, 2]));
       await pending;
       final expected = switch (edit) {
         _Edit.save => [1, 2, 3],
@@ -54,6 +54,49 @@ void main() {
       expect(problems, isEmpty);
     });
   }
+
+  test('storage read snapshots freeze decoded and unreadable entries', () {
+    final items = [1];
+    final unreadable = <Object?>['legacy'];
+    final result = StoredList(items, unreadable: unreadable);
+    items.clear();
+    unreadable.clear();
+    expect(result.items, [1]);
+    expect(result.unreadable, ['legacy']);
+    expect(result.items.clear, throwsUnsupportedError);
+    expect(result.unreadable.clear, throwsUnsupportedError);
+  });
+
+  test('parser import distinguishes an in-memory edit from a successful write', () async {
+    final problems = <LibraryProblem>[];
+    final library = ParserLibrary(
+      onProblem: problems.add,
+      read: () => Future<StoredList<AdvertisementParser>?>.value(),
+      write: (_, _, {unreadable = const []}) => Future<void>.error(StateError('Disk full')),
+    );
+    addTearDown(library.dispose);
+    const parser = AdvertisementParser(name: 'Own', source: AdvertisementSource.manufacturer, fields: []);
+    final result = await library.addParsers([parser]);
+    expect(result.saved, isFalse);
+    expect(result.value, 1);
+    expect(library.parsers.last, parser);
+    expect(problems.single.error, isA<StateError>());
+    expect(problems.single.stackTrace, isNotNull);
+  });
+
+  test('catalog import does not save over an unreadable envelope', () async {
+    final problems = <LibraryProblem>[];
+    final library = GattCatalogLibrary(
+      onProblem: problems.add,
+      read: () => Future<StoredList<KnownService>?>.error(const FormatException('Newer envelope')),
+      write: (_, _, {unreadable = const []}) => fail('The protected envelope must stay unchanged'),
+    );
+    addTearDown(library.dispose);
+    final result = await library.addCatalogServices([KnownService(Guid('fff0'), 'Own', [])]);
+    expect(result.saved, isFalse);
+    expect(result.value.added, 1);
+    expect(problems.last.message, contains('changes are not saved'));
+  });
 
   test('parser import waits for loading and preserves earlier stored parsers', () async {
     final loading = Completer<StoredList<AdvertisementParser>?>();
@@ -70,9 +113,11 @@ void main() {
     await Future<void>.delayed(Duration.zero);
     expect(writes, isEmpty);
     loading.complete(StoredList([testDongleParsers.first]));
-    expect(await pending, 1);
-    expect(library.items, [testDongleParsers.first, testDongleParsers.last]);
-    expect(writes.single, library.items);
+    final result = await pending;
+    expect(result.saved, isTrue);
+    expect(result.value, 1);
+    expect(library.parsers, [testDongleParsers.first, testDongleParsers.last]);
+    expect(writes.single, library.parsers);
   });
 
   test('catalog import waits for loading and replaces in place by UUID', () async {
@@ -94,8 +139,9 @@ void main() {
     expect(writes, isEmpty);
     loading.complete(StoredList([original, retained]));
     final result = await pending;
-    expect([result.added, result.replaced, result.present], [0, 1, 0]);
-    expect(library.items, [replacement, retained]);
-    expect(writes.single, library.items);
+    expect(result.saved, isTrue);
+    expect([result.value.added, result.value.replaced, result.value.present], [0, 1, 0]);
+    expect(library.catalog, [replacement, retained]);
+    expect(writes.single, library.catalog);
   });
 }
