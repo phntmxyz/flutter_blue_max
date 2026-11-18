@@ -5,9 +5,6 @@ on:
     paths:
       - 'packages/**'
       - '.github/workflows/example_build.yml'
-  push:
-    tags:
-      - 'example-test/**'
   workflow_dispatch:
     inputs:
       platform:
@@ -41,6 +38,10 @@ defaults:
 
 jobs:
   build:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     name: ${{ matrix.platform == 'checks' && 'Check example' || format('Build {0}', matrix.platform) }}
     runs-on: ${{ (matrix.platform == 'ios' || matrix.platform == 'macos') && 'macos-15' || 'ubuntu-24.04' }}
     timeout-minutes: 45
@@ -153,7 +154,10 @@ jobs:
             "$BUILD_PLATFORM" "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"
 
   darwin-compatibility:
-    if: github.event_name != 'pull_request' && (inputs.platform || 'all') == 'all'
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (inputs.platform || 'all') == 'all'
     name: Darwin ${{ matrix.integration }} on Flutter ${{ matrix.flutter }} (${{ matrix.platform }})
     runs-on: macos-15
     timeout-minutes: 30

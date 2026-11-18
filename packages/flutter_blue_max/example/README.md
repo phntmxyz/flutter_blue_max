@@ -96,20 +96,11 @@ The desktop layout with the in-memory platform fake from the widget tests.
 
 ## Download builds from GitHub Actions
 
-The [Build example downloads](../../../.github/workflows/example_build.yml) workflow builds all five supported targets with Flutter 3.47.7 and retains downloads for 14 days.
-Pull requests that change the packages or this workflow run all five builds, formatting checks, package:lint analysis, the native test suite and the two Chrome scenarios.
-It produces Actions artifacts rather than GitHub Releases or pub.dev packages.
+The [Build example downloads](../../../.github/workflows/example_build.yml) workflow builds five platforms with Flutter 3.47.7 and retains downloads for 14 days.
+Pull requests that change the packages or this workflow run formatting checks, analysis, and the Dart and Chrome tests in one Linux job.
 
-To build a branch without an open pull request before the workflow is on the default branch, check out that branch and deliberately push a new `example-test/` tag:
-
-```sh
-git tag example-test/my-build HEAD
-git push origin refs/tags/example-test/my-build
-```
-
-Use a unique tag for each build; the tag builds its exact commit on all five platforms.
-For branches without an open pull request, ordinary pushes do not trigger this workflow.
-Once the workflow exists on the default branch, **Actions → Build example downloads → Run workflow** also lets you choose a branch and either `all` or one platform ([GitHub instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)).
+Once the workflow is on the default branch, open **Actions → Build example downloads → Run workflow**, select the default branch, and choose `all` or one platform ([GitHub instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)).
+Choosing `all` also runs the Darwin compatibility builds.
 After the run, download files from **Artifacts** or the links in the job summaries.
 
 | Platform | Download | Usage |
