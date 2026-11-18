@@ -456,7 +456,9 @@ void main() {
       final first = await controller.catalogLibrary.addCatalogServices([thermostat]);
       expect(first.saved, isTrue);
       expect([first.value.added, first.value.replaced, first.value.present], [1, 0, 0]);
-      final next = await controller.catalogLibrary.addCatalogServices([renamed, lamp, lamp]);
+      final imports = [renamed, lamp, lamp];
+      final preview = await controller.catalogLibrary.previewReplacements(imports);
+      final next = await controller.catalogLibrary.addCatalogServices(imports, confirmedReplacements: preview);
       expect(next.saved, isTrue);
       expect([next.value.added, next.value.replaced, next.value.present], [1, 1, 1]);
       expect(controller.catalog.map((s) => s.name), ['Room thermostat', 'Lamp']);

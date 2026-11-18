@@ -5,12 +5,8 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 
 /// A service name and its known characteristics.
 /// A [test] service must contain every listed characteristic with exactly its properties.
-class KnownService(
-  final Guid uuid,
-  final String name,
-  List<KnownCharacteristic> characteristics, {
-  final bool test = false,
-}) {
+class KnownService(Guid uuid, final String name, List<KnownCharacteristic> characteristics, {final bool test = false}) {
+  final Guid uuid = _immutableUuid(uuid);
   final List<KnownCharacteristic> characteristics = List.unmodifiable(characteristics);
 
   /// Throws a [FormatException] for stored data that no longer describes a service.
@@ -19,12 +15,19 @@ class KnownService(
   /// Reads typed JSON values and defaults absent optional settings.
   factory fromPick(RequiredPick data) {
     try {
-      return KnownService(
-        Guid(data('uuid').asStringOrThrow()),
-        data('name').asStringOrThrow(),
-        data('characteristics').asListOrThrow(KnownCharacteristic.fromPick),
-        test: data('test').value != null && data('test').asBoolOrThrow(),
-      );
+      final name = data('name').asStringOrThrow();
+      final checked = data('test').value != null && data('test').asBoolOrThrow();
+      final characteristics = data('characteristics').asListOrThrow(KnownCharacteristic.fromPick);
+      final seen = <Guid>{};
+      for (final characteristic in characteristics) {
+        if (!seen.add(characteristic.uuid)) {
+          throw FormatException('The service $name repeats characteristic ${characteristic.uuid}.');
+        }
+        if (checked && (characteristic.properties?.isEmpty ?? true)) {
+          throw FormatException('Select expected properties for ${characteristic.name} in the checked service $name.');
+        }
+      }
+      return KnownService(Guid(data('uuid').asStringOrThrow()), name, characteristics, test: checked);
     } on FormatException {
       rethrow;
     } on Object catch (error, stackTrace) {
@@ -52,9 +55,9 @@ class KnownService(
   KnownCharacteristic? characteristic(Guid uuid) => characteristics.where((c) => c.uuid == uuid).firstOrNull;
 
   /// Names of characteristics [discovered] lacks or reports with other properties; empty unless [test].
-  ({List<String> missing, List<String> different}) compare(BluetoothService discovered) {
+  GattComparison compare(BluetoothService discovered) {
     if (!test) {
-      return (missing: const [], different: const []);
+      return GattComparison(missing: const [], different: const []);
     }
     List<BluetoothCharacteristic> matching(KnownCharacteristic known) =>
         discovered.characteristics.where((c) => c.uuid == known.uuid).toList();
@@ -63,7 +66,7 @@ class KnownService(
       return actual.isNotEmpty && !actual.every((c) => known.matches(c.properties));
     }
 
-    return (
+    return GattComparison(
       missing: [
         for (final known in characteristics)
           if (matching(known).isEmpty) known.name,
@@ -74,6 +77,12 @@ class KnownService(
       ],
     );
   }
+}
+
+/// Missing characteristics and property mismatches from a catalog comparison.
+class GattComparison({required List<String> missing, required List<String> different}) {
+  final List<String> missing = List.unmodifiable(missing);
+  final List<String> different = List.unmodifiable(different);
 }
 
 /// The characteristic properties the GATT explorer shows and the catalog compares.
@@ -94,7 +103,8 @@ enum GattProperty(final String label) {
 }
 
 /// A characteristic name and, for test services, the exact properties it must report.
-class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>? properties}) {
+class KnownCharacteristic(Guid uuid, final String name, {Set<GattProperty>? properties}) {
+  final Guid uuid = _immutableUuid(uuid);
   final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
 
   /// Throws a [FormatException] for stored data that no longer describes a characteristic.
@@ -136,7 +146,9 @@ class KnownCharacteristic(final Guid uuid, final String name, {Set<GattProperty>
 }
 
 /// Characteristic User Description: a peripheral's own label for a characteristic.
-final userDescriptionUuid = Guid('2901');
+final userDescriptionUuid = _immutableUuid(Guid('2901'));
+
+Guid _immutableUuid(Guid uuid) => Guid.fromBytes(List.unmodifiable(uuid.bytes));
 
 /// The last read User Description, or null before it was read or if there is none.
 String? userDescription(BluetoothCharacteristic characteristic) {
@@ -315,6 +327,8 @@ final standardServices = List<KnownService>.unmodifiable([
 ]);
 
 Set<GattProperty>? _propertiesOrNull(Pick value) {
-  if (value.value == null) return null;
+  if (value.value == null) {
+    return null;
+  }
   return value.asListOrThrow((it) => GattProperty.values.byName(it.asStringOrThrow())).toSet();
 }

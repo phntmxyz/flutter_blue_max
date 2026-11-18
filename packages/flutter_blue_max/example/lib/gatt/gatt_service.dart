@@ -13,7 +13,9 @@ class const GattService({super.key, required final BluetoothService service}) ex
   Widget build(BuildContext context) {
     final known = context.read<WorkbenchController>().knownService(service.uuid);
     final own = known != null && context.read<WorkbenchController>().catalog.contains(known);
-    final (:missing, :different) = known?.compare(service) ?? (missing: const <String>[], different: const <String>[]);
+    final comparison = known?.compare(service);
+    final missing = comparison?.missing ?? const <String>[];
+    final different = comparison?.different ?? const <String>[];
     final isTestEntry = known?.test ?? false;
     final matches = missing.isEmpty && different.isEmpty;
     final expected = isTestEntry ? matches : null;

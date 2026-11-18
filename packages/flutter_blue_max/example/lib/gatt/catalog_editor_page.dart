@@ -5,14 +5,16 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/form_validation.dart';
+import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:provider/provider.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
-/// Edits one of the user's own GATT catalog services. Pops with the service, or with nothing when cancelled.
+/// Saves one of the user's own GATT catalog services and keeps the editor open on conflicts.
 class const CatalogEditorPage({
   super.key,
   final KnownService? initial,
+  required final Future<void> Function(KnownService) onSave,
 
   /// The user's other services, whose UUIDs this one must not reuse.
   final List<KnownService> others = const [],
@@ -22,11 +24,16 @@ class const CatalogEditorPage({
   /// [initial] prefills a new entry, e.g. from a discovered service.
   static Future<void> open(BuildContext context, {KnownService? initial, KnownService? previous}) async {
     final controller = context.read<GattCatalogLibrary>();
-    final service = await Navigator.of(context).push(
-      MaterialPageRoute<KnownService>(
+    await controller.load();
+    if (!context.mounted) {
+      return;
+    }
+    await Navigator.of(context).push(
+      MaterialPageRoute<void>(
         builder: (_) {
           return CatalogEditorPage(
             initial: initial ?? previous,
+            onSave: (service) => controller.save(service, previous: previous),
             editing: previous != null,
             others: [
               for (final service in controller.catalog)
@@ -36,9 +43,6 @@ class const CatalogEditorPage({
         },
       ),
     );
-    if (service != null) {
-      await controller.save(service, previous: previous);
-    }
   }
 
   @override
@@ -46,6 +50,7 @@ class const CatalogEditorPage({
 }
 
 class _CatalogEditorPageState() extends State<CatalogEditorPage> {
+  bool _saving = false;
   final _name = FormControl<String>(value: '');
   final _uuid = FormControl<String>(value: '');
   final _characteristicForms = FormArray<Map<String, dynamic>>([]);
@@ -126,6 +131,28 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
       ),
   ]);
 
+  Future<void> _save() async {
+    if (!_form.valid) {
+      _form.markAllAsTouched();
+      return;
+    }
+    setState(() => _saving = true);
+    try {
+      await widget.onSave(_build());
+      if (mounted && ModalRoute.of(context)?.isCurrent == true) {
+        Navigator.pop(context);
+      }
+    } on CatalogConflict catch (exception) {
+      if (mounted) {
+        tell(context, exception.message);
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _saving = false);
+      }
+    }
+  }
+
   void _removeCharacteristic(CharacteristicDraft draft) {
     setState(() => _characteristicForms.removeAt(_characteristics.indexOf(draft)));
     WidgetsBinding.instance.addPostFrameCallback((_) => draft.dispose());
@@ -143,16 +170,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(
-              onPressed: () {
-                if (_form.valid) {
-                  Navigator.pop(context, _build());
-                  return;
-                }
-                _form.markAllAsTouched();
-              },
-              child: const Text('Save entry'),
-            ),
+            child: FilledButton(onPressed: _saving ? null : _save, child: const Text('Save entry')),
           ),
         ],
       ),

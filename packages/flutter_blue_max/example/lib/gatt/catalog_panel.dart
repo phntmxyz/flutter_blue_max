@@ -1,11 +1,14 @@
 import 'dart:developer' as developer;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
+import 'package:flutter_blue_max_example/shared/persisted_library.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
 import 'package:provider/provider.dart';
@@ -137,11 +140,23 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
       tell(context, 'The file holds no services.');
       return;
     }
-    final chosen = await _choose(context, services: services, importing: true);
+    final replacements = await controller.previewReplacements(services);
+    if (!context.mounted) {
+      return;
+    }
+    final chosen = await _choose(context, services: services, replacements: replacements);
     if (chosen == null) {
       return;
     }
-    final change = await controller.addCatalogServices(chosen);
+    final LibraryChange<CatalogImportResult> change;
+    try {
+      change = await controller.addCatalogServices(chosen, confirmedReplacements: replacements);
+    } on CatalogConflict catch (exception) {
+      if (context.mounted) {
+        tell(context, exception.message);
+      }
+      return;
+    }
     if (!change.saved) {
       return;
     }
@@ -162,7 +177,7 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
   }
 
   Future<void> _export(BuildContext button) async {
-    final chosen = await _choose(button, services: button.read<GattCatalogLibrary>().catalog, importing: false);
+    final chosen = await _choose(button, services: button.read<GattCatalogLibrary>().catalog);
     if (chosen == null || !button.mounted) {
       return;
     }
@@ -200,34 +215,12 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
   Future<List<KnownService>?> _choose(
     BuildContext context, {
     required List<KnownService> services,
-    required bool importing,
+    Map<Guid, KnownService>? replacements,
   }) {
     Widget summary(KnownService service) =>
         Text('${service.uuid.str.toUpperCase()} · ${counted(service.characteristics.length, _characteristicNoun)}');
-    Widget importDetails(KnownService service) {
-      final previous = context.read<GattCatalogLibrary>().catalogServiceReplacedBy(service);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          summary(service),
-          if (previous != null)
-            Row(
-              children: [
-                Icon(Icons.warning_amber_rounded, size: 16, color: Theme.of(context).colorScheme.error),
-                const SizedBox(width: 6),
-                Expanded(
-                  child: Text(
-                    'Replaces your ${previous.name}',
-                    style: TextStyle(color: Theme.of(context).colorScheme.error),
-                  ),
-                ),
-              ],
-            ),
-        ],
-      );
-    }
 
-    if (importing) {
+    if (replacements != null) {
       return SelectionDialog.show(
         context,
         title: const Text('Import services'),
@@ -235,7 +228,8 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
         noun: serviceNoun,
         items: services,
         label: (s) => Text(s.name),
-        details: importDetails,
+        details: (service) =>
+            CatalogImportDetails(summary: summary(service), previousName: replacements[service.uuid]?.name),
       );
     }
     return SelectionDialog.show(
@@ -246,6 +240,31 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
       items: services,
       label: (s) => Text(s.name),
       details: summary,
+    );
+  }
+}
+
+/// Service summary and confirmed replacement warning for a catalog import row.
+class const CatalogImportDetails({required final Widget summary, final String? previousName}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final previous = previousName;
+    final color = Theme.of(context).colorScheme.error;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        summary,
+        if (previous != null)
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, size: 16, color: color),
+              const SizedBox(width: 6),
+              Expanded(
+                child: Text('Replaces your $previous', style: TextStyle(color: color)),
+              ),
+            ],
+          ),
+      ],
     );
   }
 }

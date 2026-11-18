@@ -3,6 +3,7 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:spot/spot.dart';
@@ -40,7 +41,12 @@ extension CatalogFilesRobot on WorkbenchRobot {
     files.openContent = encodeCatalogFile([_roomThermostat, _lamp]);
     await tapLabel('Import');
     spot<Dialog>().spotText('FFF0 · 1 characteristic', exact: true).existsOnce();
-    spot<Dialog>().spotText('Replaces your Thermostat', exact: true).existsOnce();
+    spot<Dialog>()
+        .spot<CheckboxListTile>()
+        .withChild(spotText('Room thermostat', exact: true))
+        .spot<CatalogImportDetails>()
+        .spotText('Replaces your Thermostat', exact: true)
+        .existsOnce();
     spot<Dialog>().spotText('FFE0 · 1 characteristic', exact: true).existsOnce();
     await tapInDialog('Import 2 services');
     spotText('Imported 2 services, 1 replaced your own', exact: true).existsOnce();

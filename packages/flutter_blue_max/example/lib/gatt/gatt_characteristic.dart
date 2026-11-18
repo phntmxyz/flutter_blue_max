@@ -71,7 +71,9 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
       if (kIsWeb) {
         controller.setSubscribedOnWeb(c, subscribed: notify, generation: generation);
       }
-      if (c.properties.read) await c.read();
+      if (c.properties.read) {
+        await c.read();
+      }
     });
   }
 
@@ -92,14 +94,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final expected = checked ? known.matches(p) : null;
     final description = userDescription(c);
     final uuid = c.uuid.str.toUpperCase();
-    final String? name;
-    if (known == null) {
-      name = description;
-    } else if (expected == true) {
-      name = 'Test · ${known.name}';
-    } else {
-      name = known.name;
-    }
+    final name = _displayName(known, description, expected: expected);
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
@@ -210,6 +205,16 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   }
 }
 
+String? _displayName(KnownCharacteristic? known, String? description, {required bool? expected}) {
+  if (known == null) {
+    return description;
+  }
+  if (expected == true) {
+    return 'Test · ${known.name}';
+  }
+  return known.name;
+}
+
 /// Styled title shared by discovered service and characteristic tiles, with an optional test verdict.
 class const GattTitle({super.key, required final Widget title, final bool? expected}) extends StatelessWidget {
   @override
@@ -218,14 +223,10 @@ class const GattTitle({super.key, required final Widget title, final bool? expec
     return Row(
       children: [
         if (expected != null) ...[
-          Builder(
-            builder: (context) {
-              if (expected!) {
-                return Icon(Icons.check_circle_rounded, size: 16, color: colors.primary);
-              }
-              return Icon(Icons.error_outline_rounded, size: 16, color: colors.error);
-            },
-          ),
+          if (expected!)
+            Icon(Icons.check_circle_rounded, size: 16, color: colors.primary)
+          else
+            Icon(Icons.error_outline_rounded, size: 16, color: colors.error),
           const SizedBox(width: 6),
         ],
         Flexible(child: title),

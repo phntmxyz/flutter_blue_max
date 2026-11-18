@@ -120,6 +120,50 @@ void main() {
     expect(writes.single, library.parsers);
   });
 
+  test('catalog save checks for duplicates after loading', () async {
+    final loading = Completer<StoredList<KnownService>?>();
+    final original = KnownService(Guid('fff0'), 'Original', []);
+    final duplicate = KnownService(Guid('fff0'), 'Duplicate', []);
+    final library = GattCatalogLibrary(
+      read: () => loading.future,
+      onProblem: (_) => fail('Unexpected library problem'),
+      write: (_, _, {unreadable = const []}) => fail('Do not write the duplicate'),
+    );
+    addTearDown(library.dispose);
+    final rejected = expectLater(library.save(duplicate), throwsA(isA<CatalogConflict>()));
+    loading.complete(StoredList([original]));
+    await rejected;
+    expect(library.catalog, [original]);
+  });
+
+  test('catalog replaces only the entry that was confirmed in the preview', () async {
+    final original = KnownService(Guid('fff0'), 'Original', []);
+    final updated = KnownService(Guid('fff0'), 'Changed after preview', []);
+    final replacement = KnownService(Guid('fff0'), 'Replacement', []);
+    final newEntry = KnownService(Guid('fff1'), 'New entry', []);
+    final writes = <List<Object?>>[];
+    final library = GattCatalogLibrary(
+      read: () => Future.value(StoredList([original])),
+      onProblem: (_) => fail('Unexpected library problem'),
+      write: (_, items, {unreadable = const []}) async {
+        writes.add(items);
+      },
+    );
+    addTearDown(library.dispose);
+    final imports = [newEntry, replacement];
+    final preview = await library.previewReplacements(imports);
+    await library.save(updated, previous: original);
+
+    await expectLater(
+      library.addCatalogServices(imports, confirmedReplacements: preview),
+      throwsA(isA<CatalogConflict>()),
+    );
+    expect(library.catalog, [updated]);
+    expect(writes, [
+      [updated],
+    ]);
+  });
+
   test('catalog import waits for loading and replaces in place by UUID', () async {
     final loading = Completer<StoredList<KnownService>?>();
     final original = KnownService(Guid('fff0'), 'Original', []);
@@ -134,11 +178,13 @@ void main() {
       },
     );
     addTearDown(library.dispose);
-    final pending = library.addCatalogServices([replacement]);
+    final pendingPreview = library.previewReplacements([replacement]);
     await Future<void>.delayed(Duration.zero);
     expect(writes, isEmpty);
     loading.complete(StoredList([original, retained]));
-    final result = await pending;
+    final confirmed = await pendingPreview;
+    expect(confirmed, {original.uuid: original});
+    final result = await library.addCatalogServices([replacement], confirmedReplacements: confirmed);
     expect(result.saved, isTrue);
     expect([result.value.added, result.value.replaced, result.value.present], [0, 1, 0]);
     expect(library.catalog, [replacement, retained]);

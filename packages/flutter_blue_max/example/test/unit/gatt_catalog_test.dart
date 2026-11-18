@@ -22,6 +22,28 @@ void main() {
     );
   });
 
+  test('catalog JSON rejects incomplete checks and repeated characteristic UUIDs', () {
+    final namingOnly = {
+      'uuid': 'fff0',
+      'name': 'Sensor',
+      'characteristics': [
+        {'uuid': '2a19', 'name': 'Value'},
+      ],
+    };
+    expect(KnownService.fromJson(namingOnly).characteristics.single.properties, isNull);
+    expect(() => KnownService.fromJson({...namingOnly, 'test': true}), throwsFormatException);
+    expect(
+      () => KnownService.fromJson({
+        ...namingOnly,
+        'characteristics': [
+          {'uuid': '2a19', 'name': 'First'},
+          {'uuid': '00002a19-0000-1000-8000-00805f9b34fb', 'name': 'Second'},
+        ],
+      }),
+      throwsFormatException,
+    );
+  });
+
   test('catalog collections are immutable snapshots', () {
     final properties = <GattProperty>{GattProperty.read};
     final characteristic = KnownCharacteristic(Guid('2a19'), 'Level', properties: properties);
@@ -38,6 +60,9 @@ void main() {
     final builtIn = builtInService(Guid('180f'))!;
     expect(() => builtIn.characteristics.clear(), throwsUnsupportedError);
     expect(builtInService(Guid('180f'))!.characteristics, isNotEmpty);
+    expect(builtIn.uuid.bytes.clear, throwsUnsupportedError);
+    expect(builtIn.characteristics.first.uuid.bytes.clear, throwsUnsupportedError);
+    expect(userDescriptionUuid.bytes.clear, throwsUnsupportedError);
   });
 
   test('properties must match exactly, ignoring flags the explorer does not show', () {
@@ -62,6 +87,8 @@ void main() {
     expect(standard.compare(empty).missing, isEmpty);
     expect(test.compare(empty).missing, ['Level']);
     expect(test.compare(empty).different, isEmpty);
+    expect(test.compare(empty).missing.clear, throwsUnsupportedError);
+    expect(test.compare(empty).different.clear, throwsUnsupportedError);
   });
 
   test('catalog entries are found by short and full UUID', () {
