@@ -1,17 +1,18 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
-import 'package:provider/provider.dart';
 
 /// Channel card shared by `DeviceL2capPanel` and `L2capServerPanel`.
 /// Exchanges data with the peer that owns this channel, regardless of selection.
 class const L2capChannelCard({super.key, required final ChannelSession session}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final idle = !context.read<WorkbenchController>().busy(Operation.channel(session));
+    final idle = !workbenchRef.of(context).busy(Operation.channel(session));
     return WorkbenchCard(
       key: ValueKey(session.key),
       title: Text('${session.incoming ? 'Incoming' : 'Outgoing'} · PSM ${session.channel.psm}'),
@@ -29,12 +30,12 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
                 const Chip(label: Text('Closed'))
               else ...[
                 OutlinedButton.icon(
-                  onPressed: idle ? () => context.read<WorkbenchController>().readChannel(session) : null,
+                  onPressed: idle ? () => workbenchRef.of(context).readChannel(session) : null,
                   icon: const Icon(Icons.download_outlined),
                   label: const Text('Read buffered data'),
                 ),
                 TextButton.icon(
-                  onPressed: idle ? () => context.read<WorkbenchController>().closeChannel(session) : null,
+                  onPressed: idle ? () => workbenchRef.of(context).closeChannel(session) : null,
                   icon: const Icon(Icons.close),
                   label: const Text('Close channel'),
                 ),
@@ -50,7 +51,7 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
           _ReceiveHistory(receipts: session.history),
           if (!session.closed) ...[
             const SizedBox(height: 16),
-            PayloadEditor(enabled: idle, onSend: (bytes) => context.read<WorkbenchController>().send(session, bytes)),
+            PayloadEditor(enabled: idle, onSend: (bytes) => workbenchRef.of(context).send(session, bytes)),
             const SizedBox(height: 12),
             Wrap(
               spacing: 8,
@@ -62,7 +63,7 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
                       return null;
                     }
                     return () {
-                      return context.read<WorkbenchController>().sendTestTraffic(session, size: 10 * 1024, count: 1);
+                      return workbenchRef.of(context).sendTestTraffic(session, size: 10 * 1024, count: 1);
                     };
                   })(),
                   icon: const Icon(Icons.data_usage),
@@ -73,7 +74,7 @@ class const L2capChannelCard({super.key, required final ChannelSession session})
                     if (!idle) {
                       return null;
                     }
-                    return () => context.read<WorkbenchController>().sendTestTraffic(session, size: 1024, count: 20);
+                    return () => workbenchRef.of(context).sendTestTraffic(session, size: 1024, count: 20);
                   })(),
                   icon: const Icon(Icons.bolt),
                   label: const Text('Burst 20×1 KB'),

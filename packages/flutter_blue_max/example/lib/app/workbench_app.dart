@@ -1,15 +1,16 @@
 import 'dart:async';
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/activity/activity_panel.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_example/library/library_panel.dart';
 import 'package:flutter_blue_max_example/shared/json_files.dart';
-import 'package:provider/provider.dart';
 
 /// A responsive diagnostic app for the plugin's native and web backends.
 class const WorkbenchApp({
@@ -67,13 +68,17 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MultiProvider(
-      key: ObjectKey(_controller),
-      providers: [
-        ChangeNotifierProvider.value(value: _controller),
-        ChangeNotifierProvider.value(value: _controller.parserLibrary),
-        ChangeNotifierProvider.value(value: _controller.catalogLibrary),
+    final panels = IndexedStack(
+      index: _destination,
+      children: [
+        DevicesPanel(active: _destination == 0),
+        if (_controller.supportsL2cap) const L2capServerPanel(),
+        LibraryPanel(shareFile: widget.shareFile),
+        const ActivityPanel(),
       ],
+    );
+    return WorkbenchScope(
+      controller: _controller,
       child: MaterialApp(
         title: 'Blue Max',
         debugShowCheckedModeBanner: false,
@@ -88,19 +93,10 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
             child: child,
           );
         },
-        home: Selector<WorkbenchController, List<Object?>>(
-          child: IndexedStack(
-            index: _destination,
-            children: [
-              DevicesPanel(active: _destination == 0),
-              if (_controller.supportsL2cap) const L2capServerPanel(),
-              LibraryPanel(shareFile: widget.shareFile),
-              const ActivityPanel(),
-            ],
-          ),
-          selector: (_, c) => [c.adapter, c.error, c.busy(Operation.adapter)],
-          builder: (context, _, panels) {
-            final c = _controller;
+        home: Builder(
+          builder: (context) {
+            workbenchRef.watchOnly(context, (c) => (c.adapter, c.error));
+            final c = workbenchRef.of(context);
             final wide = MediaQuery.sizeOf(context).width >= 720;
             return Scaffold(
               appBar: AppBar(
@@ -182,7 +178,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                             ),
                             const VerticalDivider(width: 1),
                           ],
-                          Expanded(child: panels!),
+                          Expanded(child: panels),
                         ],
                       ),
                     ),
@@ -217,8 +213,8 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
 class const AdapterBanner() extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) => [c.adapter, c.busy(Operation.adapter)]);
-    final message = switch (context.read<WorkbenchController>().adapter) {
+    workbenchRef.watchOnly(context, (c) => (c.adapter, c.busy(Operation.adapter)));
+    final message = switch (workbenchRef.of(context).adapter) {
       BluetoothAdapterState.unknown when kIsWeb =>
         'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
       BluetoothAdapterState.unauthorized =>
@@ -238,10 +234,10 @@ class const AdapterBanner() extends StatelessWidget {
           Expanded(child: Text(message)),
           if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
             // Only an off adapter needs the Android enable request.
-            if (context.read<WorkbenchController>().adapter == BluetoothAdapterState.off)
+            if (workbenchRef.of(context).adapter == BluetoothAdapterState.off)
               TextButton(
                 onPressed: (() {
-                  final controller = context.read<WorkbenchController>();
+                  final controller = workbenchRef.of(context);
                   if (controller.busy(Operation.adapter)) {
                     return null;
                   }

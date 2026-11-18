@@ -1,8 +1,9 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
-import 'package:provider/provider.dart';
 
 /// Local server destination in `WorkbenchApp`, available only on L2CAP platforms.
 /// The receiving role waits for peers; it does not open a channel to a selected device.
@@ -16,8 +17,8 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
 
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) => c.serverState);
-    final c = context.read<WorkbenchController>();
+    workbenchRef.watchSnapshot(context, (c) => c.serverState);
+    final c = workbenchRef.of(context);
     final incoming = c.channelSessions.where((s) => s.incoming).toList();
     final connectedCount = incoming.where((s) => !s.closed).length;
     final listenerControls = ServerListenerControls(
@@ -90,7 +91,7 @@ class const ServerListenerControls({
               Expanded(child: SelectableText('PSM $psm', style: Theme.of(context).textTheme.headlineSmall)),
               IconButton(
                 tooltip: 'Copy server PSM',
-                onPressed: () => context.read<WorkbenchController>().copyToClipboard('$psm'),
+                onPressed: () => workbenchRef.of(context).copyToClipboard('$psm'),
                 icon: const Icon(Icons.copy),
               ),
             ],

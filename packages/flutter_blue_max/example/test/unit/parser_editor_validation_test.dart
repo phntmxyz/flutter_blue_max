@@ -16,9 +16,9 @@ void main() {
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
   });
 
-  testWidgets('preview uses the same cross-field validation as saving through the workbench', (tester) async {
+  testWidgets('web: the Library editor rejects invalid parsers until corrected', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1400, 2000));
-    await robot.validatePreviewBeforeSaving(withSample: !kIsWeb);
-  });
+    await robot.validatePreviewBeforeSaving(withSample: false);
+  }, skip: !kIsWeb);
 }

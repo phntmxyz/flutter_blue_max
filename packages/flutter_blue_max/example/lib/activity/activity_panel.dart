@@ -1,6 +1,7 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:provider/provider.dart';
 
 /// Activity destination in `WorkbenchApp`.
 /// Searchable session output includes native diagnostics and payload previews.
@@ -14,7 +15,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final controller = context.read<WorkbenchController>();
+    final controller = workbenchRef.of(context);
     return ValueListenableBuilder(
       valueListenable: controller.activity,
       builder: (_, entries, _) => ActivityLog(

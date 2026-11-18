@@ -1,13 +1,14 @@
 import 'dart:async';
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
-import 'package:provider/provider.dart';
 
 /// Characteristic row inside `GattService`.
 /// Inspects the actual characteristic instance and its descriptors.
@@ -21,7 +22,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   bool _withoutResponse = false;
   bool _writing = false;
   bool _notifying = false;
-  late final ValueListenable<List<int>?> _value;
+  late ValueListenable<List<int>?> _value;
 
   StreamSubscription<List<int>>? _notificationChanges;
   StreamSubscription<List<int>>? _descriptionChanges;
@@ -29,7 +30,6 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   @override
   void initState() {
     super.initState();
-    _value = context.read<WorkbenchController>().observeCharacteristic(widget.characteristic);
     if (!kIsWeb) {
       _notifying = widget.characteristic.isNotifying;
     }
@@ -55,6 +55,12 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
   }
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _value = workbenchRef.of(context).observeCharacteristic(widget.characteristic);
+  }
+
+  @override
   void dispose() {
     unawaited(_notificationChanges?.cancel());
     unawaited(_descriptionChanges?.cancel());
@@ -63,14 +69,14 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
 
   Future<void> _readCharacteristic() async {
     final c = widget.characteristic;
-    await context.read<WorkbenchController>().run(Operation.characteristic(c), () async {
+    await workbenchRef.of(context).run(Operation.characteristic(c), () async {
       await c.read();
     });
   }
 
   Future<void> _toggleNotifications() async {
     final c = widget.characteristic;
-    final controller = context.read<WorkbenchController>();
+    final controller = workbenchRef.of(context);
     await controller.run(Operation.characteristic(c), () async {
       final notify = !(kIsWeb ? controller.subscribedOnWeb(c) : _notifying);
       final generation = controller.connectionGeneration(c.device);
@@ -91,11 +97,11 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
     final p = c.properties;
     final operation = Operation.characteristic(c);
     final enabled =
-        !context.select<WorkbenchController, bool>((controller) => controller.busy(operation)) && c.device.isConnected;
+        !workbenchRef.watchOnly(context, (controller) => controller.busy(operation)) && c.device.isConnected;
     final notifying = kIsWeb
-        ? context.select<WorkbenchController, bool>((controller) => controller.subscribedOnWeb(c))
+        ? workbenchRef.watchOnly(context, (controller) => controller.subscribedOnWeb(c))
         : _notifying;
-    final service = context.read<WorkbenchController>().knownService(c.serviceUuid);
+    final service = workbenchRef.of(context).knownService(c.serviceUuid);
     final known = service?.characteristic(c.uuid);
     final isTestEntry = service?.test ?? false;
     final checked = isTestEntry && known != null;
@@ -198,7 +204,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                   enabled: enabled,
                   label: const Text('Write characteristic'),
                   onSend: (value) {
-                    return context.read<WorkbenchController>().run(operation, () async {
+                    return workbenchRef.of(context).run(operation, () async {
                       await c.write(value, withoutResponse: !p.write || _withoutResponse);
                       if (p.read) {
                         await c.read();
@@ -257,7 +263,7 @@ class _DescriptorState() extends State<GattDescriptorTile> {
 
   Future<void> _readDescriptor() async {
     final d = widget.descriptor;
-    await context.read<WorkbenchController>().run(Operation.descriptor(d), () async {
+    await workbenchRef.of(context).run(Operation.descriptor(d), () async {
       await d.read();
     });
   }
@@ -266,7 +272,7 @@ class _DescriptorState() extends State<GattDescriptorTile> {
   Widget build(BuildContext context) {
     final d = widget.descriptor;
     final operation = Operation.descriptor(d);
-    final enabled = !context.select((WorkbenchController c) => c.busy(operation)) && d.device.isConnected;
+    final enabled = !workbenchRef.watchOnly(context, (c) => c.busy(operation)) && d.device.isConnected;
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),
@@ -283,7 +289,7 @@ class _DescriptorState() extends State<GattDescriptorTile> {
           enabled: enabled,
           label: const Text('Write descriptor'),
           onSend: (value) {
-            return context.read<WorkbenchController>().run(operation, () async {
+            return workbenchRef.of(context).run(operation, () async {
               await d.write(value);
             });
           },

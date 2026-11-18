@@ -1,7 +1,9 @@
 import 'dart:developer' as developer;
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
@@ -12,7 +14,6 @@ import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/persisted_library.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
-import 'package:provider/provider.dart';
 
 const _characteristicNoun = Noun(singular: 'characteristic', plural: 'characteristics');
 
@@ -21,8 +22,8 @@ const _characteristicNoun = Noun(singular: 'characteristic', plural: 'characteri
 class const CatalogPanel({super.key, final ShareFile? shareFile}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    context.select<GattCatalogLibrary, Object?>((c) => c.catalog);
-    final c = context.read<GattCatalogLibrary>();
+    catalogLibraryRef.watchOnly(context, (c) => c.catalog);
+    final c = catalogLibraryRef.of(context);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -118,7 +119,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
   }
 
   Future<void> _import(BuildContext context) async {
-    final controller = context.read<GattCatalogLibrary>();
+    final controller = catalogLibraryRef.of(context);
     final List<KnownService>? services;
     try {
       services = await openCatalogFile();
@@ -178,7 +179,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
   }
 
   Future<void> _export(BuildContext button) async {
-    final chosen = await _choose(button, services: button.read<GattCatalogLibrary>().catalog);
+    final chosen = await _choose(button, services: catalogLibraryRef.of(button).catalog);
     if (chosen == null || !button.mounted) {
       return;
     }
@@ -208,7 +209,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
   }
 
   Future<void> _reset(BuildContext context) async {
-    final controller = context.read<GattCatalogLibrary>();
+    final controller = catalogLibraryRef.of(context);
     final confirmed = await confirm(
       context,
       title: 'Reset catalog?',

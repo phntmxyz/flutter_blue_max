@@ -1,12 +1,13 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
 import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
-import 'package:provider/provider.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 
 /// Devices destination of `WorkbenchApp`: discovery and details share two panes on desktop, one on phones.
@@ -20,7 +21,7 @@ class _DevicesPanelState() extends State<DevicesPanel> {
   bool _showDetails = false;
 
   /// Outlives the search field, which narrow layouts drop while the details are shown.
-  late final _query = TextEditingController(text: context.read<WorkbenchController>().query);
+  late final _query = TextEditingController(text: workbenchRef.of(context).query);
 
   @override
   void dispose() {
@@ -30,14 +31,14 @@ class _DevicesPanelState() extends State<DevicesPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final selected = context.select((WorkbenchController c) => c.selected);
+    final selected = workbenchRef.watchOnly(context, (c) => c.selected);
     return LayoutBuilder(
       builder: (context, constraints) {
         final wide = constraints.maxWidth >= 850;
         final list = DeviceDiscoveryList(
           queryController: _query,
           onSelect: (device) {
-            context.read<WorkbenchController>().select(device);
+            workbenchRef.of(context).select(device);
             setState(() => _showDetails = true);
           },
         );
@@ -80,7 +81,7 @@ class const DeviceDetails({super.key, final VoidCallback? onBack}) extends State
 
 class _DeviceDetailsState() extends State<DeviceDetails> {
   bool _l2cap = false;
-  WorkbenchController get controller => context.read<WorkbenchController>();
+  WorkbenchController get controller => workbenchRef.of(context);
   VoidCallback? get onBack => widget.onBack;
 
   @override
@@ -111,8 +112,9 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
         ),
       );
     }
-    final header = context.select(
-      (WorkbenchController c) => (
+    final header = workbenchRef.watchOnly(
+      context,
+      (c) => (
         name: c.nameOf(device),
         connected: c.connected,
         ready: c.ready,
@@ -281,8 +283,9 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
 class const GattExplorer() extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final c = context.read<WorkbenchController>();
-    context.select<WorkbenchController, Object?>(
+    final c = workbenchRef.of(context);
+    workbenchRef.watchSnapshot(
+      context,
       (c) => [
         c.selected,
         c.connected,
@@ -340,8 +343,8 @@ class const DeviceDiscoveryList({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    context.select((WorkbenchController c) => c.discoveryState);
-    final c = context.read<WorkbenchController>();
+    workbenchRef.watchSnapshot(context, (c) => c.discoveryState);
+    final c = workbenchRef.of(context);
     final results = c.visibleDevices;
     return RefreshIndicator(
       onRefresh: c.refreshScan,

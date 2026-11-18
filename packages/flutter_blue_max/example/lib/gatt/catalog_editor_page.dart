@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/form_validation.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
-import 'package:provider/provider.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
@@ -23,7 +24,7 @@ class const CatalogEditorPage({
   /// Opens the editor and saves the result, replacing [previous] when editing.
   /// [initial] prefills a new entry, e.g. from a discovered service.
   static Future<void> open(BuildContext context, {KnownService? initial, KnownService? previous}) async {
-    final controller = context.read<GattCatalogLibrary>();
+    final controller = catalogLibraryRef.of(context);
     await controller.load();
     if (!context.mounted) {
       return;

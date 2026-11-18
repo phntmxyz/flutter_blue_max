@@ -1,18 +1,18 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:provider/provider.dart';
 
 /// One service in the GATT explorer of `DevicesPanel`.
 /// A discovered service, named and checked against the GATT catalog when it is known.
 class const GattService({super.key, required final BluetoothService service}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    final known = context.read<WorkbenchController>().knownService(service.uuid);
-    final own = known != null && context.read<WorkbenchController>().catalog.contains(known);
+    final known = workbenchRef.of(context).knownService(service.uuid);
+    final own = known != null && workbenchRef.of(context).catalog.contains(known);
     final comparison = known?.compare(service);
     final missing = comparison?.missing ?? const <String>[];
     final different = comparison?.different ?? const <String>[];

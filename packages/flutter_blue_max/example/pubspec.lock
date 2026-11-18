@@ -90,13 +90,53 @@ packages:
     source: hosted
     version: "2.1.0"
   collection:
-    dependency: transitive
+    dependency: "direct main"
     description:
       name: collection
       sha256: "2f5709ae4d3d59dd8f7cd309b4e023046b57d8a6c82130785d2b0e5868084e76"
       url: "https://pub.dev"
     source: hosted
     version: "1.19.1"
+  context_plus:
+    dependency: "direct main"
+    description:
+      name: context_plus
+      sha256: "00b716ae36e4085b0c1c2fead11d81a4c6d5b3043d0e381a0ecc4564f50f8ac4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.7"
+  context_plus_core:
+    dependency: transitive
+    description:
+      name: context_plus_core
+      sha256: "5d751bb4e417bc686f7215b776503268cdf8084e1a39f23bc378828e7b65b64f"
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.2"
+  context_ref:
+    dependency: transitive
+    description:
+      name: context_ref
+      sha256: "5a077db962ad06111c599eb6c4720ad3b7f35d0ac9e40faee22b8729b0f530cd"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.2.3"
+  context_watch:
+    dependency: transitive
+    description:
+      name: context_watch
+      sha256: fe37fabadb8fa488daf89430f2bbb1c85851f6db56b419a75b7ef4849c687857
+      url: "https://pub.dev"
+    source: hosted
+    version: "7.0.3"
+  context_watch_base:
+    dependency: transitive
+    description:
+      name: context_watch_base
+      sha256: "6f4c217f1f8221e34e18926a4a11d643e9d2ed9390a49b7e3d1be9b5e4a622f1"
+      url: "https://pub.dev"
+    source: hosted
+    version: "8.0.3"
   convert:
     dependency: transitive
     description:
@@ -495,14 +535,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
-  nested:
-    dependency: transitive
-    description:
-      name: nested
-      sha256: "03bac4c528c64c95c722ec99280375a6f2fc708eec17c7b3f07253b626cd2a20"
-      url: "https://pub.dev"
-    source: hosted
-    version: "1.0.0"
   objective_c:
     dependency: transitive
     description:
@@ -607,14 +639,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.2"
-  provider:
-    dependency: "direct main"
-    description:
-      name: provider
-      sha256: "4e82183fa20e5ca25703ead7e05de9e4cceed1fbd1eadc1ac3cb6f565a09f272"
-      url: "https://pub.dev"
-    source: hosted
-    version: "6.1.5+1"
   pub_semver:
     dependency: transitive
     description:

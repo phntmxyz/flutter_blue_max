@@ -1,24 +1,24 @@
 import 'dart:developer' as developer;
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
-import 'package:provider/provider.dart';
 
 /// Parsers section of `LibraryPanel`.
 /// Manages every saved parser, including those bound to devices that are not nearby.
 class const ParsersPanel({super.key, final ShareFile? shareFile}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    context.select<ParserLibrary, Object?>((c) => c.parsers);
-    final c = context.read<ParserLibrary>();
+    parserLibraryRef.watchOnly(context, (c) => c.parsers);
+    final c = parserLibraryRef.of(context);
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
@@ -100,7 +100,7 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
   }
 
   Future<void> _import(BuildContext context) async {
-    final controller = context.read<ParserLibrary>();
+    final controller = parserLibraryRef.of(context);
     final List<AdvertisementParser>? parsers;
     try {
       parsers = await openParserFile();
@@ -149,7 +149,7 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
       button,
       title: 'Export parsers',
       action: 'Export',
-      parsers: button.read<ParserLibrary>().parsers,
+      parsers: parserLibraryRef.of(button).parsers,
     );
     if (chosen == null || !button.mounted) {
       return;
@@ -180,7 +180,7 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
   }
 
   Future<void> _reset(BuildContext context) async {
-    final controller = context.read<ParserLibrary>();
+    final controller = parserLibraryRef.of(context);
     final confirmed = await confirm(
       context,
       title: 'Reset parsers?',

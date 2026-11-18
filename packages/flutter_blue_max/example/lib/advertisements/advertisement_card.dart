@@ -1,10 +1,11 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:provider/provider.dart';
 
 /// Advertisement section of the selected device in `DevicesPanel`.
 /// The inspected peer's latest advertisement, its parsers and an optional live history of all of them.
@@ -21,7 +22,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
   bool _changesOnly = false;
   bool _parsedOnly = false;
 
-  WorkbenchController get c => context.read<WorkbenchController>();
+  WorkbenchController get c => workbenchRef.of(context);
   BluetoothDevice get device => widget.device;
 
   @override
@@ -39,7 +40,7 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
 
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) {
+    workbenchRef.watchSnapshot(context, (c) {
       final tracker = c.advertisementTracker;
       final peerTracker = tracker?.remoteId == device.remoteId ? tracker : null;
       return [

@@ -1,11 +1,12 @@
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/l2cap/psm.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
-import 'package:provider/provider.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 
 /// L2CAP tab of the selected device inspector in `DevicesPanel`.
@@ -30,9 +31,10 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
 
   @override
   Widget build(BuildContext context) {
-    final c = context.read<WorkbenchController>();
+    final c = workbenchRef.of(context);
     final device = widget.device;
-    context.select<WorkbenchController, Object?>(
+    workbenchRef.watchSnapshot(
+      context,
       (c) => [
         device.isConnected,
         c.ready,

@@ -1,12 +1,12 @@
 import 'dart:async';
 
+import 'package:context_plus/context_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
 import 'package:flutter_blue_max_example/shared/form_validation.dart';
 import 'package:flutter_blue_max_example/shared/payload_codec.dart';
-import 'package:provider/provider.dart';
 import 'package:reactive_forms/reactive_forms.dart';
 
 /// Opened from `AdvertisementCard` or `ParsersPanel`.
@@ -27,7 +27,7 @@ class const ParserEditorPage({
     DeviceIdentifier? device,
     AdvertisementData? advertisement,
   }) async {
-    final controller = context.read<ParserLibrary>();
+    final controller = parserLibraryRef.of(context);
     final parser = await Navigator.of(context).push(
       MaterialPageRoute<AdvertisementParser>(
         builder: (_) => ParserEditorPage(device: device, advertisement: advertisement, initial: previous),
