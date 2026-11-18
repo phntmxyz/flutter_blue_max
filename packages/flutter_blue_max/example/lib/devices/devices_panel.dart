@@ -258,11 +258,18 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    OutlinedButton.icon(
-                      onPressed: available && !c.busy(Operation.discover) ? c.discover : null,
-                      icon: const Icon(Icons.refresh_rounded),
-                      label: Text(c.busy(Operation.discover) ? 'Discovering…' : 'Discover services'),
-                    ),
+                    if (c.busy(Operation.discover))
+                      OutlinedButton.icon(
+                        onPressed: null,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Discovering…'),
+                      )
+                    else
+                      OutlinedButton.icon(
+                        onPressed: available ? c.discover : null,
+                        icon: const Icon(Icons.refresh_rounded),
+                        label: const Text('Discover services'),
+                      ),
                     if (c.services.isEmpty)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 20),

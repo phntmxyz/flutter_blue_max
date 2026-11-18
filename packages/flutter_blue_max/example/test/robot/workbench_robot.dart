@@ -201,9 +201,7 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
 
   Future<void> rejectUnsupportedServer() async {
     logEvent('Report an unsupported server from the platform boundary');
-    platform.overrideListenL2CapChannel = (request) {
-      platform.serverStarts++;
-      platform.listenRequests.add(request);
+    platform.overrideListenL2CapChannel = (_) {
       return Future<int>.error(UnimplementedError());
     };
     await startServer();

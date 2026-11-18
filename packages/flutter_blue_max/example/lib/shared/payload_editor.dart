@@ -30,15 +30,28 @@ class _PayloadEditorState() extends State<PayloadEditor> {
     super.dispose();
   }
 
+  Future<void> _send() async {
+    if (!widget.enabled || _sending) {
+      return;
+    }
+    if (!_form.valid) {
+      _form.markAllAsTouched();
+      return;
+    }
+    final bytes = PayloadCodec.decode(_form.control('payload').value as String, hex: _hex);
+    setState(() => _sending = true);
+    try {
+      await widget.onSend(bytes);
+    } finally {
+      if (mounted) {
+        setState(() => _sending = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final enabled = widget.enabled && !_sending;
-    final payload = _form.control('payload');
-    if (enabled && payload.disabled) {
-      payload.markAsEnabled(emitEvent: false);
-    } else if (!enabled && payload.enabled) {
-      payload.markAsDisabled(emitEvent: false);
-    }
     return ReactiveForm(
       formGroup: _form,
       child: Column(
@@ -50,12 +63,12 @@ class _PayloadEditorState() extends State<PayloadEditor> {
               ButtonSegment(value: false, label: Text('UTF-8')),
             ],
             selected: {_hex},
-            onSelectionChanged: _sending ? null : (value) => setState(() => _form.control('hex').value = value.single),
+            onSelectionChanged: enabled ? (value) => setState(() => _form.control('hex').value = value.single) : null,
           ),
           const SizedBox(height: 12),
           ReactiveTextField<String>(
             formControlName: 'payload',
-            readOnly: !widget.enabled || _sending,
+            readOnly: !enabled,
             minLines: 2,
             maxLines: 5,
             decoration: InputDecoration(labelText: 'Payload', hintText: _hex ? '01 A2 FF' : 'Hello from Blue Max'),
@@ -63,27 +76,7 @@ class _PayloadEditorState() extends State<PayloadEditor> {
           ),
           const SizedBox(height: 12),
           FilledButton.icon(
-            onPressed: (() {
-              if (!widget.enabled || _sending) {
-                return null;
-              }
-              return () async {
-                if (!_form.valid) {
-                  _form.markAllAsTouched();
-                  return;
-                }
-                setState(() => _sending = true);
-                try {
-                  await widget.onSend(
-                    PayloadCodec.decode(_form.value['payload']! as String, hex: _form.value['hex']! as bool),
-                  );
-                } finally {
-                  if (mounted) {
-                    setState(() => _sending = false);
-                  }
-                }
-              };
-            })(),
+            onPressed: enabled ? _send : null,
             icon: const Icon(Icons.send_rounded, size: 18),
             label: _sending ? const Text('Sending…') : widget.label,
           ),

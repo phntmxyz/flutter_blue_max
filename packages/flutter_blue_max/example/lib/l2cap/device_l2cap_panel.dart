@@ -18,9 +18,9 @@ class const DeviceL2capPanel({super.key, required final BluetoothDevice device})
 class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
   final _form = FormGroup({
     'psm': FormControl<int>(validators: [Validators.required]),
-    'secure': FormControl<bool>(value: true),
   });
   final _psmAccessor = _PsmAccessor();
+  bool _secure = true;
 
   @override
   void dispose() {
@@ -38,11 +38,6 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
     final channelIdle = !c.busy(Operation.open);
     final connectionIdle = !c.busy(Operation.connection);
     final enabled = connectionReady && channelIdle && connectionIdle;
-    if (enabled && _form.disabled) {
-      _form.markAsEnabled(emitEvent: false);
-    } else if (!enabled && _form.enabled) {
-      _form.markAsDisabled(emitEvent: false);
-    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -54,7 +49,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Builder(
-                builder: (context) {
+                builder: (_) {
                   if (!connected) {
                     return const Text('Connect this device above to open an L2CAP channel.');
                   }
@@ -74,16 +69,18 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                             hintText: 'Decimal or 0x hexadecimal',
                           ),
                           validationMessages: {
-                            ValidationMessage.required: (_) =>
-                                'Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.',
+                            ValidationMessage.required: (_) {
+                              return 'Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.';
+                            },
                           },
                         ),
                         const SizedBox(height: 8),
                         Builder(
-                          builder: (context) {
+                          builder: (_) {
                             if (defaultTargetPlatform == TargetPlatform.android) {
-                              return ReactiveSwitchListTile(
-                                formControlName: 'secure',
+                              return SwitchListTile(
+                                value: _secure,
+                                onChanged: enabled ? (value) => setState(() => _secure = value) : null,
                                 contentPadding: EdgeInsets.zero,
                                 title: const Text('Require encryption'),
                               );
@@ -94,26 +91,26 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                             );
                           },
                         ),
-                        FilledButton.icon(
-                          onPressed: (() {
-                            if (enabled) {
-                              return () {
-                                if (!_form.valid) {
-                                  _form.markAllAsTouched();
-                                  return;
-                                }
-                                c.openChannel(
-                                  _form.value['psm']! as int,
-                                  device: device,
-                                  secure: _form.value['secure']! as bool,
-                                );
-                              };
-                            }
-                            return null;
-                          })(),
-                          icon: const Icon(Icons.link_rounded),
-                          label: Text(c.busy(Operation.open) ? 'Opening…' : 'Open channel'),
-                        ),
+                        if (!channelIdle)
+                          FilledButton.icon(
+                            onPressed: null,
+                            icon: const Icon(Icons.link_rounded),
+                            label: const Text('Opening…'),
+                          )
+                        else
+                          FilledButton.icon(
+                            onPressed: enabled
+                                ? () {
+                                    if (!_form.valid) {
+                                      _form.markAllAsTouched();
+                                      return;
+                                    }
+                                    c.openChannel(_form.value['psm']! as int, device: device, secure: _secure);
+                                  }
+                                : null,
+                            icon: const Icon(Icons.link_rounded),
+                            label: const Text('Open channel'),
+                          ),
                       ],
                     ),
                   );

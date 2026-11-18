@@ -98,7 +98,7 @@ class const ServerListenerControls({
           const SizedBox(height: 12),
         ],
         Builder(
-          builder: (context) {
+          builder: (_) {
             if (psm == null) {
               return FilledButton.icon(
                 onPressed: canChangeServer ? onStart : null,

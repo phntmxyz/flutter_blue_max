@@ -19,7 +19,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final closeRequests = <CloseL2CapChannelRequest>[];
   final stoppedServers = <int>[];
   final connected = <DeviceIdentifier>{};
-  Completer<int>? pendingServer;
   int serverStarts = 0;
   bool includeGattExtras = false;
   bool emitNotifyDescriptorEvents = true;
@@ -47,7 +46,6 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   final descriptorWritten = StreamController<BmDescriptorData>.broadcast(sync: true);
   final turnOnResponses = StreamController<BmTurnOnResponse>.broadcast(sync: true);
   List<int> bufferedBytes = [];
-  Completer<void>? pendingWrites;
   int turnOnRequests = 0;
   int scanStarts = 0;
   int scanStops = 0;
@@ -92,12 +90,10 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     extraServices.clear();
     notifyRequests.clear();
     systemPeers.clear();
-    pendingServer = null;
     serverStarts = 0;
     includeGattExtras = false;
     emitNotifyDescriptorEvents = true;
     bufferedBytes = [];
-    pendingWrites = null;
     turnOnRequests = 0;
     scanStarts = 0;
     scanStops = 0;
@@ -512,15 +508,11 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
 
   @override
   Future<int> listenL2CapChannel(ListenL2CapChannelRequest request) async {
+    serverStarts++;
+    listenRequests.add(request);
     final override = overrideListenL2CapChannel;
     if (override != null) {
       return await override(request);
-    }
-    serverStarts++;
-    listenRequests.add(request);
-    final pending = pendingServer;
-    if (pending != null) {
-      return await pending.future;
     }
     return 129;
   }
@@ -613,11 +605,10 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
 
   @override
   Future<void> writeL2CapChannel(WriteL2CapChannelRequest request) async {
+    writes.add(request);
     final override = overrideWriteL2CapChannel;
     if (override != null) {
-      return await override(request);
+      await override(request);
     }
-    writes.add(request);
-    await pendingWrites?.future;
   }
 }

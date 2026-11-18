@@ -295,14 +295,14 @@ void main() {
     await controller.startServer(secure: true);
     await controller.stopServer();
     final pending = Completer<int>();
-    platform.pendingServer = pending;
+    platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await Future<void>.delayed(Duration.zero);
     platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('stale'), psm: 129));
     platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('current'), psm: 131));
     pending.complete(131);
     await starting;
-    platform.pendingServer = null;
+    platform.overrideListenL2CapChannel = null;
     expect(controller.channels.map((s) => s.channel.psm), [131]);
     expect(platform.closeRequests.any((r) => r.remoteId == 'stale' && r.psm == 129), isTrue);
     await controller.stopServer();
@@ -671,7 +671,7 @@ void main() {
   test('duplicate server submission is ignored and late startup is cleaned up on disposal', () async {
     final (:controller, :platform) = await _setup(dispose: false);
     final pending = Completer<int>();
-    platform.pendingServer = pending;
+    platform.overrideListenL2CapChannel = (_) => pending.future;
     final before = platform.serverStarts;
     final opening = controller.startServer(secure: true);
     await Future<void>.delayed(Duration.zero);
@@ -680,7 +680,7 @@ void main() {
     controller.dispose();
     pending.complete(135);
     await opening;
-    platform.pendingServer = null;
+    platform.overrideListenL2CapChannel = null;
     expect(platform.stoppedServers, contains(135));
     expect(controller.serverPsm, isNull);
   });
@@ -688,7 +688,7 @@ void main() {
   test('a peer accepted before the server reports its PSM is kept', () async {
     final (:controller, :platform) = await _setup();
     final pending = Completer<int>();
-    platform.pendingServer = pending;
+    platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await Future<void>.delayed(Duration.zero);
 
@@ -704,7 +704,7 @@ void main() {
   test('a failed listener start closes provisional accepts and permits a new start', () async {
     final (:controller, :platform) = await _setup();
     final pending = Completer<int>();
-    platform.pendingServer = pending;
+    platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await _until(() => platform.listenRequests.isNotEmpty);
 
@@ -720,7 +720,7 @@ void main() {
     expect(platform.closeRequests.single.remoteId, remoteId.str);
     expect(platform.closeRequests.single.psm, 135);
 
-    platform.pendingServer = null;
+    platform.overrideListenL2CapChannel = null;
     await controller.startServer(secure: true);
     expect(controller.serverPsm, 129);
     expect(controller.channels, isEmpty);
@@ -813,9 +813,7 @@ void main() {
 
   test('an unimplemented server reports unsupported without leaving a pending session', () async {
     final (:controller, :platform) = await _setup();
-    platform.overrideListenL2CapChannel = (request) {
-      platform.serverStarts++;
-      platform.listenRequests.add(request);
+    platform.overrideListenL2CapChannel = (_) {
       return Future<int>.error(UnimplementedError());
     };
 
@@ -858,8 +856,8 @@ void main() {
       controller.select(peer);
       await controller.connect();
       final before = platform.openRequests.length;
-      platform.overrideOpenL2CapChannel = (request) {
-        platform.openRequests.add(request);
+      platform.overrideOpenL2CapChannel = (req) {
+        platform.openRequests.add(req);
         return Future<void>.error(failure);
       };
 
@@ -895,8 +893,8 @@ void main() {
       final platform = fixture.platform;
       final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:51');
       c.select(peer);
-      platform.overrideConnect = (request) async {
-        platform.connectRequests.add(request);
+      platform.overrideConnect = (req) async {
+        platform.connectRequests.add(req);
         return true;
       };
       final opening = c.connect();
@@ -917,10 +915,10 @@ void main() {
       final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:52');
       c.select(peer);
       await c.connect();
-      platform.overrideOpenL2CapChannel = (request) async {
+      platform.overrideOpenL2CapChannel = (req) async {
         platform.overrideOpenL2CapChannel = null;
-        platform.openRequests.add(request);
-        await platform.disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(request.remoteId)));
+        platform.openRequests.add(req);
+        await platform.disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(req.remoteId)));
         throw StateError('Temporary channel failure');
       };
       final attempts = platform.openRequests.length;
@@ -938,8 +936,8 @@ void main() {
       final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:53');
       controller.select(peer);
       await controller.connect();
-      platform.overrideOpenL2CapChannel = (request) {
-        platform.openRequests.add(request);
+      platform.overrideOpenL2CapChannel = (req) {
+        platform.openRequests.add(req);
         return Future<void>.error(StateError('Peer rejected the channel'));
       };
 
@@ -996,7 +994,7 @@ void main() {
       expect(large.value.last, 255);
       expect(large.remoteId, 'traffic');
       final gate = Completer<void>();
-      platform.pendingWrites = gate;
+      platform.overrideWriteL2CapChannel = (_) => gate.future;
       addTearDown(() {
         if (!gate.isCompleted) {
           gate.complete();
