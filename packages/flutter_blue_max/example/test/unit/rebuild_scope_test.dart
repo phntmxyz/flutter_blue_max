@@ -73,7 +73,7 @@ void main() {
     spot<AdapterBanner>().spotText('Bluetooth is off.').doesNotExist();
   });
 
-  const panels = [DevicesPanel, L2capServerPanel, LibraryPanel, ActivityPanel];
+  const panels = [DevicesPanel, L2capServerPanel, LibraryPanel, ActivityLog];
 
   testWidgets('logs and discovery rebuild only the panels that use them', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
@@ -93,7 +93,7 @@ void main() {
     }
 
     for (final type in panels) {
-      expect(builds[type] ?? 0, type == ActivityPanel ? 10 : 0, reason: '$type log rebuild count');
+      expect(builds[type] ?? 0, type == ActivityLog ? 10 : 0, reason: '$type log rebuild count');
     }
     spotAllWidgets().spot<ActivityPanel>().existsOnce();
     spot<ActivityPanel>().doesNotExist();

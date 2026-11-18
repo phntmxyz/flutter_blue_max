@@ -39,7 +39,7 @@ class WorkbenchController({
 
   /// Characteristics subscribed on web per peer, where no CCCD event reports it; cleared when the link drops.
   final _webSubscriptions = <DeviceIdentifier, Set<Operation>>{};
-  final _logs = <String>[];
+  final _activity = ValueNotifier<List<ActivityEntry>>(const []);
   late final parserLibrary = ParserLibrary(write: saveList, onProblem: _libraryProblem)..addListener(_update);
   late final catalogLibrary = GattCatalogLibrary(write: saveList, onProblem: _libraryProblem)..addListener(_update);
 
@@ -76,7 +76,8 @@ class WorkbenchController({
   /// Bounded to keep a long-running diagnostic session from growing indefinitely.
   static const maxLogEntries = 500;
 
-  List<String> get logs => List.unmodifiable(_logs);
+  List<String> get logs => List.unmodifiable(_activity.value.map((entry) => entry.text));
+  ValueListenable<List<ActivityEntry>> get activity => _activity;
 
   /// Immutable snapshots for panel selectors.
   /// Copy mutable collections so a prior selection cannot change in place.
@@ -299,7 +300,7 @@ class WorkbenchController({
 
   void _libraryProblem(LibraryProblem problem) {
     error = problem.message;
-    log(problem.activity);
+    log(problem.activity, severity: ActivitySeverity.error);
     if (problem.stackTrace != null) {
       developer.log(problem.activity, name: 'workbench', error: problem.error, stackTrace: problem.stackTrace);
     }
@@ -572,7 +573,7 @@ class WorkbenchController({
     try {
       await _refreshRssi(device);
     } catch (exception, stackTrace) {
-      log('Automatic RSSI read failed: $exception');
+      log('Automatic RSSI read failed: $exception', severity: ActivitySeverity.error);
       developer.log('Automatic RSSI read failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     }
   }
@@ -644,7 +645,7 @@ class WorkbenchController({
       // Keep a failed native close reachable through the card's Close action.
       _trackChannel(channel, incoming: true);
       error = 'Closing late L2CAP accept: $exception';
-      log('ERROR $error');
+      log('ERROR $error', severity: ActivitySeverity.error);
     }
   }
 
@@ -825,7 +826,7 @@ class WorkbenchController({
       } else {
         error = '${operation.label}: $exception';
       }
-      log('ERROR ${operation.label}: $exception');
+      log('ERROR ${operation.label}: $exception', severity: ActivitySeverity.error);
       developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
     } finally {
       _busy.remove(operation);
@@ -848,24 +849,25 @@ class WorkbenchController({
   }
 
   void clearLogs() {
-    _logs.clear();
+    _activity.value = const [];
     _update();
   }
 
-  void log(String message) {
+  void log(String message, {ActivitySeverity severity = ActivitySeverity.info}) {
     if (_disposed) {
       return;
     }
-    _logs.add('${clock.now().toIso8601String()}  $message');
-    if (_logs.length > maxLogEntries) {
-      _logs.removeRange(0, _logs.length - maxLogEntries);
-    }
+    final previous = _activity.value;
+    _activity.value = List.unmodifiable([
+      ...previous.skip(previous.length >= maxLogEntries ? 1 : 0),
+      ActivityEntry('${clock.now().toIso8601String()}  $message', severity: severity),
+    ]);
     _update();
   }
 
   void _streamError(Object exception, StackTrace stackTrace) {
     error = exception.toString();
-    log('ERROR $error');
+    log('ERROR $error', severity: ActivitySeverity.error);
     developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
   }
 
@@ -880,6 +882,7 @@ class WorkbenchController({
     _disposed = true;
     parserLibrary.dispose();
     catalogLibrary.dispose();
+    _activity.dispose();
     for (final subscription in _subscriptions) {
       unawaited(subscription.cancel());
     }
@@ -944,37 +947,69 @@ class WorkbenchController({
 
 /// Identifies an operation for [WorkbenchController.run] and [WorkbenchController.busy].
 /// Operations with a [scope], such as one channel, run independently of each other.
-class const Operation._(
-  /// Prefixes the error the operation reports.
-  final String label, [
-  final Object? scope,
-]) {
-  static const initialize = Operation._('Initialize');
-  static const clipboard = Operation._('Copy to clipboard');
-  static const scan = Operation._('Scan');
-  static const systemDevices = Operation._('System devices');
-  static const connection = Operation._('Connection');
-  static const cancelConnection = Operation._('Cancel connection');
-  static const adapter = Operation._('Turn on Bluetooth');
-  static const discover = Operation._('Service discovery');
-  static const bond = Operation._('Bond');
-  static const mtu = Operation._('MTU request');
-  static const server = Operation._('L2CAP server');
-  static const open = Operation._('Open L2CAP channel');
+class const Operation._(final _OperationKind _kind, [final Object? scope, final String? _detail]) {
+  static const initialize = Operation._(_OperationKind.initialize);
+  static const clipboard = Operation._(_OperationKind.clipboard);
+  static const scan = Operation._(_OperationKind.scan);
+  static const systemDevices = Operation._(_OperationKind.systemDevices);
+  static const connection = Operation._(_OperationKind.connection);
+  static const cancelConnection = Operation._(_OperationKind.cancelConnection);
+  static const adapter = Operation._(_OperationKind.adapter);
+  static const discover = Operation._(_OperationKind.discover);
+  static const bond = Operation._(_OperationKind.bond);
+  static const mtu = Operation._(_OperationKind.mtu);
+  static const server = Operation._(_OperationKind.server);
+  static const open = Operation._(_OperationKind.open);
 
-  new rssi(BluetoothDevice device) : this._('Read RSSI', device.remoteId);
-  new channel(ChannelSession session) : this._('L2CAP channel', session.key);
+  new rssi(BluetoothDevice device) : this._(_OperationKind.rssi, device.remoteId);
+  new channel(ChannelSession session) : this._(_OperationKind.channel, session.key);
   new characteristic(BluetoothCharacteristic c)
-    : this._('Characteristic ${c.uuid}', (c.remoteId, c.serviceUuid, c.uuid, c.instanceId));
+    : this._(_OperationKind.characteristic, (c.remoteId, c.serviceUuid, c.uuid, c.instanceId), c.uuid.toString());
   new descriptor(BluetoothDescriptor d)
-    : this._('Descriptor ${d.uuid}', (d.remoteId, d.serviceUuid, d.characteristicUuid, d.uuid, d.instanceId));
+    : this._(_OperationKind.descriptor, (
+        d.remoteId,
+        d.serviceUuid,
+        d.characteristicUuid,
+        d.uuid,
+        d.instanceId,
+      ), d.uuid.toString());
+
+  /// Prefixes the error the operation reports.
+  String get label => _detail == null ? _kind.label : '${_kind.label} $_detail';
 
   @override
-  bool operator ==(Object other) => other is Operation && other.label == label && other.scope == scope;
+  bool operator ==(Object other) => other is Operation && other._kind == _kind && other.scope == scope;
 
   @override
-  int get hashCode => Object.hash(label, scope);
+  int get hashCode => Object.hash(_kind, scope);
 }
+
+enum _OperationKind(final String label) {
+  initialize('Initialize'),
+  clipboard('Copy to clipboard'),
+  scan('Scan'),
+  systemDevices('System devices'),
+  connection('Connection'),
+  cancelConnection('Cancel connection'),
+  adapter('Turn on Bluetooth'),
+  discover('Service discovery'),
+  bond('Bond'),
+  mtu('MTU request'),
+  server('L2CAP server'),
+  open('Open L2CAP channel'),
+  rssi('Read RSSI'),
+  channel('L2CAP channel'),
+  characteristic('Characteristic'),
+  descriptor('Descriptor'),
+}
+
+enum ActivitySeverity() {
+  info,
+  error,
+}
+
+/// A formatted session log line and its severity for Activity.
+class const ActivityEntry(final String text, {required final ActivitySeverity severity});
 
 /// A capability the platform lacks, as opposed to a failure of the operation.
 class const _Unsupported(final Object cause) implements Exception {

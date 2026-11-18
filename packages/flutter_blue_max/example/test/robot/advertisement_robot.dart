@@ -190,12 +190,14 @@ extension AdvertisementRobot on WorkbenchRobot {
     expect(controller.parsers, hasLength(testDongleParsers.length));
 
     logEvent('Edit a parser without a device context');
-    await act.tap(spot<IconButton>().withTooltip('Edit parser').first());
+    final status = spot<ListTile>().withChild(spotText('FBM status', exact: true));
+    final edit = status.spot<IconButton>().withTooltip('Edit parser')..existsOnce();
+    await act.tap(edit);
     await idle();
     spotText('Only this device').doesNotExist();
     await _enter('Parser name', 'Battery level');
     await tapLabel('Save parser');
-    expect(controller.parsers.first.name, 'Battery level');
+    expect(controller.parsers.map((parser) => parser.name), unorderedEquals(['Battery level', 'FBM sensor']));
     spotText('Battery level', exact: true).existsOnce();
   }
 }

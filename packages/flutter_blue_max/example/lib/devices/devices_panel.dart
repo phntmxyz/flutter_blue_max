@@ -164,10 +164,8 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                   () {
                     final isConnectingThisPeer = c.connectingDevice == device;
                     final connectionIdle = !c.busy(Operation.connection);
-                    final canConnect =
-                        c.ready &&
-                        connectionIdle &&
-                        (c.connected || (advertisement?.advertisementData.connectable ?? true));
+                    final allowsConnection = advertisement?.advertisementData.connectable ?? true;
+                    final canConnect = c.ready && connectionIdle && (c.connected || allowsConnection);
                     if (isConnectingThisPeer) {
                       return FilledButton.icon(
                         onPressed: c.busy(Operation.cancelConnection) ? null : c.cancelConnect,

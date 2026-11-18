@@ -64,17 +64,16 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   bool get _test => _check.value!;
   set _test(bool value) => _check.value = value;
 
-  Map<String, dynamic>? _validate(AbstractControl<dynamic> control) {
-    final form = control as FormGroup;
-    setInputError(form.control('name'), _required(_name.text));
+  Map<String, dynamic>? _validate(AbstractControl<dynamic> _) {
+    setInputError(_name, _required(_name.text));
     final uuid = _parse(_uuid.text);
     String? message;
     if (uuid == null) {
       message = 'Enter a 16, 32 or 128-bit UUID.';
-    } else if (widget.others.any((service) => service.uuid == uuid)) {
+    } else if (widget.others.any((other) => other.uuid == uuid)) {
       message = 'Your catalog already has this service.';
     }
-    setInputError(form.control('uuid'), message);
+    setInputError(_uuid, message);
     for (final draft in _characteristics) {
       setInputError(draft.name, _required(draft.name.text));
       final uuid = draft.parsedUuid;
@@ -231,16 +230,15 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
 }
 
 /// Form state of one characteristic.
-class CharacteristicDraft() extends FormGroup {
-  this
-    : super({
-        'name': FormControl<String>(value: ''),
-        'uuid': FormControl<String>(value: ''),
-        'properties': FormControl<Set<GattProperty>>(value: {}),
-      });
-  FormControl<String> get name => control('name') as FormControl<String>;
-  FormControl<String> get uuid => control('uuid') as FormControl<String>;
-  FormControl<Set<GattProperty>> get propertyControl => control('properties') as FormControl<Set<GattProperty>>;
+class CharacteristicDraft._(
+  final FormControl<String> name,
+  final FormControl<String> uuid,
+  final FormControl<Set<GattProperty>> propertyControl,
+) extends FormGroup {
+  new() : this._(FormControl(value: ''), FormControl(value: ''), FormControl(value: {}));
+
+  this : super({'name': name, 'uuid': uuid, 'properties': propertyControl});
+
   Set<GattProperty> get properties => propertyControl.value!;
   set properties(Set<GattProperty> value) => propertyControl.value = value;
   Guid? get parsedUuid => _parse(uuid.text);

@@ -77,7 +77,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
           CatalogServiceCard(
             service: service,
             note: switch (builtInService(service.uuid)) {
-              final replaced? => 'Replaces the built-in ${replaced.name}',
+              final replaced? => Text('Replaces the built-in ${replaced.name}'),
               null => null,
             },
             actions: [
@@ -103,7 +103,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
           for (final service in services)
             CatalogServiceCard(
               service: service,
-              note: c.catalog.any((own) => own.uuid == service.uuid) ? 'Replaced by your entry' : null,
+              note: c.catalog.any((own) => own.uuid == service.uuid) ? const Text('Replaced by your entry') : null,
               actions: [
                 TextButton.icon(
                   onPressed: () => CatalogEditorPage.open(context, initial: service),
@@ -282,7 +282,7 @@ class const CatalogImportDetails({required final Widget summary, final String? p
 class const CatalogServiceCard({
   required final KnownService service,
   required final List<Widget> actions,
-  final String? note,
+  final Widget? note,
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
@@ -299,9 +299,10 @@ class const CatalogServiceCard({
               [
                 counted(service.characteristics.length, _characteristicNoun),
                 if (service.test) 'Checked' else 'Names only',
-                ?note,
               ].join(' · '),
             ),
+            if (note case final child?)
+              DefaultTextStyle.merge(style: Theme.of(context).textTheme.bodyMedium, child: child),
           ],
         ),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,

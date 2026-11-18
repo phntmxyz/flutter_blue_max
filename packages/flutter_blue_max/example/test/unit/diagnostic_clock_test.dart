@@ -12,6 +12,17 @@ void main() {
     withClock(Clock.fixed(time), () => controller.log('clock test'));
     expect(controller.logs.single, '${time.toIso8601String()}  clock test');
   });
+  test('activity severity is independent of log content', () async {
+    final controller = WorkbenchController();
+    addTearDown(controller.dispose);
+
+    controller.log('ERROR sensor connected');
+    await controller.run(Operation.connection, () => Future<void>.error(StateError('lost connection')));
+
+    expect(controller.activity.value.map((entry) => entry.severity), [ActivitySeverity.info, ActivitySeverity.error]);
+    expect(controller.logs.first, endsWith('ERROR sensor connected'));
+  });
+
   test('channel receipt timestamps use the scoped clock', () {
     final channel = BluetoothL2capChannel(deviceId: const DeviceIdentifier('clock'), psm: 129);
     final session = ChannelSession(channel, incoming: true);

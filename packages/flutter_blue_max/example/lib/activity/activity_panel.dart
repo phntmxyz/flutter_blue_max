@@ -14,13 +14,32 @@ class _ActivityPanelState() extends State<ActivityPanel> {
 
   @override
   Widget build(BuildContext context) {
-    context.select<WorkbenchController, Object?>((c) => c.logs);
-    final lines = context
-        .read<WorkbenchController>()
-        .logs
-        .reversed
-        .where((line) => line.toLowerCase().contains(_query.toLowerCase()))
-        .toList();
+    final controller = context.read<WorkbenchController>();
+    return ValueListenableBuilder(
+      valueListenable: controller.activity,
+      builder: (_, entries, _) => ActivityLog(
+        entries: entries,
+        query: _query,
+        onQueryChanged: (text) => setState(() => _query = text),
+        onCopy: () => controller.copyToClipboard(entries.map((entry) => entry.text).join('\n')),
+        onClear: controller.clearLogs,
+      ),
+    );
+  }
+}
+
+/// The filter and log rows displayed by ActivityPanel, backed by one log snapshot.
+class const ActivityLog({
+  required final List<ActivityEntry> entries,
+  required final String query,
+  required final ValueChanged<String> onQueryChanged,
+  required final Future<bool> Function() onCopy,
+  required final VoidCallback onClear,
+}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final search = query.toLowerCase();
+    final lines = entries.reversed.where((entry) => entry.text.toLowerCase().contains(search)).toList();
     return CustomScrollView(
       slivers: [
         SliverPadding(
@@ -34,7 +53,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                 const Text('Newest first. Payloads and device identifiers are included when copying this log.'),
                 const SizedBox(height: 20),
                 TextField(
-                  onChanged: (value) => setState(() => _query = value),
+                  onChanged: onQueryChanged,
                   decoration: const InputDecoration(prefixIcon: Icon(Icons.search), hintText: 'Filter activity'),
                 ),
                 const SizedBox(height: 12),
@@ -44,8 +63,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: () async {
-                        final controller = context.read<WorkbenchController>();
-                        final copied = await controller.copyToClipboard(controller.logs.join('\n'));
+                        final copied = await onCopy();
                         if (copied && context.mounted) {
                           ScaffoldMessenger.of(context)
                               .showSnackBar(const SnackBar(content: Text('Session log copied')));
@@ -55,7 +73,7 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                       label: const Text('Copy session'),
                     ),
                     TextButton.icon(
-                      onPressed: context.read<WorkbenchController>().clearLogs,
+                      onPressed: onClear,
                       icon: const Icon(Icons.delete_outline, size: 18),
                       label: const Text('Clear'),
                     ),
@@ -81,12 +99,14 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                 separatorBuilder: (_, _) => const Divider(height: 16),
                 itemBuilder: (context, index) {
                   return SelectableText(
-                    lines[index],
+                    lines[index].text,
                     style: TextStyle(
                       fontFamily: 'monospace',
                       fontSize: 12,
                       height: 1.6,
-                      color: lines[index].contains('ERROR') ? Theme.of(context).colorScheme.error : null,
+                      color: lines[index].severity == ActivitySeverity.error
+                          ? Theme.of(context).colorScheme.error
+                          : null,
                     ),
                   );
                 },
