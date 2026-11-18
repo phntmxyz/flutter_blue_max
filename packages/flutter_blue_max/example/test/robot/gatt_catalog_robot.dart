@@ -136,6 +136,46 @@ extension GattCatalogRobot on WorkbenchRobot {
     spotText('None yet. Add a service here or from a discovered service in the GATT explorer.').existsOnce();
   }
 
+  Future<void> overrideBuiltInBatteryService() async {
+    await inspectPeripheral();
+    spotText('Battery', exact: true).existsOnce();
+    await tapLabel('Library');
+    await tapLabel('GATT catalog');
+    final title = spotText('Battery', exact: true);
+    final catalog = spot<CatalogPanel>().spot<Scrollable>()..existsOnce();
+    await tester.scrollUntilVisible(title.finder, 400, scrollable: catalog.finder);
+    await tapLabel('Battery');
+    final battery = spot<CatalogServiceCard>().withChild(title);
+    final copy = battery.spotText('Copy to your services', exact: true)..existsOnce();
+    await scrollIntoView(copy);
+    await act.tap(copy);
+    await idle();
+    await _enter('Service name', 'Battery pack');
+    await tapLabel('Save entry');
+    await openDevices();
+    spotText('Battery pack', exact: true).existsOnce();
+    spotText('Battery', exact: true).doesNotExist();
+    await tapLabel('Library');
+    final overrideTitle = spotText('Battery pack', exact: true);
+    await tester.scrollUntilVisible(overrideTitle.finder, -400, scrollable: catalog.finder);
+    await tapLabel('Battery pack');
+    final override = spot<CatalogServiceCard>().withChild(overrideTitle);
+    final remove = override.spotText('Remove', exact: true)..existsOnce();
+    await scrollIntoView(remove);
+    await act.tap(remove);
+    await idle();
+    await openDevices();
+    spotText('Battery', exact: true).existsOnce();
+    spotText('Battery pack', exact: true).doesNotExist();
+  }
+
+  Future<void> dismissCatalogKeyboard() async {
+    await tapLabel('Library');
+    await tapLabel('GATT catalog');
+    await tapLabel('Add service');
+    await verifyBackgroundDismissesKeyboard(_field('Service name'), 'Add catalog entry', 'Battery draft');
+  }
+
   Future<void> validateCatalogEditor() async {
     await tapLabel('Library');
     await tapLabel('GATT catalog');

@@ -1,5 +1,6 @@
 import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_app.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
@@ -271,6 +272,49 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     await idle();
     spot<ListTile>().withChild(spotText('Test peripheral', exact: true)).existsOnce();
     expect(controller.connected, isTrue);
+  }
+
+  Future<void> backWithHiddenInspector() async {
+    await openActivity();
+    final calls = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      calls.add(call.method);
+      return null;
+    });
+    try {
+      await tester.binding.handlePopRoute();
+      expect(calls, contains('SystemNavigator.pop'));
+    } finally {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    }
+    await openDevices();
+    spotText('180F', exact: true).existsOnce();
+  }
+
+  Future<void> dismissGattPayloadKeyboard() async {
+    await tapLabel('180F');
+    await tapLabel('2A19');
+    await tapLabel('Write');
+    final field = spot<PayloadEditor>().spot<TextField>()..existsOnce();
+    await verifyBackgroundDismissesKeyboard(field, 'GATT explorer', '01 A2');
+  }
+
+  Future<void> verifyBackgroundDismissesKeyboard(
+    WidgetSelector<TextField> field,
+    String background,
+    String draft,
+  ) async {
+    await scrollIntoView(field);
+    await act.enterText(field, draft);
+    await idle();
+    final editable = field.spot<EditableText>()..existsOnce();
+    expect(editable.snapshotWidget().focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tapLabel(background);
+    expect(editable.snapshotWidget().focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(field.snapshotWidget().controller!.text, draft);
   }
 
   Future<void> reopenConnectedPeripheral() async {

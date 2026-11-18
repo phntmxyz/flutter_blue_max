@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -70,6 +71,58 @@ extension AdvertisementRobot on WorkbenchRobot {
       expect(() => saved.match.add(1), throwsUnsupportedError);
       expect(() => saved.fields.clear(), throwsUnsupportedError);
     }
+  }
+
+  Future<void> validatePreviewBeforeSaving({required bool withSample}) async {
+    if (withSample) {
+      await scanForSensor();
+    } else {
+      await tapLabel('Library');
+    }
+    await tapLabel('Add parser');
+    if (!withSample) {
+      await _enter('Company ID (hex)', 'fffe');
+    }
+    await _enter('Parser name', 'Sensor');
+    await _enter('Field name', 'Value');
+    final before = controller.parsers.toList();
+    const preview = 'Sensor · Value: 16';
+    if (withSample) spotText(preview, exact: true).existsOnce();
+
+    for (final (label, invalid, valid) in [
+      ('Parser name', '', 'Sensor'),
+      ('Offset', '-1', '0'),
+      ('Scale', '0', '1'),
+      ('Bit count', '9', ''),
+    ]) {
+      await _enter(label, invalid);
+      await _assertPreviewRejectsSave(before, withSample: withSample);
+      if (withSample) spotText(preview, exact: true).doesNotExist();
+      await _enter(label, valid);
+      if (withSample) spotText(preview, exact: true).existsOnce();
+    }
+
+    await _enter('Bit offset', '7');
+    await _enter('Bit count', '2');
+    await _assertPreviewRejectsSave(before, withSample: withSample);
+    await _enter('Bit offset', '0');
+    await _enter('Bit count', '');
+    await tapLabel('Records');
+    await _enter('Record type (hex)', '100');
+    await _assertPreviewRejectsSave(before, withSample: withSample);
+    await tapLabel('1 byte');
+    await tapLabel('2 bytes LE');
+    spotText('Complete the form to preview.', exact: true).doesNotExist();
+    await tapLabel('Save parser');
+    spot<ParserEditorPage>().doesNotExist();
+    expect(controller.parsers.singleWhere((parser) => parser.name == 'Sensor').fields.single.record, 0x100);
+  }
+
+  Future<void> _assertPreviewRejectsSave(List<AdvertisementParser> before, {required bool withSample}) async {
+    if (withSample) spotText('Complete the form to preview.', exact: true).existsOnce();
+    await tapLabel('Save parser');
+    spot<ParserEditorPage>().existsOnce();
+    expect(controller.parsers, before);
   }
 
   Future<void> addTemperatureParser() async {

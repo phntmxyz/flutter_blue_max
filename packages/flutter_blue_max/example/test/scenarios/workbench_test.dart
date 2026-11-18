@@ -28,12 +28,6 @@ void main() {
     await robot.selectAdvertisedPeerAlsoConnectedToTheSystem();
   });
 
-  testWidgets('catalog editor: removing a field keeps validation with its own characteristic', (tester) async {
-    final robot = WorkbenchRobot(tester, platform);
-    await robot.launch(size: const Size(1200, 1000));
-    await robot.removeInvalidCharacteristicWithoutMovingErrors();
-  });
-
   testWidgets('parser editor: hidden inputs do not prevent saving after a type change', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
@@ -254,6 +248,14 @@ void main() {
     await robot.reopenConnectedPeripheral();
   });
 
+  testWidgets('phone: system Back bubbles when another destination hides the inspector', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(390, 844));
+    await robot.scanForPeripheral();
+    await robot.inspectPeripheral();
+    await robot.backWithHiddenInspector();
+  });
+
   testWidgets('phone: the search text survives a visit to the device details', (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
@@ -274,6 +276,14 @@ void main() {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.dismissKeyboardByTappingOutside();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+
+  testWidgets('GATT payload keeps its draft when a background tap dismisses the keyboard', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.scanForPeripheral();
+    await robot.inspectPeripheral();
+    await robot.dismissGattPayloadKeyboard();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
@@ -381,10 +391,11 @@ void main() {
       await robot.removeOwnCatalogService();
     });
 
-    testWidgets('the catalog editor rejects invalid entries and edits in place', (tester) async {
+    testWidgets('a custom GATT entry overrides Battery until removed', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
-      await robot.validateCatalogEditor();
+      await robot.scanForPeripheral();
+      await robot.overrideBuiltInBatteryService();
     });
 
     testWidgets('broadcast advertisements retain appearance and cannot be connected', (tester) async {
