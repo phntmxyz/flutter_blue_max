@@ -9,7 +9,6 @@ import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
 import 'package:flutter_test/flutter_test.dart';
-import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:spot/spot.dart';
 
@@ -17,13 +16,10 @@ import '../fakes/fake_bluetooth_platform.dart';
 import '../fakes/fake_file_selector.dart';
 import '../fakes/fake_share.dart';
 
-/// One fake for all tests: `SharePlus.instance` keeps the platform it saw first.
-final _share = FakeShare();
-
 class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform platform) {
   final controller = WorkbenchController();
   final files = FakeFileSelector();
-  FakeShare get share => _share;
+  final share = FakeShare();
 
   Future<void> launch({required Size size}) async {
     platform.reset();
@@ -32,11 +28,9 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
     addTearDown(dispose);
     FlutterBlueMaxPlatform.instance = platform;
     FileSelectorPlatform.instance = files;
-    _share.reset();
-    SharePlatform.instance = _share;
     tester.view.devicePixelRatio = 1;
     tester.view.physicalSize = size;
-    await tester.pumpWidget(WorkbenchApp(controller: controller));
+    await tester.pumpWidget(WorkbenchApp(controller: controller, shareFile: share.share));
     await idle();
     platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
     await idle();

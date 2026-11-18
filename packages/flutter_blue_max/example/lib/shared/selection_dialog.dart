@@ -41,8 +41,12 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
   late final _chosen = {for (var i = 0; i < widget.items.length; i++) i};
 
   bool? get _allValue {
-    if (_chosen.length == widget.items.length) return true;
-    if (_chosen.isEmpty) return false;
+    if (_chosen.length == widget.items.length) {
+      return true;
+    }
+    if (_chosen.isEmpty) {
+      return false;
+    }
     return null;
   }
 
@@ -68,7 +72,7 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
             CheckboxListTile(
               tristate: true,
               value: _allValue,
-              title: Text('All ${widget.noun.$2}'),
+              title: Text('All ${widget.noun.plural}'),
               onChanged: (_) {
                 return setState(() {
                   if (all) {

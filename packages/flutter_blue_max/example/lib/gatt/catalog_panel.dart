@@ -7,17 +7,18 @@ import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/persisted_library.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
 import 'package:provider/provider.dart';
 
-const _characteristicNoun = ('characteristic', 'characteristics');
+const _characteristicNoun = Noun(singular: 'characteristic', plural: 'characteristics');
 
 /// GATT catalog section of `LibraryPanel`.
 /// Lists the user's own GATT catalog services and the built-in ones they can extend or replace.
-class const CatalogPanel({super.key}) extends StatelessWidget {
+class const CatalogPanel({super.key, final ShareFile? shareFile}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<GattCatalogLibrary, Object?>((c) => c.catalog);
@@ -183,12 +184,20 @@ class const CatalogPanel({super.key}) extends StatelessWidget {
     }
     final box = button.findRenderObject()! as RenderBox;
     try {
-      final saved = await saveCatalogFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size);
-      if (!saved) {
-        return;
-      }
+      final outcome = await saveCatalogFile(
+        chosen,
+        origin: box.localToGlobal(Offset.zero) & box.size,
+        shareFile: shareFile,
+      );
       if (button.mounted) {
-        tell(button, 'Exported ${counted(chosen.length, serviceNoun)}');
+        switch (outcome) {
+          case ExportOutcome.saved:
+            tell(button, 'Exported ${counted(chosen.length, serviceNoun)}');
+          case ExportOutcome.unconfirmed:
+            tell(button, 'The share sheet could not confirm that the file was exported.');
+          case ExportOutcome.cancelled:
+            break;
+        }
       }
     } on Exception catch (exception, stackTrace) {
       developer.log('Export catalog services failed', name: 'workbench', error: exception, stackTrace: stackTrace);

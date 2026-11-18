@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
 import 'package:flutter_blue_max_example/shared/workbench_card.dart';
@@ -91,7 +90,7 @@ class const ServerListenerControls({
               Expanded(child: SelectableText('PSM $psm', style: Theme.of(context).textTheme.headlineSmall)),
               IconButton(
                 tooltip: 'Copy server PSM',
-                onPressed: () => Clipboard.setData(ClipboardData(text: '$psm')),
+                onPressed: () => context.read<WorkbenchController>().copyToClipboard('$psm'),
                 icon: const Icon(Icons.copy),
               ),
             ],

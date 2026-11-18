@@ -4,18 +4,15 @@ import 'package:share_plus_platform_interface/share_plus_platform_interface.dart
 final class FakeShare() extends SharePlatform {
   final shared = <ShareParams>[];
 
-  void reset() {
-    shared.clear();
-    overrideShare = null;
-  }
-
   Future<ShareResult> Function(ShareParams params)? overrideShare;
 
   @override
   Future<ShareResult> share(ShareParams params) async {
-    final override = overrideShare;
-    if (override != null) return await override(params);
     shared.add(params);
+    final override = overrideShare;
+    if (override != null) {
+      return await override(params);
+    }
     return const ShareResult('fake', ShareResultStatus.success);
   }
 }

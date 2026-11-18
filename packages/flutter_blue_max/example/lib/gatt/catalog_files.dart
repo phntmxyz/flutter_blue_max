@@ -1,13 +1,12 @@
 import 'dart:ui';
 
 import 'package:flutter_blue_max/flutter_blue_max.dart';
-
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 
 const catalogFileName = 'blue_max_gatt_catalog.json';
-const Noun serviceNoun = ('service', 'services');
+const Noun serviceNoun = Noun(singular: 'service', plural: 'services');
 const _key = 'services';
 
 String encodeCatalogFile(List<KnownService> services) => encodeJsonList(_key, services);
@@ -30,6 +29,6 @@ Future<List<KnownService>?> openCatalogFile() async {
   return text == null ? null : decodeCatalogFile(text);
 }
 
-/// Returns false when the user cancelled; see [saveJsonFile].
-Future<bool> saveCatalogFile(List<KnownService> services, {Rect? origin}) =>
-    saveJsonFile(catalogFileName, encodeCatalogFile(services), origin: origin);
+/// Exports the selected entries using [saveJsonFile].
+Future<ExportOutcome> saveCatalogFile(List<KnownService> services, {Rect? origin, ShareFile? shareFile}) =>
+    saveJsonFile(catalogFileName, encodeCatalogFile(services), origin: origin, shareFile: shareFile);

@@ -33,6 +33,15 @@ extension CatalogFilesRobot on WorkbenchRobot {
     await tapInDialog(confirm);
   }
 
+  Future<void> rejectDuplicateServiceUuids() async {
+    await openCatalog();
+    files.openContent = encodeCatalogFile([_thermostat, _roomThermostat]);
+    await tapLabel('Import');
+    spot<Dialog>().doesNotExist();
+    spot<SnackBar>().spotText('The file repeats service UUID').existsOnce();
+    expect(controller.catalog, isEmpty);
+  }
+
   Future<void> importReplacingOwnEntries() async {
     await openCatalog();
     await importServices([_thermostat], confirm: 'Import 1 service');

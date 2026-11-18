@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
+import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
 import 'package:flutter_blue_max_example/gatt/known_service.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:share_plus_platform_interface/share_plus_platform_interface.dart';
@@ -23,7 +24,9 @@ extension FileDialogsRobot on WorkbenchRobot {
       await controller.catalogLibrary.save(KnownService(Guid('fff0'), 'Sensor', []));
     }
     await tapLabel('Library');
-    if (library == LibraryFile.catalog) await tapLabel('GATT catalog');
+    if (library == LibraryFile.catalog) {
+      await tapLabel('GATT catalog');
+    }
   }
 
   Future<void> _confirmExport(LibraryFile library) async {
@@ -41,8 +44,7 @@ extension FileDialogsRobot on WorkbenchRobot {
 
   Future<void> rejectShareFailure(LibraryFile library) async {
     logEvent('Report a failing share sheet without a success message');
-    share.overrideShare = (params) {
-      share.shared.add(params);
+    share.overrideShare = (_) {
       return Future<ShareResult>.error(PlatformException(code: 'share_failed', message: 'Share unavailable'));
     };
     await _openFileLibrary(library);
@@ -56,14 +58,24 @@ extension FileDialogsRobot on WorkbenchRobot {
 
   Future<void> dismissShare(LibraryFile library) async {
     logEvent('Dismiss the share sheet without claiming an export');
-    share.overrideShare = (params) {
-      share.shared.add(params);
+    share.overrideShare = (_) {
       return Future.value(const ShareResult('', ShareResultStatus.dismissed));
     };
     await _openFileLibrary(library);
     await _confirmExport(library);
     expect(share.shared, hasLength(1));
     spot<SnackBar>().doesNotExist();
+    _expectNoExportSuccess();
+  }
+
+  Future<void> shareWithoutConfirmation(LibraryFile library) async {
+    share.overrideShare = (_) => Future.value(const ShareResult('', ShareResultStatus.unavailable));
+    await _openFileLibrary(library);
+    await _confirmExport(library);
+    expect(share.shared, hasLength(1));
+    spot<SnackBar>()
+        .spotText('The share sheet could not confirm that the file was exported.', exact: true)
+        .existsOnce();
     _expectNoExportSuccess();
   }
 
@@ -97,15 +109,15 @@ extension FileDialogsRobot on WorkbenchRobot {
     spot<SnackBar>().doesNotExist();
   }
 
-  Future<void> rejectDesktopSaveFailure() async {
+  Future<void> rejectDesktopSaveFailure(LibraryFile library) async {
     var calls = 0;
     files.overrideGetSaveLocation = ({acceptedTypeGroups, options = const SaveDialogOptions()}) {
       calls++;
-      expect(options.suggestedName, parserFileName);
+      expect(options.suggestedName, library == LibraryFile.catalog ? catalogFileName : parserFileName);
       return Future<FileSaveLocation?>.error(PlatformException(code: 'save_failed', message: 'Save unavailable'));
     };
-    await _openFileLibrary(LibraryFile.parsers);
-    await _confirmExport(LibraryFile.parsers);
+    await _openFileLibrary(library);
+    await _confirmExport(library);
     expect(calls, 1);
     spot<SnackBar>()
         .spotText('Export failed: PlatformException(save_failed, Save unavailable, null, null)', exact: true)
@@ -113,14 +125,14 @@ extension FileDialogsRobot on WorkbenchRobot {
     _expectNoExportSuccess();
   }
 
-  Future<void> cancelDesktopSave() async {
+  Future<void> cancelDesktopSave(LibraryFile library) async {
     var calls = 0;
     files.overrideGetSaveLocation = ({acceptedTypeGroups, options = const SaveDialogOptions()}) {
       calls++;
       return Future.value();
     };
-    await _openFileLibrary(LibraryFile.parsers);
-    await _confirmExport(LibraryFile.parsers);
+    await _openFileLibrary(library);
+    await _confirmExport(library);
     expect(calls, 1);
     expect(share.shared, isEmpty);
     spot<SnackBar>().doesNotExist();

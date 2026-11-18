@@ -8,6 +8,7 @@ import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:flutter_blue_max_example/devices/devices_panel.dart';
 import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
 import 'package:flutter_blue_max_example/library/library_panel.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:provider/provider.dart';
 
 /// A responsive diagnostic app for the plugin's native and web backends.
@@ -16,6 +17,7 @@ class const WorkbenchApp({
 
   /// An injected controller remains owned by the caller; only an app-created controller is disposed here.
   final WorkbenchController? controller,
+  final ShareFile? shareFile,
 }) extends StatefulWidget {
   @override
   State<WorkbenchApp> createState() => _WorkbenchAppState();
@@ -68,7 +70,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
             children: [
               DevicesPanel(active: _destination == 0),
               if (_controller.supportsL2cap) const L2capServerPanel(),
-              const LibraryPanel(),
+              LibraryPanel(shareFile: widget.shareFile),
               const ActivityPanel(),
             ],
           ),
@@ -215,7 +217,9 @@ class const AdapterBanner() extends StatelessWidget {
               TextButton(
                 onPressed: (() {
                   final controller = context.read<WorkbenchController>();
-                  if (controller.busy(Operation.adapter)) return null;
+                  if (controller.busy(Operation.adapter)) {
+                    return null;
+                  }
                   return controller.turnOn;
                 })(),
                 child: const Text('Turn on Bluetooth'),

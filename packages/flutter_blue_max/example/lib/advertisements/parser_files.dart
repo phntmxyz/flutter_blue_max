@@ -5,7 +5,7 @@ import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 
 const parserFileName = 'blue_max_parsers.json';
-const Noun parserNoun = ('parser', 'parsers');
+const Noun parserNoun = Noun(singular: 'parser', plural: 'parsers');
 const _key = 'parsers';
 
 String encodeParserFile(List<AdvertisementParser> parsers) => encodeJsonList(_key, parsers);
@@ -20,6 +20,6 @@ Future<List<AdvertisementParser>?> openParserFile() async {
   return text == null ? null : decodeParserFile(text);
 }
 
-/// Returns false when the user cancelled; see [saveJsonFile].
-Future<bool> saveParserFile(List<AdvertisementParser> parsers, {Rect? origin}) =>
-    saveJsonFile(parserFileName, encodeParserFile(parsers), origin: origin);
+/// Exports the selected entries using [saveJsonFile].
+Future<ExportOutcome> saveParserFile(List<AdvertisementParser> parsers, {Rect? origin, ShareFile? shareFile}) =>
+    saveJsonFile(parserFileName, encodeParserFile(parsers), origin: origin, shareFile: shareFile);

@@ -40,11 +40,11 @@ List<T> decodeJsonList<T>(
   }
   final items = json is Map<String, dynamic> ? json[key] : null;
   if (items is! List) {
-    throw FormatException('The file holds no ${noun.$2}.');
+    throw FormatException('The file holds no ${noun.plural}.');
   }
   return [
     for (final item in items)
-      if (item is Map<String, dynamic>) fromJson(item) else throw FormatException('Invalid ${noun.$1}: $item'),
+      if (item is Map<String, dynamic>) fromJson(item) else throw FormatException('Invalid ${noun.singular}: $item'),
   ];
 }
 
@@ -54,10 +54,18 @@ Future<String?> openJsonFile() async {
   return file == null ? null : await file.readAsString();
 }
 
-/// Saves [json] as [name] where the user chooses: a save dialog on desktop, a download on the web, and the share
-/// sheet on phones, whose file pickers cannot save. [origin] anchors the share sheet on iPad.
-/// Returns false when the user cancelled.
-Future<bool> saveJsonFile(String name, String json, {Rect? origin}) async {
+/// Opens the native share sheet for a phone export.
+typedef ShareFile = Future<ShareResult> Function(ShareParams params);
+
+enum ExportOutcome() {
+  saved,
+  cancelled,
+  unconfirmed,
+}
+
+/// Saves [json] as [name] through a desktop save dialog, a browser download, or a phone share sheet.
+/// [origin] anchors the share sheet on iPad.
+Future<ExportOutcome> saveJsonFile(String name, String json, {Rect? origin, ShareFile? shareFile}) async {
   final file = XFile.fromData(utf8.encode(json), mimeType: 'application/json', name: name);
   final phone =
       !kIsWeb &&
@@ -66,19 +74,22 @@ Future<bool> saveJsonFile(String name, String json, {Rect? origin}) async {
         _ => false,
       };
   if (phone) {
-    final result = await SharePlus.instance.share(
-      ShareParams(files: [file], fileNameOverrides: [name], sharePositionOrigin: origin),
-    );
-    return result.status != ShareResultStatus.dismissed;
+    final share = shareFile ?? SharePlus.instance.share;
+    final result = await share(ShareParams(files: [file], fileNameOverrides: [name], sharePositionOrigin: origin));
+    return switch (result.status) {
+      ShareResultStatus.success => ExportOutcome.saved,
+      ShareResultStatus.dismissed => ExportOutcome.cancelled,
+      ShareResultStatus.unavailable => ExportOutcome.unconfirmed,
+    };
   }
   if (kIsWeb) {
     await file.saveTo(name);
-    return true;
+    return ExportOutcome.saved;
   }
   final location = await getSaveLocation(acceptedTypeGroups: [_jsonFiles], suggestedName: name);
   if (location == null) {
-    return false;
+    return ExportOutcome.cancelled;
   }
   await file.saveTo(location.path);
-  return true;
+  return ExportOutcome.saved;
 }

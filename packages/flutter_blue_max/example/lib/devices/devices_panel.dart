@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_max/flutter_blue_max.dart';
 import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
@@ -137,7 +136,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                   Expanded(child: SelectableText(device.remoteId.str, style: Theme.of(context).textTheme.bodySmall)),
                   IconButton(
                     tooltip: 'Copy device ID',
-                    onPressed: () => Clipboard.setData(ClipboardData(text: device.remoteId.str)),
+                    onPressed: () => c.copyToClipboard(device.remoteId.str),
                     icon: const Icon(Icons.copy_rounded, size: 18),
                   ),
                 ],

@@ -6,6 +6,7 @@ import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart'
 import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
 import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
 import 'package:flutter_blue_max_example/shared/noun.dart';
 import 'package:flutter_blue_max_example/shared/prompts.dart';
 import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
@@ -13,7 +14,7 @@ import 'package:provider/provider.dart';
 
 /// Parsers section of `LibraryPanel`.
 /// Manages every saved parser, including those bound to devices that are not nearby.
-class const ParsersPanel({super.key}) extends StatelessWidget {
+class const ParsersPanel({super.key, final ShareFile? shareFile}) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     context.select<ParserLibrary, Object?>((c) => c.parsers);
@@ -155,12 +156,20 @@ class const ParsersPanel({super.key}) extends StatelessWidget {
     }
     final box = button.findRenderObject()! as RenderBox;
     try {
-      final saved = await saveParserFile(chosen, origin: box.localToGlobal(Offset.zero) & box.size);
-      if (!saved) {
-        return;
-      }
+      final outcome = await saveParserFile(
+        chosen,
+        origin: box.localToGlobal(Offset.zero) & box.size,
+        shareFile: shareFile,
+      );
       if (button.mounted) {
-        tell(button, 'Exported ${counted(chosen.length, parserNoun)}');
+        switch (outcome) {
+          case ExportOutcome.saved:
+            tell(button, 'Exported ${counted(chosen.length, parserNoun)}');
+          case ExportOutcome.unconfirmed:
+            tell(button, 'The share sheet could not confirm that the file was exported.');
+          case ExportOutcome.cancelled:
+            break;
+        }
       }
     } on Exception catch (exception, stackTrace) {
       developer.log('Export parsers failed', name: 'workbench', error: exception, stackTrace: stackTrace);

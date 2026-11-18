@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/gatt/gatt_characteristic.dart';
 import 'package:flutter_blue_max_example/shared/payload_editor.dart';
 import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
@@ -13,6 +14,44 @@ import 'workbench_robot.dart';
 
 /// Exercises restored controls through the actual app, replacing only native I/O.
 extension DiagnosticsRobot on WorkbenchRobot {
+  Future<void> rejectDiagnosticClipboardWrites() async {
+    final messenger = tester.binding.defaultBinaryMessenger;
+    var writes = 0;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) {
+      if (call.method == 'Clipboard.setData') {
+        writes++;
+        return Future<Object?>.error(PlatformException(code: 'clipboard_denied'));
+      }
+      return Future<Object?>.value();
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(SystemChannels.platform, null));
+
+    Future<void> tapCopyIcon(String tooltip) async {
+      final icon = spot<IconButton>().withTooltip(tooltip)..existsOnce();
+      await scrollIntoView(icon);
+      await act.tap(icon);
+      await idle();
+    }
+
+    await scanForPeripheral();
+    await selectPeripheral();
+    await tapCopyIcon('Copy device ID');
+    expect(controller.error, contains('clipboard_denied'));
+
+    await tapLabel('Local server');
+    await controller.startServer(secure: true);
+    await idle();
+    await tapCopyIcon('Copy server PSM');
+    expect(controller.error, contains('clipboard_denied'));
+
+    await tapLabel('Activity');
+    await tapLabel('Copy session');
+    expect(writes, 3);
+    expect(controller.error, contains('clipboard_denied'));
+    expect(controller.logs.where((line) => line.contains('ERROR Copy to clipboard')), hasLength(3));
+    spotText('Session log copied', exact: true).doesNotExist();
+  }
+
   Future<void> inspectPeripheralWithDescriptors() async {
     platform.includeGattExtras = true;
     await inspectPeripheral();

@@ -151,18 +151,29 @@ void main() {
         await robot.launch(size: const Size(1200, 850));
         await robot.cancelFilePicker(library);
       });
+      testWidgets('$library: an unconfirmed share does not claim an export', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(390, 844));
+        await robot.shareWithoutConfirmation(library);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.android));
+      testWidgets('$library: a failing save dialog reports the export error', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(1200, 850));
+        await robot.rejectDesktopSaveFailure(library);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
+      testWidgets('$library: cancelling a save does not claim an export', (tester) async {
+        final robot = WorkbenchRobot(tester, platform);
+        await robot.launch(size: const Size(1200, 850));
+        await robot.cancelDesktopSave(library);
+      }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
     }
-    testWidgets('desktop: a failing save dialog reports the export error', (tester) async {
-      final robot = WorkbenchRobot(tester, platform);
-      await robot.launch(size: const Size(1200, 850));
-      await robot.rejectDesktopSaveFailure();
-    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
-    testWidgets('desktop: cancelling a save does not claim an export', (tester) async {
-      final robot = WorkbenchRobot(tester, platform);
-      await robot.launch(size: const Size(1200, 850));
-      await robot.cancelDesktopSave();
-    }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
   });
+
+  testWidgets('clipboard rejection is reported from all diagnostic copy actions', (tester) async {
+    final robot = WorkbenchRobot(tester, platform);
+    await robot.launch(size: const Size(1200, 850));
+    await robot.rejectDiagnosticClipboardWrites();
+  }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
   group('Parser files', () {
     testWidgets('phone: export chosen parsers through the share sheet', (tester) async {
@@ -203,6 +214,12 @@ void main() {
   });
 
   group('Catalog files', () {
+    testWidgets('desktop: duplicate service UUIDs fail before the import chooser', (tester) async {
+      final robot = WorkbenchRobot(tester, platform);
+      await robot.launch(size: const Size(1200, 850));
+      await robot.rejectDuplicateServiceUuids();
+    });
+
     testWidgets('desktop: import replaces own entries with the same UUID and skips identical ones', (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));

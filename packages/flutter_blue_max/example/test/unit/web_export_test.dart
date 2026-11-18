@@ -27,7 +27,7 @@ void main() {
 
     final saved = await saveJsonFile('probe-parsers.json', encodeJsonList('parsers', const []));
 
-    expect(saved, isTrue);
+    expect(saved, ExportOutcome.saved);
     expect(clicked, hasLength(1));
     expect(clicked.single.download, 'probe-parsers.json');
     expect(clicked.single.href, startsWith('blob:'));

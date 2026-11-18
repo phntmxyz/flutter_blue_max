@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_blue_max_example/app/workbench_controller.dart';
 import 'package:provider/provider.dart';
 
@@ -45,10 +44,9 @@ class _ActivityPanelState() extends State<ActivityPanel> {
                   children: [
                     OutlinedButton.icon(
                       onPressed: () async {
-                        await Clipboard.setData(
-                          ClipboardData(text: context.read<WorkbenchController>().logs.join('\n')),
-                        );
-                        if (context.mounted) {
+                        final controller = context.read<WorkbenchController>();
+                        final copied = await controller.copyToClipboard(controller.logs.join('\n'));
+                        if (copied && context.mounted) {
                           ScaffoldMessenger.of(context)
                               .showSnackBar(const SnackBar(content: Text('Session log copied')));
                         }

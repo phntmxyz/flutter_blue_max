@@ -775,6 +775,15 @@ class WorkbenchController({
     }
   }
 
+  Future<bool> copyToClipboard(String text) async {
+    var copied = false;
+    await run(Operation.clipboard, () async {
+      await Clipboard.setData(ClipboardData(text: text));
+      copied = true;
+    });
+    return copied;
+  }
+
   void dismissError() {
     error = null;
     _update();
@@ -867,6 +876,7 @@ class const Operation._(
   final Object? scope,
 ]) {
   static const initialize = Operation._('Initialize');
+  static const clipboard = Operation._('Copy to clipboard');
   static const scan = Operation._('Scan');
   static const systemDevices = Operation._('System devices');
   static const connection = Operation._('Connection');

@@ -128,7 +128,9 @@ class PersistedLibrary<T>({
   }
 
   void _notify() {
-    if (!_disposed) notifyListeners();
+    if (!_disposed) {
+      notifyListeners();
+    }
   }
 
   @override

@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_blue_max_example/advertisements/parsers_panel.dart';
 import 'package:flutter_blue_max_example/gatt/catalog_panel.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
 
 /// Library destination in `WorkbenchApp`, switching between `ParsersPanel` and `CatalogPanel`.
 /// What the app knows about payloads and GATT databases, saved on this device.
-class const LibraryPanel({super.key}) extends StatefulWidget {
+class const LibraryPanel({super.key, final ShareFile? shareFile}) extends StatefulWidget {
   @override
   State<LibraryPanel> createState() => _LibraryPanelState();
 }
@@ -30,7 +31,9 @@ class _LibraryPanelState() extends State<LibraryPanel> {
             ),
           ),
         ),
-        Expanded(child: _catalog ? const CatalogPanel() : const ParsersPanel()),
+        Expanded(
+          child: _catalog ? CatalogPanel(shareFile: widget.shareFile) : ParsersPanel(shareFile: widget.shareFile),
+        ),
       ],
     );
   }
