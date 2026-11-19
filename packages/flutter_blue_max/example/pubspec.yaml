@@ -36,3 +36,6 @@ flutter:
   uses-material-design: true
   config:
     enable-swift-package-manager: true
+
+format:
+  line_length: 120
