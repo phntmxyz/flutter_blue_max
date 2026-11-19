@@ -1,3 +1,8 @@
+## Unreleased
+* Return the macOS host controller name from `adapterName`, or an empty string when no controller/name is available (previously the constant "Mac Bluetooth Adapter").
+* Reply once to `getAdapterName` and `isSupported` method calls on iOS and macOS.
+* Support both pre-3.41 and current Flutter Swift Package Manager engine layouts, and link IOBluetooth on macOS through SPM and CocoaPods.
+
 ## 6.0.0
 * First public release as `flutter_blue_max_darwin` (fork of `flutter_blue_plus_darwin`). Version numbers below 6.0.0 refer to the original FlutterBluePlus history and are not published under this name.
 * Add L2CAP CoC support (client & server)

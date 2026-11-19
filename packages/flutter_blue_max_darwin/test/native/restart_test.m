@@ -591,8 +591,22 @@ static void TestRestartWaitsForManagerReadiness(CBManagerState finalState) {
     [[plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
 }
 
+static void TestIsSupportedRepliesOnce(void) {
+    TestPeripheral *peripheral;
+    TestRegistrar *registrar = CreatePlugin(&peripheral);
+    __block NSUInteger replies = 0;
+    [registrar.plugin handleMethodCall:[FlutterMethodCall methodCallWithMethodName:@"isSupported" arguments:nil]
+                               result:^(id value) {
+        replies++;
+        NSCAssert([value isEqual:@YES], @"Supported adapter returned %@", value);
+    }];
+    NSCAssert(replies == 1, @"isSupported replied %lu times", (unsigned long)replies);
+    [[registrar.plugin valueForKey:@"checkForMtuChangesTimer"] invalidate];
+}
+
 int main(void) {
     @autoreleasepool {
+        TestIsSupportedRepliesOnce();
         TestCancelPendingConnect(NO, NO);
         TestCancelPendingConnect(YES, NO);
         TestCancelPendingConnect(NO, YES);
@@ -613,7 +627,7 @@ int main(void) {
         TestLateClientOpenCannotReviveChannel();
         TestQueuedStreamSetupCannotOutliveCleanup();
         TestEmptyRestartStillRetiresItsProducer();
-        puts("20 Darwin restart regression tests passed");
+        puts("21 Darwin native regression tests passed");
     }
     return 0;
 }

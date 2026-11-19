@@ -4,10 +4,10 @@
 
 part of '../flutter_blue_max.dart';
 
-/// Represents an L2CAP (Logical Link Control and Adaptation Protocol) channel 
+/// Represents an L2CAP (Logical Link Control and Adaptation Protocol) channel
 /// for communication with a Bluetooth device.
 ///
-/// L2CAP is a protocol in the Bluetooth protocol stack that handles multiplexing, 
+/// L2CAP is a protocol in the Bluetooth protocol stack that handles multiplexing,
 /// segmentation and reassembly, and error detection and recovery for higher level protocols.
 /// It provides connection-oriented and connectionless data services to upper layer protocols.
 ///
@@ -17,20 +17,20 @@ part of '../flutter_blue_max.dart';
 /// ```dart
 /// // Open an L2CAP channel
 /// BluetoothL2capChannel channel = await device.openL2CapChannel(1234);
-/// 
+///
 /// // Write data to the channel
 /// await channel.write([0x01, 0x02, 0x03]);
-/// 
+///
 /// // Read data from the channel
 /// List<int> data = await channel.read();
-/// 
+///
 /// // Close the channel when done
 /// await channel.close();
 /// ```
 class BluetoothL2capChannel {
   /// The device identifier for the connected Bluetooth device
   final DeviceIdentifier deviceId;
-  
+
   /// The Protocol Service Multiplexer (PSM) value for this L2CAP channel.
   /// PSM values are used to distinguish between different services/protocols
   /// running over L2CAP on the same device.
@@ -49,7 +49,7 @@ class BluetoothL2capChannel {
   ///
   /// [data] - The bytes to send. Can be any list of integers (0-255).
   ///
-  /// Throws [FlutterBlueMaxException] if the write operation fails or 
+  /// Throws [FlutterBlueMaxException] if the write operation fails or
   /// the channel is not open.
   ///
   /// Example:
@@ -58,12 +58,12 @@ class BluetoothL2capChannel {
   /// ```
   Future<void> write(List<int> data) async {
     await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.writeL2CapChannel(
-      WriteL2CapChannelRequest(
-        remoteId: deviceId.str,
-        psm: psm,
-        value: data,
-      ),
-    ));
+          WriteL2CapChannelRequest(
+            remoteId: deviceId.str,
+            psm: psm,
+            value: data,
+          ),
+        ));
   }
 
   /// Reads data from the L2CAP channel.
@@ -74,7 +74,7 @@ class BluetoothL2capChannel {
   /// Returns a [List<int>] containing the received bytes. The list is
   /// empty if no data is buffered.
   ///
-  /// Throws [FlutterBlueMaxException] if the read operation fails or 
+  /// Throws [FlutterBlueMaxException] if the read operation fails or
   /// the channel is not open.
   ///
   /// Note: For real-time data reception, consider using [FlutterBlueMax.onL2capReceived]
@@ -87,8 +87,8 @@ class BluetoothL2capChannel {
   /// ```
   Future<List<int>> read() async {
     return await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.readL2CapChannel(
-      ReadL2CapChannelRequest(remoteId: deviceId.str, psm: psm),
-    ));
+          ReadL2CapChannelRequest(remoteId: deviceId.str, psm: psm),
+        ));
   }
 
   /// Closes the L2CAP channel.
@@ -110,8 +110,8 @@ class BluetoothL2capChannel {
   /// ```
   Future<void> close() async {
     await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.closeL2CapChannel(
-      CloseL2CapChannelRequest(remoteId: deviceId.str, psm: psm),
-    ));
+          CloseL2CapChannelRequest(remoteId: deviceId.str, psm: psm),
+        ));
   }
 
   /// Stream of incoming L2CAP channel data.
@@ -131,8 +131,8 @@ class BluetoothL2capChannel {
   /// ```
   Stream<List<int>> get onL2CapChannelReceived {
     return FlutterBlueMaxPlatform.instance.onL2CapChannelReceived
-      .where((d) => d.remoteId == deviceId && d.psm == psm)
-      .map((d) => d.value);
+        .where((d) => d.remoteId == deviceId && d.psm == psm)
+        .map((d) => d.value);
   }
 
   /// Stream that emits an event when this channel dies — because the remote
@@ -154,8 +154,8 @@ class BluetoothL2capChannel {
   /// ```
   Stream<void> get onClosed {
     return FlutterBlueMaxPlatform.instance.onL2CapChannelClosed
-      .where((e) => e.remoteId == deviceId && e.psm == psm)
-      .map((e) {});
+        .where((e) => e.remoteId == deviceId && e.psm == psm)
+        .map((e) {});
   }
 
   @override

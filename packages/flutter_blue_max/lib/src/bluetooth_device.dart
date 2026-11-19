@@ -726,14 +726,14 @@ class BluetoothDevice {
   /// ```dart
   /// // Ensure device is connected
   /// await device.connect();
-  /// 
+  ///
   /// // Open a secure L2CAP channel on PSM 1234
   /// BluetoothL2capChannel channel = await device.openL2CapChannel(1234);
-  /// 
+  ///
   /// // Use the channel for communication
   /// await channel.write([0x01, 0x02, 0x03]);
   /// List<int> response = await channel.read();
-  /// 
+  ///
   /// // Always close the channel when done
   /// await channel.close();
   /// ```

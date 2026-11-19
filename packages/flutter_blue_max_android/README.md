@@ -13,3 +13,9 @@ should add it to your `pubspec.yaml` as usual.
 
 [1]: https://pub.dev/packages/flutter_blue_max
 [2]: https://flutter.dev/to/endorsed-federated-plugin
+
+## Android build requirements
+
+The plugin requires Android Gradle Plugin (AGP) 7.0 or newer. The build script uses
+`namespace` and the `lint` DSL, available in AGP 7.0. Apps using an older AGP must
+upgrade their Android build configuration before updating this plugin.

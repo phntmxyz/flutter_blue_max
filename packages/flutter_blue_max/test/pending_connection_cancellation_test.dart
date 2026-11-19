@@ -9,12 +9,10 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   final binding = TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('pending Darwin connect cancellation completes both public futures',
-      () async {
+  test('pending Darwin connect cancellation completes both public futures', () async {
     final plugin = FlutterBlueMaxDarwin();
     FlutterBlueMaxPlatform.instance = plugin;
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     final connectStarted = Completer<void>();
     const remoteId = '12345678-1234-1234-1234-123456789abc';
     var disconnectCalls = 0;
@@ -54,8 +52,7 @@ void main() {
     });
 
     final device = BluetoothDevice.fromId(remoteId);
-    final connecting =
-        device.connect(mtu: null, timeout: const Duration(seconds: 2));
+    final connecting = device.connect(mtu: null, timeout: const Duration(seconds: 2));
     final cancelled = expectLater(
       connecting,
       throwsA(isA<FlutterBlueMaxException>().having(

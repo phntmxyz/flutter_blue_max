@@ -1,0 +1,184 @@
+name: Build example downloads
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/example_build.yml'
+  workflow_dispatch:
+    inputs:
+      platform:
+        description: Platform to build
+        type: choice
+        required: true
+        default: all
+        options:
+          - all
+          - android
+          - ios
+          - macos
+          - linux
+          - web
+
+# A newer PR update supersedes the previous checks. Explicit builds each get their own run.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.7'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: packages/flutter_blue_max/example
+
+jobs:
+  build:
+    if: >-
+      github.event_name == 'pull_request' ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
+    name: ${{ matrix.platform == 'checks' && 'Check example' || format('Build {0}', matrix.platform) }}
+    runs-on: ${{ (matrix.platform == 'ios' || matrix.platform == 'macos') && 'macos-15' || 'ubuntu-24.04' }}
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: >-
+          ${{ fromJSON(github.event_name == 'pull_request' && '["checks"]' ||
+          (inputs.platform || 'all') == 'all' && '["android","ios","macos","linux","web"]' ||
+          format('["{0}"]', inputs.platform)) }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Set up Java
+        if: matrix.platform == 'android'
+        uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+          cache-dependency-path: |
+            packages/flutter_blue_max/example/android/**/*.gradle.kts
+            packages/flutter_blue_max/example/android/gradle.properties
+            packages/flutter_blue_max/example/android/gradle/wrapper/gradle-wrapper.properties
+            packages/flutter_blue_max_android/android/*.gradle
+
+      - name: Install Linux build dependencies
+        if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang cmake ninja-build pkg-config libgtk-3-dev libstdc++-12-dev
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve the example dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Check example formatting, analysis and tests
+        if: matrix.platform == 'checks' || matrix.platform == 'linux'
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze --no-pub lib test
+          flutter test --no-pub
+          flutter test --no-pub --platform chrome \
+            test/scenarios/workbench_test.dart --plain-name 'web:'
+          flutter test --no-pub --platform chrome \
+            test/unit/web_export_test.dart test/unit/advertisement_parser_test.dart \
+            test/unit/payload_editor_test.dart test/unit/parser_editor_validation_test.dart
+
+      - name: Create the download directory
+        if: matrix.platform != 'checks'
+        run: mkdir -p dist
+
+      - name: Build Android APK
+        if: matrix.platform == 'android'
+        run: |
+          flutter build apk --release --no-pub
+          cp build/app/outputs/flutter-apk/app-release.apk dist/blue-max-android-release.apk
+
+      - name: Build iOS Simulator app
+        if: matrix.platform == 'ios'
+        run: |
+          flutter build ios --simulator --debug --no-codesign --no-pub
+          tar -czf "dist/blue-max-ios-simulator-$(uname -m)-debug.tar.gz" \
+            -C build/ios/iphonesimulator Runner.app
+
+      # Flutter 3.47.7 cannot AOT-compile this app on macOS; see flutter/flutter#191575.
+      - name: Build macOS debug app
+        if: matrix.platform == 'macos'
+        run: |
+          flutter build macos --debug --no-pub
+          tar -czf "dist/blue-max-macos-$(uname -m)-debug.tar.gz" \
+            -C build/macos/Build/Products/Debug "Blue Max.app"
+
+      - name: Build Linux bundle
+        if: matrix.platform == 'linux'
+        run: |
+          flutter build linux --release --no-pub
+          tar -czf dist/blue-max-linux-x64-release.tar.gz -C build/linux/x64/release bundle
+
+      - name: Build web app
+        if: matrix.platform == 'web'
+        run: |
+          flutter build web --release --no-pub
+          tar -czf dist/blue-max-web-release.tar.gz -C build web
+
+      - name: Upload download
+        if: matrix.platform != 'checks'
+        id: upload
+        uses: actions/upload-artifact@v7
+        with:
+          path: packages/flutter_blue_max/example/dist/*
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+
+      - name: Link download in summary
+        if: matrix.platform != 'checks'
+        env:
+          BUILD_PLATFORM: ${{ matrix.platform }}
+          DOWNLOAD_URL: ${{ steps.upload.outputs.artifact-url }}
+        run: |
+          printf '### Blue Max: %s\n\n[Download build](%s)\n' \
+            "$BUILD_PLATFORM" "$DOWNLOAD_URL" >> "$GITHUB_STEP_SUMMARY"
+
+  darwin-compatibility:
+    if: >-
+      github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
+      (inputs.platform || 'all') == 'all'
+    name: Darwin ${{ matrix.integration }} on Flutter ${{ matrix.flutter }} (${{ matrix.platform }})
+    runs-on: macos-15
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {flutter: '3.38.5', integration: spm, platform: macos}
+          - {flutter: '3.38.5', integration: spm, platform: ios}
+          - {flutter: '3.47.7', integration: pods, platform: macos}
+          - {flutter: '3.47.7', integration: pods, platform: ios}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ matrix.flutter }}
+          channel: stable
+          cache: true
+      - name: Build isolated Darwin consumer
+        working-directory: .
+        env:
+          INTEGRATION: ${{ matrix.integration }}
+          PLATFORM: ${{ matrix.platform }}
+        run: bash .github/scripts/build_darwin_smoke.sh "$FLUTTER_ROOT" "$INTEGRATION" "$PLATFORM"
