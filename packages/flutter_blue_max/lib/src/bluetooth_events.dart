@@ -2,58 +2,47 @@ part of '../flutter_blue_max.dart';
 
 class BluetoothEvents {
   Stream<OnConnectionStateChangedEvent> get onConnectionStateChanged {
-    return FlutterBlueMaxPlatform.instance.onConnectionStateChanged
-        .map((p) => OnConnectionStateChangedEvent(p));
+    return FlutterBlueMaxPlatform.instance.onConnectionStateChanged.map((p) => OnConnectionStateChangedEvent(p));
   }
 
   Stream<OnMtuChangedEvent> get onMtuChanged {
-    return FlutterBlueMaxPlatform.instance.onMtuChanged
-        .map((p) => OnMtuChangedEvent(p));
+    return FlutterBlueMaxPlatform.instance.onMtuChanged.map((p) => OnMtuChangedEvent(p));
   }
 
   Stream<OnReadRssiEvent> get onReadRssi {
-    return FlutterBlueMaxPlatform.instance.onReadRssi
-        .map((p) => OnReadRssiEvent(p));
+    return FlutterBlueMaxPlatform.instance.onReadRssi.map((p) => OnReadRssiEvent(p));
   }
 
   Stream<OnServicesResetEvent> get onServicesReset {
-    return FlutterBlueMaxPlatform.instance.onServicesReset
-        .map((p) => OnServicesResetEvent(p));
+    return FlutterBlueMaxPlatform.instance.onServicesReset.map((p) => OnServicesResetEvent(p));
   }
 
   Stream<OnDiscoveredServicesEvent> get onDiscoveredServices {
-    return FlutterBlueMaxPlatform.instance.onDiscoveredServices
-        .map((p) => OnDiscoveredServicesEvent(p));
+    return FlutterBlueMaxPlatform.instance.onDiscoveredServices.map((p) => OnDiscoveredServicesEvent(p));
   }
 
   Stream<OnCharacteristicReceivedEvent> get onCharacteristicReceived {
-    return FlutterBlueMaxPlatform.instance.onCharacteristicReceived
-        .map((p) => OnCharacteristicReceivedEvent(p));
+    return FlutterBlueMaxPlatform.instance.onCharacteristicReceived.map((p) => OnCharacteristicReceivedEvent(p));
   }
 
   Stream<OnCharacteristicWrittenEvent> get onCharacteristicWritten {
-    return FlutterBlueMaxPlatform.instance.onCharacteristicWritten
-        .map((p) => OnCharacteristicWrittenEvent(p));
+    return FlutterBlueMaxPlatform.instance.onCharacteristicWritten.map((p) => OnCharacteristicWrittenEvent(p));
   }
 
   Stream<OnDescriptorReadEvent> get onDescriptorRead {
-    return FlutterBlueMaxPlatform.instance.onDescriptorRead
-        .map((p) => OnDescriptorReadEvent(p));
+    return FlutterBlueMaxPlatform.instance.onDescriptorRead.map((p) => OnDescriptorReadEvent(p));
   }
 
   Stream<OnDescriptorWrittenEvent> get onDescriptorWritten {
-    return FlutterBlueMaxPlatform.instance.onDescriptorWritten
-        .map((p) => OnDescriptorWrittenEvent(p));
+    return FlutterBlueMaxPlatform.instance.onDescriptorWritten.map((p) => OnDescriptorWrittenEvent(p));
   }
 
   Stream<OnNameChangedEvent> get onNameChanged {
-    return FlutterBlueMaxPlatform.instance.onNameChanged
-        .map((p) => OnNameChangedEvent(p));
+    return FlutterBlueMaxPlatform.instance.onNameChanged.map((p) => OnNameChangedEvent(p));
   }
 
   Stream<OnBondStateChangedEvent> get onBondStateChanged {
-    return FlutterBlueMaxPlatform.instance.onBondStateChanged
-        .map((p) => OnBondStateChangedEvent(p));
+    return FlutterBlueMaxPlatform.instance.onBondStateChanged.map((p) => OnBondStateChangedEvent(p));
   }
 }
 

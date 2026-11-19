@@ -113,7 +113,7 @@ class FlutterBlueMax {
   /// Stream of received L2CAP data from all channels (both client and server).
   ///
   /// This stream provides real-time notifications whenever data is received
-  /// on any L2CAP channel, whether it's a client channel (opened via 
+  /// on any L2CAP channel, whether it's a client channel (opened via
   /// [BluetoothDevice.openL2CapChannel]) or a server channel (accepting
   /// connections via [listenL2capChannel]).
   ///
@@ -464,8 +464,7 @@ class FlutterBlueMax {
   static Future<PhySupport> getPhySupport() async {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "getPhySupport", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbp, "getPhySupport", FbpErrorCode.androidOnly.index, "android-only");
     }
 
     return await _invokeMethod(() => FlutterBlueMaxPlatform.instance.getPhySupport(PhySupportRequest()));
@@ -503,7 +502,7 @@ class FlutterBlueMax {
   /// // Start listening for L2CAP connections
   /// int serverPsm = await FlutterBlueMax.listenL2capChannel(secure: true);
   /// print('L2CAP server listening on PSM: $serverPsm');
-  /// 
+  ///
   /// // Listen for incoming data
   /// FlutterBlueMax.onL2capReceived.listen((data) {
   ///   if (data.psm == serverPsm) {
@@ -511,7 +510,7 @@ class FlutterBlueMax {
   ///     // Handle server data
   ///   }
   /// });
-  /// 
+  ///
   /// // Remember to stop the server when done
   /// await FlutterBlueMax.stopL2capServer(serverPsm);
   /// ```
@@ -555,9 +554,9 @@ class FlutterBlueMax {
   /// ```dart
   /// // Start an L2CAP server
   /// int serverPsm = await FlutterBlueMax.listenL2capChannel();
-  /// 
+  ///
   /// // ... use the server ...
-  /// 
+  ///
   /// // Stop the server when done
   /// await FlutterBlueMax.stopL2capServer(serverPsm);
   /// print('L2CAP server on PSM $serverPsm has been stopped');
@@ -707,8 +706,8 @@ class FlutterBlueMax {
       ]).listen((r) {
         if (r.success == true) {
           _lastChrs[r.remoteId] ??= {};
-          _lastChrs[r.remoteId]![_chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] =
-              r.value;
+          _lastChrs[r.remoteId]![
+              _chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] = r.value;
         }
       });
     } on UnimplementedError {

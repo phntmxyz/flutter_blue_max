@@ -10,7 +10,7 @@ build_dir="$(mktemp -d)"
 trap 'rm -rf "$build_dir"' EXIT
 
 xcrun clang -fobjc-arc -fmodules -fmodules-cache-path="$build_dir/modules" \
-    -F "$framework_dir" -framework FlutterMacOS -framework Foundation -framework CoreBluetooth \
+    -F "$framework_dir" -framework FlutterMacOS -framework Foundation -framework CoreBluetooth -framework IOBluetooth \
     -I "$source_dir/include/flutter_blue_max_darwin" \
     -Wl,-rpath,"$framework_dir" \
     "$source_dir/FlutterBlueMaxPlugin.m" "$test_dir/restart_test.m" \

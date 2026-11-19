@@ -1,0 +1,122 @@
+import 'package:context_plus/context_plus.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
+import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import 'package:flutter_blue_max_example/shared/payload_editor.dart';
+import 'package:flutter_blue_max_example/shared/workbench_card.dart';
+
+/// Channel card shared by `DeviceL2capPanel` and `L2capServerPanel`.
+/// Exchanges data with the peer that owns this channel, regardless of selection.
+class const L2capChannelCard({super.key, required final ChannelSession session}) extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    final idle = !workbenchRef.of(context).busy(Operation.channel(session));
+    return WorkbenchCard(
+      key: ValueKey(session.key),
+      title: Text('${session.incoming ? 'Incoming' : 'Outgoing'} · PSM ${session.channel.psm}'),
+      subtitle: Text(session.channel.deviceId.str),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              Chip(label: Text('TX ${session.transmitted} B')),
+              Chip(label: Text('RX ${session.received} B')),
+              if (session.closed)
+                const Chip(label: Text('Closed'))
+              else ...[
+                OutlinedButton.icon(
+                  onPressed: idle ? () => workbenchRef.of(context).readChannel(session) : null,
+                  icon: const Icon(Icons.download_outlined),
+                  label: const Text('Read buffered data'),
+                ),
+                TextButton.icon(
+                  onPressed: idle ? () => workbenchRef.of(context).closeChannel(session) : null,
+                  icon: const Icon(Icons.close),
+                  label: const Text('Close channel'),
+                ),
+              ],
+            ],
+          ),
+          if (session.lastReceived.isNotEmpty) ...[
+            const SizedBox(height: 12),
+            const Text('Last received chunk'),
+            SelectableText(PayloadCodec.hex(session.lastReceived), style: const TextStyle(fontFamily: 'monospace')),
+            Text(PayloadCodec.text(session.lastReceived), maxLines: 4, overflow: TextOverflow.ellipsis),
+          ],
+          _ReceiveHistory(receipts: session.history),
+          if (!session.closed) ...[
+            const SizedBox(height: 16),
+            PayloadEditor(enabled: idle, onSend: (bytes) => workbenchRef.of(context).send(session, bytes)),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: (() {
+                    if (!idle) {
+                      return null;
+                    }
+                    return () {
+                      return workbenchRef.of(context).sendTestTraffic(session, size: 10 * 1024, count: 1);
+                    };
+                  })(),
+                  icon: const Icon(Icons.data_usage),
+                  label: const Text('Send 10 KB'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: (() {
+                    if (!idle) {
+                      return null;
+                    }
+                    return () => workbenchRef.of(context).sendTestTraffic(session, size: 1024, count: 20);
+                  })(),
+                  icon: const Icon(Icons.bolt),
+                  label: const Text('Burst 20×1 KB'),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+/// Payload formatting is deferred until the history expansion is visible.
+class const _ReceiveHistory({required final List<ChannelReceipt> receipts}) extends StatefulWidget {
+  @override
+  State<_ReceiveHistory> createState() => _ReceiveHistoryState();
+}
+
+class _ReceiveHistoryState() extends State<_ReceiveHistory> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final receipts = widget.receipts;
+    return ExpansionTile(
+      expandedCrossAxisAlignment: CrossAxisAlignment.start,
+      tilePadding: EdgeInsets.zero,
+      title: const Text('Receive history'),
+      subtitle: Text('${receipts.length} entries · buffer reads can repeat streamed bytes'),
+      onExpansionChanged: (expanded) => setState(() => _expanded = expanded),
+      children: [
+        if (_expanded)
+          for (final entry in receipts)
+            ListTile(
+              title: Text('${entry.source.label} · ${entry.time.toIso8601String()} · ${entry.bytes.length} B'),
+              subtitle: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [SelectableText(entry.hex), SelectableText(entry.text)],
+              ),
+            ),
+      ],
+    );
+  }
+}

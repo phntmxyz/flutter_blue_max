@@ -1,0 +1,321 @@
+import 'dart:async';
+
+import 'package:context_plus/context_plus.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/activity/activity_panel.dart';
+import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/devices/devices_panel.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
+import 'package:flutter_blue_max_example/library/library_panel.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
+
+/// A responsive diagnostic app for the plugin's native and web backends.
+class const WorkbenchApp({
+  super.key,
+
+  /// An injected controller remains owned by the caller; only an app-created controller is disposed here.
+  final WorkbenchController? controller,
+  final ShareFile? shareFile,
+}) extends StatefulWidget {
+  @override
+  State<WorkbenchApp> createState() => _WorkbenchAppState();
+}
+
+class _WorkbenchAppState() extends State<WorkbenchApp> {
+  late WorkbenchController _controller;
+  Future<void> _bindingReady = Future.value();
+  int _destination = 0;
+  ThemeMode _themeMode = ThemeMode.dark;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = widget.controller ?? WorkbenchController();
+    unawaited(_controller.start());
+  }
+
+  @override
+  void didUpdateWidget(WorkbenchApp oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (identical(oldWidget.controller, widget.controller) || identical(_controller, widget.controller)) {
+      return;
+    }
+    final previous = _controller;
+    if (oldWidget.controller == null) {
+      previous.dispose();
+      _bindingReady = _bindingReady.then((_) => previous.shutdownComplete);
+    }
+    final next = _controller = widget.controller ?? WorkbenchController();
+    unawaited(
+      _bindingReady.then((_) async {
+        if (mounted && identical(_controller, next)) {
+          await next.start();
+        }
+      }),
+    );
+  }
+
+  @override
+  void dispose() {
+    if (widget.controller == null) {
+      _controller.dispose();
+    }
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final panels = IndexedStack(
+      index: _destination,
+      children: [
+        DevicesPanel(active: _destination == 0),
+        if (_controller.supportsL2cap) const L2capServerPanel(),
+        LibraryPanel(shareFile: widget.shareFile),
+        const ActivityPanel(),
+      ],
+    );
+    return WorkbenchScope(
+      controller: _controller,
+      child: MaterialApp(
+        title: 'Blue Max',
+        debugShowCheckedModeBanner: false,
+        theme: _theme(Brightness.light),
+        darkTheme: _theme(Brightness.dark),
+        themeMode: _themeMode,
+        // Touch platforms keep the keyboard open on taps outside a field; this closes it for every field and dialog.
+        builder: (context, child) {
+          return GestureDetector(
+            behavior: HitTestBehavior.translucent,
+            onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+            child: child,
+          );
+        },
+        home: Builder(
+          builder: (context) {
+            workbenchRef.watchOnly(context, (c) => (c.adapter, c.error));
+            final c = workbenchRef.of(context);
+            final wide = MediaQuery.sizeOf(context).width >= 720;
+            return Scaffold(
+              appBar: AppBar(
+                title: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(10),
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.primaryContainer,
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: const Icon(Icons.bluetooth_rounded),
+                    ),
+                    const SizedBox(width: 12),
+                    const Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text('Blue Max', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+                        Text('Bluetooth workbench', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
+                      ],
+                    ),
+                  ],
+                ),
+                actions: [
+                  if (wide)
+                    Chip(
+                      avatar: () {
+                        if (c.ready) {
+                          return Icon(Icons.circle, size: 10, color: Theme.of(context).colorScheme.primary);
+                        }
+                        return const Icon(Icons.circle_outlined, size: 10);
+                      }(),
+                      label: Text('Bluetooth ${c.adapter.name}'),
+                    ),
+                  IconButton(
+                    tooltip: 'Toggle light / dark theme',
+                    onPressed: () {
+                      setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
+                    },
+                    icon: Icon(_themeMode == ThemeMode.dark ? Icons.light_mode_outlined : Icons.dark_mode_outlined),
+                  ),
+                  const SizedBox(width: 12),
+                ],
+              ),
+              body: SafeArea(
+                child: Column(
+                  children: [
+                    const Divider(height: 1),
+                    if (!c.ready) const AdapterBanner(),
+                    if (c.error != null) ErrorBanner(message: Text(c.error!), onDismiss: c.dismissError),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          if (wide) ...[
+                            NavigationRail(
+                              selectedIndex: _destination,
+                              onDestinationSelected: (index) => setState(() => _destination = index),
+                              labelType: NavigationRailLabelType.all,
+                              scrollable: true,
+                              destinations: [
+                                const NavigationRailDestination(
+                                  icon: Icon(Icons.radar_rounded),
+                                  label: Text('Devices'),
+                                ),
+                                if (c.supportsL2cap)
+                                  const NavigationRailDestination(
+                                    icon: Icon(Icons.dns_outlined),
+                                    label: Text('Local server'),
+                                  ),
+                                const NavigationRailDestination(
+                                  icon: Icon(Icons.local_library_outlined),
+                                  label: Text('Library'),
+                                ),
+                                const NavigationRailDestination(
+                                  icon: Icon(Icons.terminal_rounded),
+                                  label: Text('Activity'),
+                                ),
+                              ],
+                            ),
+                            const VerticalDivider(width: 1),
+                          ],
+                          Expanded(child: panels),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              bottomNavigationBar: (() {
+                if (wide) {
+                  return null;
+                }
+                return NavigationBar(
+                  selectedIndex: _destination,
+                  onDestinationSelected: (index) => setState(() => _destination = index),
+                  destinations: [
+                    const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
+                    if (c.supportsL2cap)
+                      const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
+                    const NavigationDestination(icon: Icon(Icons.local_library_outlined), label: 'Library'),
+                    const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
+                  ],
+                );
+              })(),
+            );
+          },
+        ),
+      ),
+    );
+  }
+}
+
+/// Bluetooth availability banner above every workbench destination.
+class const AdapterBanner() extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    workbenchRef.watchOnly(context, (c) => (c.adapter, c.busy(Operation.adapter)));
+    final message = switch (workbenchRef.of(context).adapter) {
+      BluetoothAdapterState.unknown when kIsWeb =>
+        'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
+      BluetoothAdapterState.unauthorized =>
+        'Bluetooth permission is denied. Allow access in system settings, then reopen the app.',
+      BluetoothAdapterState.unavailable => 'Bluetooth is not available on this device.',
+      BluetoothAdapterState.off => 'Bluetooth is off. Enable it in system settings to scan or connect.',
+      _ => 'Waiting for Bluetooth…',
+    };
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+      color: Theme.of(context).colorScheme.surfaceContainerHigh,
+      child: Row(
+        children: [
+          const Icon(Icons.info_outline, size: 18),
+          const SizedBox(width: 12),
+          Expanded(child: Text(message)),
+          if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
+            // Only an off adapter needs the Android enable request.
+            if (workbenchRef.of(context).adapter == BluetoothAdapterState.off)
+              TextButton(
+                onPressed: (() {
+                  final controller = workbenchRef.of(context);
+                  if (controller.busy(Operation.adapter)) {
+                    return null;
+                  }
+                  return controller.turnOn;
+                })(),
+                child: const Text('Turn on Bluetooth'),
+              ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+ThemeData _theme(Brightness brightness) {
+  final dark = brightness == Brightness.dark;
+  final colors = ColorScheme.fromSeed(seedColor: const Color(0xFF207F75), brightness: brightness).copyWith(
+    primary: dark ? const Color(0xFF85E3D1) : const Color(0xFF006B5E),
+    surface: dark ? const Color(0xFF101820) : const Color(0xFFF6F8FA),
+  );
+  return ThemeData(
+    useMaterial3: true,
+    colorScheme: colors,
+    scaffoldBackgroundColor: colors.surface,
+    appBarTheme: AppBarTheme(backgroundColor: colors.surface, centerTitle: false, toolbarHeight: 80, elevation: 0),
+    cardTheme: CardThemeData(
+      elevation: 0,
+      margin: EdgeInsets.zero,
+      color: dark ? const Color(0xFF19242E) : Colors.white,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: colors.outlineVariant.withValues(alpha: 0.45)),
+      ),
+    ),
+    inputDecorationTheme: InputDecorationTheme(
+      filled: true,
+      fillColor: dark ? const Color(0xFF101820) : const Color(0xFFF0F4F6),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+    ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: FilledButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16)),
+    ),
+    outlinedButtonTheme: OutlinedButtonThemeData(
+      style: OutlinedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16)),
+    ),
+    dividerTheme: DividerThemeData(color: colors.outlineVariant.withValues(alpha: 0.45)),
+    // Expanded tiles otherwise draw lines flush against their header and last child, and center their children.
+    expansionTileTheme: const ExpansionTileThemeData(
+      shape: Border(),
+      collapsedShape: Border(),
+      expandedAlignment: Alignment.centerLeft,
+    ),
+  );
+}
+
+/// Session error banner above the selected destination, with an explicit dismissal action.
+class const ErrorBanner({super.key, required final Widget message, required final VoidCallback onDismiss})
+    extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      color: Theme.of(context).colorScheme.errorContainer,
+      padding: const EdgeInsets.fromLTRB(20, 8, 8, 8),
+      child: Row(
+        children: [
+          Expanded(
+            child: DefaultTextStyle.merge(
+              maxLines: 3,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(color: Theme.of(context).colorScheme.onErrorContainer),
+              child: message,
+            ),
+          ),
+          IconButton(tooltip: 'Dismiss error', onPressed: onDismiss, icon: const Icon(Icons.close)),
+        ],
+      ),
+    );
+  }
+}

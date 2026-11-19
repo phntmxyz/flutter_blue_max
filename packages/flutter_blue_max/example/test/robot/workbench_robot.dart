@@ -1,0 +1,433 @@
+import 'package:file_selector_platform_interface/file_selector_platform_interface.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_blue_max_example/app/workbench_app.dart';
+import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import 'package:flutter_blue_max_example/devices/devices_panel.dart';
+import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
+import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
+import 'package:flutter_blue_max_example/shared/payload_editor.dart';
+import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
+import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:spot/spot.dart';
+
+import '../fakes/fake_bluetooth_platform.dart';
+import '../fakes/fake_file_selector.dart';
+import '../fakes/fake_share.dart';
+
+class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform platform) {
+  final controller = WorkbenchController();
+  final files = FakeFileSelector();
+  final share = FakeShare();
+
+  Future<void> launch({required Size size}) async {
+    platform.reset();
+    SharedPreferences.setMockInitialValues({});
+    logEvent('Launch the real workbench at $size');
+    addTearDown(dispose);
+    FlutterBlueMaxPlatform.instance = platform;
+    FileSelectorPlatform.instance = files;
+    tester.view.devicePixelRatio = 1;
+    tester.view.physicalSize = size;
+    await tester.pumpWidget(WorkbenchApp(controller: controller, shareFile: share.share));
+    await idle();
+    platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.on));
+    await idle();
+  }
+
+  Future<void> dispose() async {
+    logEvent('Close the workbench');
+    platform.overrideConnect = null;
+    platform.includeGattExtras = false;
+    platform.emitNotifyDescriptorEvents = true;
+    platform.systemPeers.clear();
+    await tester.pumpWidget(const SizedBox.shrink());
+    controller.dispose();
+    await idle();
+    tester.view.resetPhysicalSize();
+    tester.view.resetDevicePixelRatio();
+    tester.view.resetViewInsets();
+  }
+
+  Future<void> idle() async {
+    await tester.runAsync(() async {});
+    await tester.pump();
+    for (var frame = 0; frame < 30 && tester.binding.hasScheduledFrame; frame++) {
+      await tester.pump(const Duration(milliseconds: 50));
+      await tester.runAsync(() async {});
+      if (controller.scanning) {
+        break;
+      }
+    }
+    await tester.runAsync(() async {});
+    await tester.pump();
+  }
+
+  void logEvent(String description) {
+    debugPrint(description);
+    timeline.addEvent(eventType: 'robot', details: description);
+  }
+
+  Future<void> scanForPeripheral({bool includeSecondPeer = false}) async {
+    await tapLabel('Start scan');
+    logEvent('Receive a peripheral advertisement from native I/O');
+    platform.advertise();
+    if (includeSecondPeer) {
+      platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
+    }
+    await idle();
+    await tapLabel('Stop scan');
+    spotText('Test peripheral').existsOnce();
+  }
+
+  Future<void> inspectPeripheral() async {
+    await selectPeripheral();
+    await connectSelected();
+    expect(controller.connected, isTrue);
+    await tapLabel('Discover services');
+    spotText('180F').existsOnce();
+  }
+
+  Future<void> selectPeripheral({String name = 'Test peripheral'}) async {
+    logEvent('Select "$name" in the device list');
+    final tile = spot<ScanResultTile>().withChild(spotText(name, exact: true))..existsOnce();
+    await scrollIntoView(tile);
+    await act.tap(tile);
+    await idle();
+  }
+
+  Future<void> selectSystemPeer(String name) async {
+    logEvent('Select "$name" from the system-connected peers');
+    final section = spot<ExpansionTile>().withChild(spotText('Connected to the system', exact: true));
+    final tile = section.spot<ListTile>().withChild(spotText(name, exact: true))..existsOnce();
+    await scrollIntoView(tile);
+    await act.tap(tile);
+    await idle();
+  }
+
+  Future<void> connectSelected() => tapLabel('Connect');
+
+  Future<void> trackAdvertisements() async {
+    await tapLabel('Advertisement');
+    await tapLabel('Track advertisements');
+    logEvent('Receive repeated advertisements with a changing payload');
+    platform.advertise(
+      rssi: -60,
+      manufacturerData: {
+        0x59: [1],
+      },
+    );
+    platform.advertise(
+      rssi: -40,
+      manufacturerData: {
+        0x59: [2],
+      },
+    );
+    await idle();
+    spotText('2 advertisements', exact: true).existsOnce();
+    spotText('-60 … -40 dBm', exact: true).existsOnce();
+    spotText('1 payload changes', exact: true).existsOnce();
+    spotText('-40 dBm · Connectable · Tracking 2', exact: true).existsOnce();
+    await tapLabel('Stop tracking');
+    expect(controller.tracking, isFalse);
+    spotText('Track advertisements', exact: true).existsOnce();
+    spotText('-40 dBm · Connectable · 2 tracked', exact: true).existsOnce();
+  }
+
+  void expectLocalDeviceName() {
+    logEvent('Verify the local device name in discovery');
+    spotText('This device: Test workstation', exact: true).existsOnce();
+  }
+
+  void expectConnectionRequired() {
+    logEvent('Verify that the device must be connected before entering a remote PSM');
+    spotText('Connect this device above to open an L2CAP channel.', exact: true).existsOnce();
+    spot<DeviceL2capPanel>().spot<TextField>().doesNotExist();
+    spotText('Open channel', exact: true).doesNotExist();
+  }
+
+  void expectEmptyPsm() {
+    logEvent('Verify that a different peer does not inherit the previous PSM');
+    final field = spot<DeviceL2capPanel>().spot<TextField>()..existsOnce();
+    expect(field.snapshotWidget().controller!.text, isEmpty);
+  }
+
+  Future<void> openL2cap() => tapLabel('L2CAP');
+  Future<void> openLocalServer() async {
+    await tapLabel('Local server');
+    spot<ServerStatusCard>().spot<ServerListenerControls>().existsOnce();
+  }
+
+  Future<void> readAndWriteCharacteristic() async {
+    await tapLabel('180F');
+    await tapLabel('2A19');
+    await tapLabel('Read');
+    spotText('64', exact: true).existsOnce();
+    await tapLabel('Write');
+    logEvent('Enter a malformed payload and verify that it is not transmitted');
+    final field = spot<PayloadEditor>().spot<TextField>()..existsOnce();
+    await scrollIntoView(field);
+    await act.enterText(field, 'F');
+    await idle();
+    final count = platform.characteristicWrites.length;
+    await tapLabel('Write characteristic');
+    expect(platform.characteristicWrites, hasLength(count));
+    logEvent('Send valid hex using the characteristic’s write-without-response capability');
+    field.existsOnce();
+    await act.enterText(field, '01 A2 FF');
+    await idle();
+    await tapLabel('Write characteristic');
+    expect(platform.characteristicWrites.last.value, [1, 162, 255]);
+    expect(platform.characteristicWrites.last.writeType, BmWriteType.withoutResponse);
+  }
+
+  Future<void> inspectEmptyGattValue() async {
+    Future<void> showValue() async {
+      await tapLabel('180F');
+      await tapLabel('2A19');
+    }
+
+    await showValue();
+    spotText('No value yet', exact: true).existsOnce();
+    spotText('0 bytes', exact: true).doesNotExist();
+    platform.characteristicReadValue = [];
+    await tapLabel('Read');
+    spotText('0 bytes', exact: true).existsOnce();
+    spotText('Empty', exact: true).existsOnce();
+    spotText('No value yet', exact: true).doesNotExist();
+
+    await tapLabel('180F');
+    await showValue();
+    spotText('0 bytes', exact: true).existsOnce();
+    await tapLabel('Disconnect');
+    await connectSelected();
+    await tapLabel('Discover services');
+    await showValue();
+    spotText('No value yet', exact: true).existsOnce();
+  }
+
+  Future<void> startServer() => tapLabel('Start server');
+  Future<void> stopServer() => tapLabel('Stop server');
+  Future<void> turnOffEncryption() => tapLabel('Require encryption');
+
+  void expectServerEncryption({required bool secure}) {
+    logEvent('Verify that the server was started ${secure ? 'with' : 'without'} encryption');
+    expect(platform.listenRequests.last.secure, secure);
+  }
+
+  void expectChannelEncryption({required bool secure}) {
+    logEvent('Verify that the channel was opened ${secure ? 'with' : 'without'} encryption');
+    expect(platform.openRequests.last.secure, secure);
+  }
+
+  Future<void> openActivity() => tapLabel('Activity');
+  Future<void> openDevices() => tapLabel('Devices');
+
+  Future<void> rejectUnsupportedServer() async {
+    logEvent('Report an unsupported server from the platform boundary');
+    platform.overrideListenL2CapChannel = (_) {
+      return Future<int>.error(UnimplementedError());
+    };
+    await startServer();
+    spot<ErrorBanner>().spotText('This operation is not supported on this device.', exact: true).existsOnce();
+    expect(controller.serverPsm, isNull);
+    expect(controller.busy(Operation.server), isFalse);
+  }
+
+  Future<void> dismissUnsupportedError() async {
+    logEvent('Dismiss the unsupported-operation message');
+    final close = spot<ErrorBanner>().spot<IconButton>().withTooltip('Dismiss error')..existsOnce();
+    await act.tap(close);
+    await idle();
+    spotText('This operation is not supported on this device.', exact: true).doesNotExist();
+  }
+
+  Future<void> filterWithKeyboard() async {
+    logEvent('Filter devices while the phone keyboard reduces the viewport');
+    final field = spot<TextField>()..existsOnce();
+    tester.view.viewInsets = const FakeViewPadding(bottom: 280);
+    await act.enterText(field, 'missing peripheral');
+    await idle();
+    expect(controller.visibleDevices, isEmpty);
+    tester.view.resetViewInsets();
+    await idle();
+    spotText('No matching devices', exact: true).existsOnce();
+    field.existsOnce();
+    await act.enterText(field, 'Test peripheral');
+    await idle();
+    spot<ListTile>().withChild(spotText('Test peripheral', exact: true)).existsOnce();
+    tester.view.resetViewInsets();
+    await idle();
+  }
+
+  Future<void> keepSearchAcrossDetails() async {
+    final field = spot<TextField>()..existsOnce();
+    await act.enterText(field, 'Test');
+    await idle();
+    spot<ListTile>().withChild(spotText('Other peripheral', exact: true)).doesNotExist();
+    await selectPeripheral();
+    logEvent('Go back from the details and verify that the search still shows the filter');
+    await tester.binding.handlePopRoute();
+    await idle();
+    expect(tester.widget<TextField>(field.finder).controller?.text, 'Test');
+    spot<ListTile>().withChild(spotText('Other peripheral', exact: true)).doesNotExist();
+  }
+
+  Future<void> dismissKeyboardByTappingOutside() async {
+    logEvent('Focus the search field, then tap the page beside it');
+    await act.tap(spot<TextField>()..existsOnce());
+    await idle();
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tapLabel('Nearby devices');
+    expect(tester.testTextInput.isVisible, isFalse);
+  }
+
+  Future<void> rotateToLandscape() async {
+    logEvent('Rotate the phone to landscape');
+    tester.view.physicalSize = const Size(844, 390);
+    await idle();
+  }
+
+  Future<void> returnToDeviceList() async {
+    logEvent('Use the system back action from the device inspector');
+    spotText('180F', exact: true).existsOnce();
+    await tester.binding.handlePopRoute();
+    await idle();
+    spot<ListTile>().withChild(spotText('Test peripheral', exact: true)).existsOnce();
+    expect(controller.connected, isTrue);
+  }
+
+  Future<void> backWithHiddenInspector() async {
+    await openActivity();
+    final calls = <String>[];
+    final messenger = tester.binding.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(SystemChannels.platform, (call) async {
+      calls.add(call.method);
+      return null;
+    });
+    try {
+      await tester.binding.handlePopRoute();
+      expect(calls, contains('SystemNavigator.pop'));
+    } finally {
+      messenger.setMockMethodCallHandler(SystemChannels.platform, null);
+    }
+    await openDevices();
+    spotText('180F', exact: true).existsOnce();
+  }
+
+  Future<void> dismissGattPayloadKeyboard() async {
+    await tapLabel('180F');
+    await tapLabel('2A19');
+    await tapLabel('Write');
+    final field = spot<PayloadEditor>().spot<TextField>()..existsOnce();
+    await verifyBackgroundDismissesKeyboard(field, 'GATT explorer', '01 A2');
+  }
+
+  Future<void> verifyBackgroundDismissesKeyboard(
+    WidgetSelector<TextField> field,
+    String background,
+    String draft,
+  ) async {
+    await scrollIntoView(field);
+    await act.enterText(field, draft);
+    await idle();
+    final editable = field.spot<EditableText>()..existsOnce();
+    expect(editable.snapshotWidget().focusNode.hasFocus, isTrue);
+    expect(tester.testTextInput.isVisible, isTrue);
+    await tapLabel(background);
+    expect(editable.snapshotWidget().focusNode.hasFocus, isFalse);
+    expect(tester.testTextInput.isVisible, isFalse);
+    expect(field.snapshotWidget().controller!.text, draft);
+  }
+
+  Future<void> reopenConnectedPeripheral() async {
+    await selectPeripheral();
+    logEvent('Verify that reopening a connected peer refreshes its signal strength');
+    spotText('-47 dBm', exact: true).existsOnce();
+    expect(controller.connected, isTrue);
+    expect(controller.error, isNull);
+  }
+
+  void expectListening() {
+    logEvent('Verify that server state survives navigation');
+    expect(controller.serverPsm, 129);
+    spotText('Stop server').existsOnce();
+    spotText('Waiting for a peer — no channel connected yet.', exact: true).existsOnce();
+  }
+
+  Future<void> acceptIncomingChannel() async {
+    logEvent('Receive an incoming channel and distinguish it from a waiting server');
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:03'), psm: 129));
+    await idle();
+    expect(controller.channels.single.incoming, isTrue);
+    spotText('Waiting for a peer — no channel connected yet.', exact: true).doesNotExist();
+    spotText('1 incoming channel connected.', exact: true).existsOnce();
+  }
+
+  void expectStopped() {
+    expect(controller.serverPsm, isNull);
+    spotText('Start server').existsOnce();
+  }
+
+  Future<void> rejectInvalidRemotePsm() async {
+    logEvent('Enter a remote PSM beyond the range of LE channels');
+    final field = spot<DeviceL2capPanel>().spot<TextField>();
+    field.existsOnce();
+    await scrollIntoView(field);
+    await act.enterText(field, '256');
+    await idle();
+    await tapLabel('Open channel');
+    spotText('Enter a PSM from 1 to 255, in decimal or 0x hexadecimal.').existsOnce();
+    expect(controller.channels, isEmpty);
+  }
+
+  Future<void> openRemoteChannel() async {
+    logEvent('Open an L2CAP channel to the connected device');
+    final field = spot<DeviceL2capPanel>().spot<TextField>()..existsOnce();
+    await scrollIntoView(field);
+    await act.enterText(field, '131');
+    await idle();
+    await tapLabel('Open channel');
+    final session = controller.channels.where((s) => s.channel.deviceId == controller.selected!.remoteId).single;
+    expect(session.incoming, isFalse);
+    await expectOnlySelectedChannel();
+  }
+
+  Future<void> expectOnlySelectedChannel() async {
+    logEvent('Verify that only the inspected peer’s channel is displayed');
+    final card = spot<L2capChannelCard>()..existsOnce();
+    await scrollIntoView(card);
+    expect(card.snapshotWidget().session.channel.deviceId, controller.selected!.remoteId);
+    spotText('Outgoing · PSM 131', exact: true).existsOnce();
+  }
+
+  void expectNoOutgoingChannels() {
+    logEvent('Verify that the local server only shows incoming channels');
+    spotText('Outgoing · PSM 131', exact: true).doesNotExist();
+    spotText('Remote PSM', exact: true).doesNotExist();
+  }
+
+  Future<void> tapInDialog(String label) async {
+    logEvent('Tap "$label" in the dialog');
+    final target = spot<Dialog>().spotText(label, exact: true)..existsOnce();
+    await act.tap(target);
+    await idle();
+  }
+
+  Future<void> scrollIntoView<T extends Widget>(WidgetSelector<T> target) async {
+    logEvent('Scroll the selected widget into view');
+    target.existsOnce();
+    await tester.ensureVisible(target.finder);
+    await idle();
+  }
+
+  Future<void> tapLabel(String label) async {
+    logEvent('Tap "$label"');
+    final target = spotText(label, exact: true)..existsOnce();
+    await scrollIntoView(target);
+    await act.tap(target);
+    await idle();
+  }
+}

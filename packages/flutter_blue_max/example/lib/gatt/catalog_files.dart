@@ -1,0 +1,34 @@
+import 'dart:ui';
+
+import 'package:flutter_blue_max/flutter_blue_max.dart';
+import 'package:flutter_blue_max_example/gatt/known_service.dart';
+import 'package:flutter_blue_max_example/shared/json_files.dart';
+import 'package:flutter_blue_max_example/shared/noun.dart';
+
+const catalogFileName = 'blue_max_gatt_catalog.json';
+const Noun serviceNoun = Noun(singular: 'service', plural: 'services');
+const _key = 'services';
+
+String encodeCatalogFile(List<KnownService> services) => encodeJsonList(_key, services);
+
+/// Throws a [FormatException] for files that do not hold catalog services.
+List<KnownService> decodeCatalogFile(String text) {
+  final services = decodeJsonList(text, key: _key, noun: serviceNoun, fromJson: KnownService.fromJson);
+  final seen = <Guid>{};
+  for (final service in services) {
+    if (!seen.add(service.uuid)) {
+      throw FormatException('The file repeats service UUID ${service.uuid}.');
+    }
+  }
+  return services;
+}
+
+/// Lets the user pick a catalog file; null when cancelled.
+Future<List<KnownService>?> openCatalogFile() async {
+  final text = await openJsonFile();
+  return text == null ? null : decodeCatalogFile(text);
+}
+
+/// Exports the selected entries using [saveJsonFile].
+Future<ExportOutcome> saveCatalogFile(List<KnownService> services, {Rect? origin, ShareFile? shareFile}) =>
+    saveJsonFile(catalogFileName, encodeCatalogFile(services), origin: origin, shareFile: shareFile);
