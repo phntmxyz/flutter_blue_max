@@ -27,7 +27,7 @@ Replace `<device-id>` below with the ID from `flutter devices`.
 | Windows | Not available | No example runner or Windows Bluetooth backend. |
 | Web | `flutter run -d chrome` | Browser device chooser and GATT for the services listed below; no L2CAP, RSSI, MTU requests or bonding. |
 
-- Android: install the Android SDK and JDK (CI uses JDK 21), enable USB debugging and grant Bluetooth permissions; Android 7–11 also needs location permission/services for scanning.
+- Android: install the Android SDK and JDK (CI uses JDK 21), enable USB debugging and grant the Bluetooth and location permissions; scanning also needs location services switched on, because the example asks for unfiltered scan results that include beacons.
 - iOS: build on macOS with Xcode and select a development team in `ios/Runner.xcodeproj` for a physical device; start Simulator with `open -a Simulator`.
 - macOS: install Xcode and allow Bluetooth access when prompted.
   Release builds failed with `Class with illegal cid` in Flutter 3.47.2 and 3.47.7; debug builds work ([matching Flutter issue](https://github.com/flutter/flutter/issues/191575)).

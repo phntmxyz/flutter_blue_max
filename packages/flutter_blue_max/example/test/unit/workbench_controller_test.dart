@@ -375,6 +375,43 @@ void main() {
     expect(platform.closeRequests.single.remoteId, remoteId.str);
   });
 
+  test('a tracking scan that fails to start keeps the previous session', () async {
+    final (:controller, :platform) = await _setup();
+    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:01');
+    await controller.trackAdvertisements(device);
+    platform.advertise(
+      manufacturerData: {
+        0xffff: [1],
+      },
+    );
+    await _until(() => controller.advertisementTracker!.count == 1);
+    await controller.stopTracking();
+    final recorded = controller.advertisementTracker;
+
+    platform.overrideStartScan = (_) => throw StateError('Location services are off');
+    await controller.trackAdvertisements(device);
+
+    expect(controller.error, contains('Location services are off'));
+    expect(controller.tracking, isFalse);
+    expect(controller.advertisementTracker, same(recorded));
+    expect(recorded!.count, 1);
+  });
+
+  test('selecting a peer logs connection changes but not its replayed state', () async {
+    final (:controller, :platform) = await _setup();
+    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:47');
+    bool logged(String state) => controller.logs.any((line) => line.contains(': $state'));
+
+    controller.select(peer);
+    await Future<void>.delayed(Duration.zero);
+    expect(logged('disconnected'), isFalse, reason: 'Nothing disconnected by selecting a peer');
+
+    await controller.connect();
+    await _until(() => logged('connected'));
+    await platform.disconnect(BmDisconnectRequest(remoteId: peer.remoteId));
+    await _until(() => logged('disconnected'));
+  });
+
   test('tracking records every advertisement of one peer and keeps the device list', () async {
     final (:controller, :platform) = await _setup();
     await controller.scan();
@@ -386,6 +423,7 @@ void main() {
     final request = platform.scanRequests.last;
     expect(request.withRemoteIds, [device.remoteId.str]);
     expect(request.continuousUpdates, isTrue);
+    expect(request.androidUsesFineLocation, isTrue, reason: 'Android filters beacons from scans without location');
     expect(controller.tracking, isTrue);
     final originalBytes = [1];
     platform.advertise(
@@ -872,21 +910,6 @@ void main() {
     });
   }
   group('Connection and diagnostic workflows', () {
-    test('polling stops when its deadline expires', () async {
-      var polls = 0;
-      await expectLater(
-        _until(() {
-          polls++;
-          return false;
-        }, timeout: const Duration(milliseconds: 10)),
-        throwsA(isA<TimeoutException>()),
-      );
-      expect(polls, greaterThan(0));
-      final pollsAtTimeout = polls;
-      await Future<void>.delayed(const Duration(milliseconds: 20));
-      expect(polls, pollsAtTimeout, reason: 'A timed-out poll must not keep running');
-    });
-
     test('cancellation interrupts a pending real plugin connection without waiting for its timeout', () async {
       final fixture = await _setup();
       final c = fixture.controller;

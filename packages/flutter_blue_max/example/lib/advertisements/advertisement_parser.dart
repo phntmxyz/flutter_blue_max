@@ -142,6 +142,9 @@ class const AdvertisementParser({
   }
 
   bool _matches(List<int> bytes) {
+    if (match.isEmpty) {
+      return true;
+    }
     if (!_fits(matchOffset, match.length, bytes.length)) {
       return false;
     }

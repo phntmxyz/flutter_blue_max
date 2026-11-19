@@ -162,6 +162,10 @@ extension AdvertisementRobot on WorkbenchRobot {
     logEvent('Verify that the service data source is prefilled from the latest advertisement');
     expect(_field('Service UUID').snapshotWidget().controller!.text, 'fff0');
     await _enter('Parser name', 'Sensor');
+    logEvent('Verify that a service the advertisement lacks explains where service data offsets start');
+    await _enter('Service UUID', '180f');
+    spotText('Offsets count from the first byte of the service data.').existsOnce();
+    await _enter('Service UUID', 'fff0');
     await tapLabel('Records');
     await _enter('Records start at', '2');
     await tapLabel('1 byte');

@@ -372,14 +372,14 @@ class WorkbenchRobot(final WidgetTester tester, final FakeBluetoothPlatform plat
   }
 
   Future<void> rejectInvalidRemotePsm() async {
-    logEvent('Enter an invalid remote PSM');
+    logEvent('Enter a remote PSM beyond the range of LE channels');
     final field = spot<DeviceL2capPanel>().spot<TextField>();
     field.existsOnce();
     await scrollIntoView(field);
-    await act.enterText(field, '0');
+    await act.enterText(field, '256');
     await idle();
     await tapLabel('Open channel');
-    spotText('Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.').existsOnce();
+    spotText('Enter a PSM from 1 to 255, in decimal or 0x hexadecimal.').existsOnce();
     expect(controller.channels, isEmpty);
   }
 

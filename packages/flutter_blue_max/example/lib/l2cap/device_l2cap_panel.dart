@@ -80,11 +80,7 @@ class _DeviceL2capPanelState() extends State<DeviceL2capPanel> {
                             labelText: 'Remote PSM',
                             hintText: 'Decimal or 0x hexadecimal',
                           ),
-                          validationMessages: {
-                            ValidationMessage.required: (_) {
-                              return 'Enter a PSM from 1 to 65535, in decimal or 0x hexadecimal.';
-                            },
-                          },
+                          validationMessages: {ValidationMessage.required: (_) => psmInputMessage},
                         ),
                         const SizedBox(height: 8),
                         Builder(

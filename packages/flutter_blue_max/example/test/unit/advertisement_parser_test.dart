@@ -72,6 +72,17 @@ void main() {
     }
   });
 
+  test('a parser without match bytes reads every payload, whatever its match offset', () {
+    const parser = AdvertisementParser(
+      name: 'Any frame',
+      source: AdvertisementSource.manufacturer,
+      companyId: testCompany,
+      matchOffset: 10,
+      fields: [AdvertisementField('Level', 0, AdvertisementFieldType.uint8)],
+    );
+    expect(parser.read(companyId: testCompany, bytes: [7]), ['Any frame · Level: 7']);
+  });
+
   test('large offsets and sizes report short payloads without overflow', () {
     final large = int.tryParse('9223372036854775807') ?? 0x1fffffffffffff;
     final field = AdvertisementField('Far away', large, AdvertisementFieldType.hex, length: large, record: 1);

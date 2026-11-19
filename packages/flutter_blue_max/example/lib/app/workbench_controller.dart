@@ -347,11 +347,11 @@ class WorkbenchController({
           log('Services changed on ${nameOf(device)}. Discover services again.');
         }),
       );
-      // The stream replays a cached state on listen, which is `disconnected` for
-      // peers never connected over GATT. Only a real link loss ends the session.
+      // The stream first replays the cached state, which is `disconnected` for peers never connected over GATT.
+      // That state is already applied here, so only later changes are handled and logged.
       var wasConnected = device.isConnected;
       subscriptions.add(
-        device.connectionState.listen((state) {
+        device.connectionState.skip(1).listen((state) {
           final lostConnection = wasConnected && state == BluetoothConnectionState.disconnected;
           wasConnected = state == BluetoothConnectionState.connected;
           if (lostConnection) {
@@ -451,6 +451,7 @@ class WorkbenchController({
     await _startOwnedScan(
       () => FlutterBlueMax.startScan(
         timeout: const Duration(seconds: 15),
+        androidUsesFineLocation: true,
         // Preserve the original example's browser service permissions.
         webOptionalServices: [Guid('180f'), Guid('180a'), Guid('1800'), Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e')],
       ),
@@ -474,11 +475,24 @@ class WorkbenchController({
     if (_disposed) {
       return;
     }
+    // The session a failed scan start would replace stays readable.
+    final previousTracker = advertisementTracker;
     advertisementTracker = AdvertisementTracker(device.remoteId);
     _trackingScan = true;
-    await _startOwnedScan(
-      () => FlutterBlueMax.startScan(withRemoteIds: [device.remoteId.str], continuousUpdates: true, oneByOne: true),
-    );
+    try {
+      await _startOwnedScan(
+        () => FlutterBlueMax.startScan(
+          withRemoteIds: [device.remoteId.str],
+          continuousUpdates: true,
+          oneByOne: true,
+          androidUsesFineLocation: true,
+        ),
+      );
+    } catch (_) {
+      advertisementTracker = previousTracker;
+      _trackingScan = false;
+      rethrow;
+    }
     log('Tracking advertisements of ${nameOf(device)}');
   });
 

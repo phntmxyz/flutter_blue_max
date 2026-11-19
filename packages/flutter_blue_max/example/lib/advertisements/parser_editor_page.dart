@@ -351,7 +351,10 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                 if (sample == null) {
                   return Text(
                     'The latest advertisement has no payload for this source. '
-                    'Offsets count from the first byte after the company ID.',
+                    '${switch (_source) {
+                      AdvertisementSource.manufacturer => 'Offsets count from the first byte after the company ID.',
+                      AdvertisementSource.service => 'Offsets count from the first byte of the service data.',
+                    }}',
                     style: Theme.of(context).textTheme.bodySmall,
                   );
                 }
