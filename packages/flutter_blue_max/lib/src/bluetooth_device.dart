@@ -145,7 +145,7 @@ class BluetoothDevice {
             .fbpTimeout(timeout.inSeconds, "connect")
             .catchError((e) async {
           if (e is FlutterBlueMaxException && e.code == FbpErrorCode.timeout.index) {
-            FlutterBlueMaxPlatform.log("[FBP] connection timeout");
+            FlutterBlueMaxPlatform.log("[FBM] connection timeout");
             await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance
                 .disconnect(BmDisconnectRequest(remoteId: remoteId))); // cancel connection attempt
           }
@@ -668,7 +668,7 @@ class BluetoothDevice {
         Duration elapsed = DateTime.now().difference(FlutterBlueMax._connectTimestamp[remoteId]!);
         if (elapsed.compareTo(minGap) < 0) {
           Duration timeLeft = minGap - elapsed;
-          FlutterBlueMaxPlatform.log("[FBP] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap, delaying "
+          FlutterBlueMaxPlatform.log("[FBM] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap, delaying "
               "${timeLeft.inMilliseconds}ms");
           await Future<void>.delayed(timeLeft);
         }

@@ -100,7 +100,7 @@ public class FlutterBlueMaxPlugin implements
     ActivityResultListener,
     ActivityAware
 {
-    private static final String TAG = "[FBP-Android]";
+    private static final String TAG = "[FBM-Android]";
 
     private LogLevel logLevel = LogLevel.DEBUG;
 
@@ -1806,7 +1806,7 @@ public class FlutterBlueMaxPlugin implements
         if (waitExpired || mBondingDevices.isEmpty()) {
             return false;
         }
-        log(LogLevel.DEBUG, "[FBP] waiting for bonding to complete...");
+        log(LogLevel.DEBUG, "[FBM] waiting for bonding to complete...");
         long deadline = SystemClock.uptimeMillis() + MAX_BONDING_WAIT_MS;
         Handler handler = new Handler(Looper.getMainLooper());
         handler.postDelayed(new Runnable() {
@@ -1817,9 +1817,9 @@ public class FlutterBlueMaxPlugin implements
                     return;
                 }
                 if (mBondingDevices.isEmpty()) {
-                    log(LogLevel.DEBUG, "[FBP] bonding completed");
+                    log(LogLevel.DEBUG, "[FBM] bonding completed");
                 } else {
-                    log(LogLevel.WARNING, "[FBP] bonding still not complete after " + MAX_BONDING_WAIT_MS + "ms - proceeding anyway");
+                    log(LogLevel.WARNING, "[FBM] bonding still not complete after " + MAX_BONDING_WAIT_MS + "ms - proceeding anyway");
                     mBondingWaitExpired.add(result);
                 }
                 onMethodCall(call, result);
@@ -3154,16 +3154,16 @@ public class FlutterBlueMaxPlugin implements
         }
         switch(level) {
             case DEBUG:
-                Log.d(TAG, "[FBP] " + message);
+                Log.d(TAG, "[FBM] " + message);
                 break;
             case WARNING:
-                Log.w(TAG, "[FBP] " + message);
+                Log.w(TAG, "[FBM] " + message);
                 break;
             case ERROR:
-                Log.e(TAG, "[FBP] " + message);
+                Log.e(TAG, "[FBM] " + message);
                 break;
             default:
-                Log.d(TAG, "[FBP] " + message);
+                Log.d(TAG, "[FBM] " + message);
                 break;
         }
     }
@@ -3565,7 +3565,7 @@ class L2CapChannelManager {
             serverInfo.closeSocket();
             openL2CapChannelInfos.remove(serverInfo);
         } else {
-            plugin.log(FlutterBlueMaxPlugin.LogLevel.WARNING, "[FBP] No server socket found with psm " + psm);
+            plugin.log(FlutterBlueMaxPlugin.LogLevel.WARNING, "[FBM] No server socket found with psm " + psm);
         }
         resultCallback.success(null);
     }
