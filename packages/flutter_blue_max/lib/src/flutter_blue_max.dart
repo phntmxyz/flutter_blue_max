@@ -709,10 +709,11 @@ class FlutterBlueMax {
         FlutterBlueMaxPlatform.instance.onCharacteristicReceived,
         FlutterBlueMaxPlatform.instance.onCharacteristicWritten
       ]).listen((r) {
-        if (r.success == true) {
+        final value = r.value;
+        if (r.success == true && value != null) {
           _lastChrs[r.remoteId] ??= {};
           _lastChrs[r.remoteId]![
-              _chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] = r.value;
+              _chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] = value;
         }
       });
     } on UnimplementedError {

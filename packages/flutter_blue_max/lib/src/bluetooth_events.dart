@@ -22,11 +22,16 @@ class BluetoothEvents {
   }
 
   Stream<OnCharacteristicReceivedEvent> get onCharacteristicReceived {
-    return FlutterBlueMaxPlatform.instance.onCharacteristicReceived.map((p) => OnCharacteristicReceivedEvent(p));
+    // a response without a value is not an event, iOS & macOS send none for a failed read
+    return FlutterBlueMaxPlatform.instance.onCharacteristicReceived
+        .where((p) => p.value != null)
+        .map((p) => OnCharacteristicReceivedEvent(p));
   }
 
   Stream<OnCharacteristicWrittenEvent> get onCharacteristicWritten {
-    return FlutterBlueMaxPlatform.instance.onCharacteristicWritten.map((p) => OnCharacteristicWrittenEvent(p));
+    return FlutterBlueMaxPlatform.instance.onCharacteristicWritten
+        .where((p) => p.value != null)
+        .map((p) => OnCharacteristicWrittenEvent(p));
   }
 
   Stream<OnDescriptorReadEvent> get onDescriptorRead {
@@ -145,7 +150,7 @@ class OnCharacteristicReceivedEvent {
       primaryServiceUuid: _response.primaryServiceUuid);
 
   /// the new data
-  List<int> get value => _response.value;
+  List<int> get value => _response.value!;
 
   /// failed?
   FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
@@ -168,7 +173,7 @@ class OnCharacteristicWrittenEvent {
       primaryServiceUuid: _response.primaryServiceUuid);
 
   /// the new data
-  List<int> get value => _response.value;
+  List<int> get value => _response.value!;
 
   /// failed?
   FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);

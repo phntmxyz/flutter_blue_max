@@ -476,7 +476,9 @@ class BmCharacteristicData {
   final Guid serviceUuid;
   final Guid characteristicUuid;
   final Guid? primaryServiceUuid;
-  final List<int> value;
+
+  /// null when the platform reports no value, iOS & macOS do so for a failed read
+  final List<int>? value;
   final bool success;
   final int errorCode;
   final String errorString;
@@ -501,8 +503,7 @@ class BmCharacteristicData {
       characteristicUuid: Guid(json['characteristic_uuid']),
       primaryServiceUuid: Guid.parse(json['primary_service_uuid']),
       instanceId: json['instance_id'],
-      // iOS & macOS send null as the value of a failed read
-      value: (json['value'] as Uint8List?) ?? Uint8List(0),
+      value: json['value'] as Uint8List?,
       success: json['success'] != 0,
       errorCode: json['error_code'],
       errorString: json['error_string'],

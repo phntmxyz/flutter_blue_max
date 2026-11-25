@@ -72,7 +72,8 @@ class BluetoothCharacteristic {
           .where((p) => p.primaryServiceUuid == primaryServiceUuid)
           .where((p) => p.instanceId == null || p.instanceId == instanceId)
           .where((p) => p.success == true)
-          .map((c) => c.value)
+          .where((p) => p.value != null)
+          .map((c) => c.value!)
           .newStreamWithInitialValue(lastValue);
 
   /// this stream emits values:
@@ -85,7 +86,8 @@ class BluetoothCharacteristic {
       .where((p) => p.primaryServiceUuid == primaryServiceUuid)
       .where((p) => p.instanceId == null || p.instanceId == instanceId)
       .where((p) => p.success == true)
-      .map((c) => c.value);
+      .where((p) => p.value != null)
+      .map((c) => c.value!);
 
   /// return true if we're subscribed to this characteristic
   ///   -  you can subscribe using setNotifyValue(true)
@@ -153,7 +155,7 @@ class BluetoothCharacteristic {
       }
 
       // set return value
-      responseValue = response.value;
+      responseValue = response.value ?? [];
     } finally {
       mtx.give();
     }
