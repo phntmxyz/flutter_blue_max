@@ -49,6 +49,8 @@ If you are new to Bluetooth, you should start by reading BLE tutorials.
 
 FlutterBlueMax supports nearly every feature on all supported platforms: iOS, macOS, Android, Linux, Web.
 
+See [PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) for every feature and whether it works on each platform.
+
 ## No Dependencies
 
 FlutterBlueMax has zero dependencies besides Flutter, Android, iOS, and macOS themselves.
@@ -700,6 +702,9 @@ FlutterBlueMax.setOptions(restoreState: true);
 You can try using https://pub.dev/packages/flutter_foreground_task or possibly https://pub.dev/packages/workmanager
 
 ## API Reference
+
+The tables below list the API.
+[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) has the details per feature, with the restrictions of each platform.
 
 Note: When functionality is unsupported on a platform, sensible defaults are returned instead of an error.
 
