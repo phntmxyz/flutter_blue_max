@@ -174,12 +174,17 @@ class FlutterBlueMax {
         .setOptions(BmSetOptionsRequest(showPowerAlert: showPowerAlert, restoreState: restoreState)));
   }
 
-  /// Turn on Bluetooth (Android only),
+  /// Turn on Bluetooth (Android & Linux only).
+  ///  - iOS & macOS do not let apps turn Bluetooth on, their platform implementation throws [UnsupportedError].
   static Future<void> turnOn({int timeout = 60}) async {
     var responseStream = FlutterBlueMaxPlatform.instance.onTurnOnResponse;
 
     // Start listening now, before invokeMethod, to ensure we don't miss the response
     Future<BmTurnOnResponse> futureResponse = responseStream.first;
+
+    // the response is only awaited when the platform reports a change,
+    // a platform without turn on responses must not raise an unhandled error
+    futureResponse.ignore();
 
     // invoke
     bool changed = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.turnOn(BmTurnOnRequest()));
@@ -704,10 +709,11 @@ class FlutterBlueMax {
         FlutterBlueMaxPlatform.instance.onCharacteristicReceived,
         FlutterBlueMaxPlatform.instance.onCharacteristicWritten
       ]).listen((r) {
-        if (r.success == true) {
+        final value = r.value;
+        if (r.success == true && value != null) {
           _lastChrs[r.remoteId] ??= {};
           _lastChrs[r.remoteId]![
-              _chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] = r.value;
+              _chrCacheKey(r.serviceUuid, r.characteristicUuid, r.instanceId, r.primaryServiceUuid)] = value;
         }
       });
     } on UnimplementedError {

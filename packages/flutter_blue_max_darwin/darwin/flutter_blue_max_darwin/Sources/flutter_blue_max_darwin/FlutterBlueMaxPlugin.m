@@ -2024,7 +2024,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
     // what data did we write?
     NSString *key = [NSString stringWithFormat:@"%@:%@:%@:%@:%@", remoteId, serviceUuid, characteristicUuid,
         descriptorUuid, primaryService != nil ? [primaryService.UUID uuidStr] : @""];  
-    NSData *value = self.writeChrs[key] ? self.writeChrs[key] : [NSMutableData data];
+    NSData *value = self.writeDescs[key] ? self.writeDescs[key] : [NSMutableData data];
     [self.writeDescs removeObjectForKey:key];
     
     // See BmDescriptorData

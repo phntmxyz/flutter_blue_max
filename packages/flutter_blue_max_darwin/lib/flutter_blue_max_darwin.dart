@@ -276,6 +276,13 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   }
 
   @override
+  Future<bool> turnOn(
+    BmTurnOnRequest request,
+  ) async {
+    throw UnsupportedError('iOS and macOS do not let apps turn Bluetooth on');
+  }
+
+  @override
   Future<bool> writeCharacteristic(
     BmWriteCharacteristicRequest request,
   ) async {
