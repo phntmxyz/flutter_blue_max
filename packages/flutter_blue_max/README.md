@@ -47,7 +47,9 @@ If you are new to Bluetooth, you should start by reading BLE tutorials.
 
 ## Cross-Platform Bluetooth Low Energy
 
-FlutterBlueMax supports nearly every feature on all supported platforms: iOS, macOS, Android, Linux, Web.
+FlutterBlueMax runs on iOS, macOS, Android, Linux and Web.
+The core of Bluetooth Low Energy works on all of them: connecting, discovering services, reading, writing and notifications.
+What a platform does not offer, such as scanning in the browser or bonding outside Android, is not available there.
 
 See [PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) for every feature and whether it works on each platform.
 
@@ -543,8 +545,8 @@ There are streams for:
 * events.onCharacteristicWritten
 * events.onDescriptorRead
 * events.onDescriptorWritten
-* events.onNameChanged (iOS Only)
-* events.onBondStateChanged (Android Only)
+* events.onNameChanged (iOS, macOS and Linux)
+* events.onBondStateChanged (Android and Linux)
 
 ```dart
 // listen to *any device* connection state changes 
@@ -706,78 +708,83 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 The tables below list the API.
 [PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) has the details per feature, with the restrictions of each platform.
 
-Note: When functionality is unsupported on a platform, sensible defaults are returned instead of an error.
+Note: When functionality is unsupported on a platform, the call either returns a default value or throws a `FlutterBlueMaxException` (`androidOnly`, `applePlatformOnly`).
+[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) says which for every feature.
 
+* ✔️ = Supported
+* ⚠️ = Works with a restriction
+* ❌ = The platform cannot do it
+* 🚧 = Not implemented yet
 * 🌀 = Stream
 * ⚡ = Synchronous
 * 🔥 = Can fail
 
 |                     | Android | iOS | Linux | macOS | Web | Description                                                 |
 |---------------------|---------|-----|-------|-------|-----|-------------------------------------------------------------|
-| setLogLevel         | ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Configure plugin log level                                  |
-| setOptions          | ✔️      | ✔️  | ❌     | ✔️    | ❌   | Set configurable bluetooth options                          |
+| setLogLevel         | ✔️      | ✔️  | ✔️    | ✔️    | ⚠️   | Configure plugin log level                                  |
+| setOptions          | ❌      | ✔️  | ❌     | ✔️    | ❌   | Set configurable bluetooth options                          |
 | isSupported         | ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Checks whether the device supports Bluetooth                |
 | turnOn            🔥| ✔️      | ❌   | ✔️    | ❌     | ❌   | Turns on the bluetooth adapter                              |
-| turnOff           🔥| ✔️      | ❌   | ✔️    | ❌     | ❌   | Turns off the bluetooth adapter                             |
-| adapterStateNow    ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Current state of the bluetooth adapter                      |
-| adapterState      🌀| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Stream of on & off states of the bluetooth adapter          |
-| startScan         🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Starts a scan for Ble devices                               |
-| stopScan          🔥| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Stop an existing scan for Ble devices                       |
-| onScanResults   🌀🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of live scan results                                 |
-| scanResults     🌀🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of live scan results or previous results             |
-| lastScanResults    ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The most recent scan results                                |
-| isScanning        🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of current scanning state                            |
+| turnOff           🔥| ⚠️      | ❌   | ✔️    | ❌     | ❌   | Turns off the bluetooth adapter                             |
+| adapterStateNow    ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️   | Current state of the bluetooth adapter                      |
+| adapterState      🌀| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️   | Stream of on & off states of the bluetooth adapter          |
+| startScan         🔥| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | Starts a scan for Ble devices                               |
+| stopScan          🔥| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️   | Stop an existing scan for Ble devices                       |
+| onScanResults   🌀🔥| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | Stream of live scan results                                 |
+| scanResults     🌀🔥| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | Stream of live scan results or previous results             |
+| lastScanResults    ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | The most recent scan results                                |
+| isScanning        🌀| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | Stream of current scanning state                            |
 | isScanningNow      ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Is a scan currently running?                                |
 | connectedDevices   ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | List of devices connected to *your app*                     |
-| systemDevices     🔥| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | List of devices connected to the system, even by other apps |
+| systemDevices     🔥| ✔️      | ⚠️  | ⚠️    | ⚠️    | ❌   | List of devices connected to the system, even by other apps |
 | getPhySupport       | ✔️      | ❌   | ❌     | ❌     | ❌   | Get supported bluetooth phy codings                         |
-| listenL2capChannel🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
-| stopL2capServer   🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stop an L2CAP server by PSM                                 |
-| onL2capReceived   🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of incoming L2CAP data from all channels             |
-| onL2capConnected  🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of clients connecting to an L2CAP server             |
-| onL2capClosed     🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of L2CAP channel close events from all channels      |
+| listenL2capChannel🔥| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
+| stopL2capServer   🔥| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stop an L2CAP server by PSM                                 |
+| onL2capReceived   🌀| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Stream of incoming L2CAP data from all channels             |
+| onL2capConnected  🌀| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stream of clients connecting to an L2CAP server             |
+| onL2capClosed     🌀| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Stream of L2CAP channel close events from all channels      |
 
 ### FlutterBlueMax Events API
 
 |                            | Android | iOS | Linux | macOS | Web | Description                                            |
 |----------------------------|---------|-----|-------|-------|-----|--------------------------------------------------------|
 | onConnectionStateChanged 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of connection changes of *all devices*          |
-| onMtuChanged             🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of mtu changes of *all devices*                 |
+| onMtuChanged             🌀| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Stream of mtu changes of *all devices*                 |
 | onReadRssi               🌀| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Stream of rssi reads of *all devices*                  |
-| onServicesReset          🌀| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Stream of services resets of *all devices*             |
+| onServicesReset          🌀| ✔️      | ✔️  | ⚠️    | ✔️    | ❌   | Stream of services resets of *all devices*             |
 | onDiscoveredServices     🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of services discovered of *all devices*         |
 | onCharacteristicReceived 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of characteristic value reads of *all devices*  |
 | onCharacteristicWritten  🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of characteristic value writes of *all devices* |
 | onDescriptorRead         🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of descriptor value reads of *all devices*      |
-| onDescriptorWritten      🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of descriptor value writes of *all devices*     |
+| onDescriptorWritten      🌀| ✔️      | ✔️  | ⚠️    | ✔️    | ⚠️  | Stream of descriptor value writes of *all devices*     |
 | onBondStateChanged       🌀| ✔️      | ❌   | ✔️    | ❌     | ❌   | Stream of bond state changes of *all devices*          |
-| onNameChanged            🌀| ❌       | ✔️  | ✔️    | ✔️    | ❌   | Stream of name changes of *all devices*                |
+| onNameChanged            🌀| 🚧       | ✔️  | ✔️    | ✔️    | ❌   | Stream of name changes of *all devices*                |
 
 ### BluetoothDevice API
 
 |                             | Android | iOS | Linux | macOS | Web | Description                                                |
 |-----------------------------|---------|-----|-------|-------|-----|------------------------------------------------------------|
 | platformName               ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The platform preferred name of the device                  |
-| advName                    ⚡| ✔️      | ✔️  | ❌     | ✔️    | ❌   | The advertised name of the device found during scanning    |
+| advName                    ⚡| ✔️      | ✔️  | ⚠️     | ✔️    | ❌   | The advertised name of the device found during scanning    |
 | connect                   🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Establishes a connection to the device                     |
 | disconnect                🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Cancels an active or pending connection to the device      |
 | isConnected                ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Is this device currently connected to *your app*?          |
 | isDisconnected             ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Is this device currently disconnected from *your app*?     |
 | connectionState           🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of connection changes for the Bluetooth Device      |
-| discoverServices          🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Discover services                                          |
-| servicesList               ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The current list of available services                     |
-| onServicesReset           🌀| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | The services changed & must be rediscovered                |
-| mtu                       🌀| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Stream of current mtu value + changes                      |
-| mtuNow                     ⚡| ✔️      | ✔️  | ❌     | ✔️    | ❌   | The current mtu value                                      |
-| readRssi                  🔥| ✔️      | ✔️  | ✔️    | ✔️    | ❌   | Read RSSI from a connected device                          |
+| discoverServices          🔥| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | Discover services                                          |
+| servicesList               ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ⚠️  | The current list of available services                     |
+| onServicesReset           🌀| ✔️      | ✔️  | ⚠️    | ✔️    | ❌   | The services changed & must be rediscovered                |
+| mtu                       🌀| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stream of current mtu value + changes                      |
+| mtuNow                     ⚡| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | The current mtu value                                      |
+| readRssi                  🔥| ✔️      | ✔️  | ⚠️    | ✔️    | ❌   | Read RSSI from a connected device                          |
 | requestMtu                🔥| ✔️      | ❌   | ❌     | ❌     | ❌   | Request to change the MTU for the device                   |
 | requestConnectionPriority 🔥| ✔️      | ❌   | ❌     | ❌     | ❌   | Request to update a high priority, low latency connection  |
-| bondState                 🌀| ✔️      | ❌   | ✔️    | ❌     | ❌   | Stream of device bond state. Can be useful on Android      |
-| createBond                🔥| ✔️      | ❌   | ✔️    | ❌     | ❌   | Force a system pairing dialogue to show, if needed         |
-| removeBond                  | ✔️      | ❌   | ✔️    | ❌     | ❌   | Remove Bluetooth Bond of device                            |
-| setPreferredPhy             | ✔️      | ❌   | ❌     | ❌     | ❌   | Set preferred RX and TX phy for connection and phy options |
-| clearGattCache              | ✔️      | ❌   | ❌     | ❌     | ❌   | Clear android cache of service discovery results           |
-| openL2CapChannel          🔥| ✔️      | ✔️  | ❌     | ✔️    | ❌   | Open an L2CAP channel; returns a BluetoothL2capChannel     |
+| bondState                 🌀| ✔️      | ❌   | 🚧    | ❌     | ❌   | Stream of device bond state. Can be useful on Android      |
+| createBond                🔥| ✔️      | ❌   | 🚧    | ❌     | ❌   | Force a system pairing dialogue to show, if needed         |
+| removeBond                  | ✔️      | ❌   | 🚧    | ❌     | ❌   | Remove Bluetooth Bond of device                            |
+| setPreferredPhy             | ⚠️      | ❌   | ❌     | ❌     | ❌   | Set preferred RX and TX phy for connection and phy options |
+| clearGattCache              | ✔️      | ❌   | 🚧     | ❌     | ❌   | Clear android cache of service discovery results           |
+| openL2CapChannel          🔥| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Open an L2CAP channel; returns a BluetoothL2capChannel     |
 
 ### BluetoothL2capChannel API
 
@@ -808,7 +815,7 @@ Note: When functionality is unsupported on a platform, sensible defaults are ret
 |-------------------|---------|-----|-------|-------|-----|-------------------------------------------|
 | uuid             ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The uuid of descriptor                    |
 | read            🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Retrieves the value of the descriptor     |
-| write           🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Writes the value of the descriptor        |
+| write           🔥| ✔️      | ⚠️  | ⚠️    | ⚠️    | ⚠️  | Writes the value of the descriptor        |
 | onValueReceived 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of descriptor value reads & writes |
 | lastValue        ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The most recent value of the descriptor   |
 | lastValueStream 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of onValueReceived + writes        |
