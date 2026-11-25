@@ -1047,7 +1047,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
       (devices) {
         if (_logLevel == LogLevel.verbose) {
           FlutterBlueMaxPlatform.log(
-            '[FBM-Linux] devices changed ${devices.map((device) => device.remoteId).toList()}',
+            '[FBP-Linux] devices changed ${devices.map((device) => device.remoteId).toList()}',
           );
         }
 
@@ -1058,7 +1058,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 (properties) {
                   if (_logLevel == LogLevel.verbose) {
                     FlutterBlueMaxPlatform.log(
-                      '[FBM-Linux] device ${device.remoteId} properties changed $properties',
+                      '[FBP-Linux] device ${device.remoteId} properties changed $properties',
                     );
                   }
 
@@ -1071,7 +1071,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                           (properties) {
                             if (_logLevel == LogLevel.verbose) {
                               FlutterBlueMaxPlatform.log(
-                                '[FBM-Linux] device ${device.remoteId} service ${service.uuid} characteristic ${characteristic.uuid} properties changed $properties',
+                                '[FBP-Linux] device ${device.remoteId} service ${service.uuid} characteristic ${characteristic.uuid} properties changed $properties',
                               );
                             }
                           },
