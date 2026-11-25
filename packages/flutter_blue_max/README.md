@@ -738,10 +738,10 @@ Note: When functionality is unsupported on a platform, the call either returns a
 | connectedDevices   ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | List of devices connected to *your app*                     |
 | systemDevices     🔥| ✔️      | ⚠️  | ⚠️    | ⚠️    | ❌   | List of devices connected to the system, even by other apps |
 | getPhySupport       | ✔️      | ❌   | ❌     | ❌     | ❌   | Get supported bluetooth phy codings                         |
-| listenL2capChannel🔥| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
-| stopL2capServer   🔥| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stop an L2CAP server by PSM                                 |
+| listenL2capChannel🔥| ⚠️      | ⚠️  | 🚧     | ⚠️    | ❌   | Start an L2CAP server; returns the assigned PSM             |
+| stopL2capServer   🔥| ⚠️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stop an L2CAP server by PSM                                 |
 | onL2capReceived   🌀| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Stream of incoming L2CAP data from all channels             |
-| onL2capConnected  🌀| ✔️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stream of clients connecting to an L2CAP server             |
+| onL2capConnected  🌀| ⚠️      | ⚠️  | 🚧     | ⚠️    | ❌   | Stream of clients connecting to an L2CAP server             |
 | onL2capClosed     🌀| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Stream of L2CAP channel close events from all channels      |
 
 ### FlutterBlueMax Events API
@@ -764,8 +764,8 @@ Note: When functionality is unsupported on a platform, the call either returns a
 
 |                             | Android | iOS | Linux | macOS | Web | Description                                                |
 |-----------------------------|---------|-----|-------|-------|-----|------------------------------------------------------------|
-| platformName               ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The platform preferred name of the device                  |
-| advName                    ⚡| ✔️      | ✔️  | ⚠️     | ✔️    | ❌   | The advertised name of the device found during scanning    |
+| platformName               ⚡| ✔️      | ✔️  | ⚠️    | ✔️    | ⚠️  | The platform preferred name of the device                  |
+| advName                    ⚡| ✔️      | ✔️  | ⚠️     | ✔️    | ⚠️   | The advertised name of the device found during scanning    |
 | connect                   🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Establishes a connection to the device                     |
 | disconnect                🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Cancels an active or pending connection to the device      |
 | isConnected                ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Is this device currently connected to *your app*?          |
@@ -781,18 +781,18 @@ Note: When functionality is unsupported on a platform, the call either returns a
 | requestConnectionPriority 🔥| ✔️      | ❌   | ❌     | ❌     | ❌   | Request to update a high priority, low latency connection  |
 | bondState                 🌀| ✔️      | ❌   | 🚧    | ❌     | ❌   | Stream of device bond state. Can be useful on Android      |
 | createBond                🔥| ✔️      | ❌   | 🚧    | ❌     | ❌   | Force a system pairing dialogue to show, if needed         |
-| removeBond                  | ✔️      | ❌   | 🚧    | ❌     | ❌   | Remove Bluetooth Bond of device                            |
+| removeBond                  | ⚠️      | ❌   | 🚧    | ❌     | ❌   | Remove Bluetooth Bond of device                            |
 | setPreferredPhy             | ⚠️      | ❌   | ❌     | ❌     | ❌   | Set preferred RX and TX phy for connection and phy options |
-| clearGattCache              | ✔️      | ❌   | 🚧     | ❌     | ❌   | Clear android cache of service discovery results           |
-| openL2CapChannel          🔥| ✔️      | ✔️  | 🚧     | ✔️    | ❌   | Open an L2CAP channel; returns a BluetoothL2capChannel     |
+| clearGattCache              | ⚠️      | ❌   | 🚧     | ❌     | ❌   | Clear android cache of service discovery results           |
+| openL2CapChannel          🔥| ⚠️      | ✔️  | 🚧     | ✔️    | ❌   | Open an L2CAP channel; returns a BluetoothL2capChannel     |
 
 ### BluetoothL2capChannel API
 
 |                         | Android | iOS | macOS | Description                                        |
 |-------------------------|---------|-----|-------|----------------------------------------------------|
-| write                 🔥| ✔️      | ✔️  | ✔️    | Write bytes to the L2CAP channel                   |
-| read                  🔥| ✔️      | ✔️  | ✔️    | Read bytes from the L2CAP channel (polling)        |
-| close                 🔥| ✔️      | ✔️  | ✔️    | Close the L2CAP channel and free resources         |
+| write                 🔥| ⚠️      | ✔️  | ✔️    | Write bytes to the L2CAP channel                   |
+| read                  🔥| ⚠️      | ✔️  | ✔️    | Read bytes from the L2CAP channel (polling)        |
+| close                 🔥| ⚠️      | ✔️  | ✔️    | Close the L2CAP channel and free resources         |
 | onL2CapChannelReceived🌀| ✔️      | ✔️  | ✔️    | Stream of incoming bytes for this specific channel |
 | onClosed              🌀| ✔️      | ✔️  | ✔️    | Emits when the channel dies (not on local close()) |
 
@@ -804,7 +804,7 @@ Note: When functionality is unsupported on a platform, the call either returns a
 | read            🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Retrieves the value of the characteristic                       |
 | write           🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Writes the value of the characteristic                          |
 | setNotifyValue  🔥| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Sets notifications or indications on the characteristic         |
-| isNotifying      ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Are notifications or indications currently enabled              |
+| isNotifying      ⚡| ✔️      | ✔️  | 🚧    | ✔️    | 🚧  | Are notifications or indications currently enabled              |
 | onValueReceived 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of characteristic value updates received from the device |
 | lastValue        ⚡| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | The most recent value of the characteristic                     |
 | lastValueStream 🌀| ✔️      | ✔️  | ✔️    | ✔️    | ✔️  | Stream of onValueReceived + writes                              |
