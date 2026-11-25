@@ -82,7 +82,7 @@ class BluetoothDescriptor {
     // check connected
     if (device.isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "readDescriptor", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "readDescriptor", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -118,9 +118,9 @@ class BluetoothDescriptor {
 
       // wait for response
       BmDescriptorData response = await futureResponse
-          .fbpEnsureAdapterIsOn("readDescriptor")
-          .fbpEnsureDeviceIsConnected(device, "readDescriptor")
-          .fbpTimeout(timeout, "readDescriptor");
+          .fbmEnsureAdapterIsOn("readDescriptor")
+          .fbmEnsureDeviceIsConnected(device, "readDescriptor")
+          .fbmTimeout(timeout, "readDescriptor");
 
       // failed?
       if (!response.success) {
@@ -140,7 +140,7 @@ class BluetoothDescriptor {
     // check connected
     if (device.isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "writeDescriptor", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "writeDescriptor", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -174,9 +174,9 @@ class BluetoothDescriptor {
 
       // wait for response
       BmDescriptorData response = await futureResponse
-          .fbpEnsureAdapterIsOn("writeDescriptor")
-          .fbpEnsureDeviceIsConnected(device, "writeDescriptor")
-          .fbpTimeout(timeout, "writeDescriptor");
+          .fbmEnsureAdapterIsOn("writeDescriptor")
+          .fbmEnsureDeviceIsConnected(device, "writeDescriptor")
+          .fbmTimeout(timeout, "writeDescriptor");
 
       // failed?
       if (!response.success) {

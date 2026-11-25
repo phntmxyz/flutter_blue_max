@@ -13,14 +13,14 @@ extension AddOrUpdate<T> on List<T> {
 }
 
 extension FutureTimeout<T> on Future<T> {
-  Future<T> fbpTimeout(int seconds, String function) {
+  Future<T> fbmTimeout(int seconds, String function) {
     return timeout(Duration(seconds: seconds), onTimeout: () {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, function, FbpErrorCode.timeout.index, "Timed out after ${seconds}s");
+          ErrorPlatform.fbm, function, FbmErrorCode.timeout.index, "Timed out after ${seconds}s");
     });
   }
 
-  Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) {
+  Future<T> fbmEnsureDeviceIsConnected(BluetoothDevice device, String function) {
     // Create a completer to represent the result of this extended Future.
     var completer = Completer<T>();
 
@@ -29,7 +29,7 @@ extension FutureTimeout<T> on Future<T> {
       if (event == BluetoothConnectionState.disconnected) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
-              ErrorPlatform.fbp, function, FbpErrorCode.deviceIsDisconnected.index, "Device is disconnected"));
+              ErrorPlatform.fbm, function, FbmErrorCode.deviceIsDisconnected.index, "Device is disconnected"));
         }
       }
     });
@@ -51,7 +51,7 @@ extension FutureTimeout<T> on Future<T> {
     return completer.future;
   }
 
-  Future<T> fbpEnsureAdapterIsOn(String function) {
+  Future<T> fbmEnsureAdapterIsOn(String function) {
     // Create a completer to represent the result of this extended Future.
     var completer = Completer<T>();
 
@@ -60,7 +60,7 @@ extension FutureTimeout<T> on Future<T> {
       if (event == BluetoothAdapterState.off || event == BluetoothAdapterState.turningOff) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
-              ErrorPlatform.fbp, function, FbpErrorCode.adapterIsOff.index, "Bluetooth adapter is off"));
+              ErrorPlatform.fbm, function, FbmErrorCode.adapterIsOff.index, "Bluetooth adapter is off"));
         }
       }
     });
@@ -81,6 +81,17 @@ extension FutureTimeout<T> on Future<T> {
 
     return completer.future;
   }
+
+  @Deprecated('Use fbmTimeout instead')
+  Future<T> fbpTimeout(int seconds, String function) => fbmTimeout(seconds, function);
+
+  @Deprecated('Use fbmEnsureDeviceIsConnected instead')
+  Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) {
+    return fbmEnsureDeviceIsConnected(device, function);
+  }
+
+  @Deprecated('Use fbmEnsureAdapterIsOn instead')
+  Future<T> fbpEnsureAdapterIsOn(String function) => fbmEnsureAdapterIsOn(function);
 }
 
 // This is a reimplementation of BehaviorSubject from RxDart library.

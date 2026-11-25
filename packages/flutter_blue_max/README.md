@@ -687,7 +687,7 @@ Add the following to your `Info.plist`
 
 When this key-value pair is included in the app's Info.plist file, the system wakes up your app to process ble `read`, `write`, and `subscription` events.
 
-To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any FBP work**:
+To wake up your app even after it is killed by the OS, set the `restoreState` option to true **before** starting any FBM work**:
 
 ```
 FlutterBlueMax.setOptions(restoreState: true);
@@ -1215,7 +1215,7 @@ await characteristic.setNotifyValue(true);
 
 There is no 100% solution.
 
-FBP already has mitigations for this error, but Android will still fail with this code randomly.
+FBM already has mitigations for this error, but Android will still fail with this code randomly.
 
 The recommended solution is to `catch` the error, and retry.
 

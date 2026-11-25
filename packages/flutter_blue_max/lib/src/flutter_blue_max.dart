@@ -107,7 +107,7 @@ class FlutterBlueMax {
   /// Get access to all device event streams
   static final BluetoothEvents events = BluetoothEvents();
 
-  /// Get access to FBP logs
+  /// Get access to FBM logs
   static Stream<String> get logs => FlutterBlueMaxPlatform.logs;
 
   /// Stream of received L2CAP data from all channels (both client and server).
@@ -192,15 +192,15 @@ class FlutterBlueMax {
     // only wait if bluetooth was off
     if (changed) {
       // wait for response
-      BmTurnOnResponse response = await futureResponse.fbpTimeout(timeout, "turnOn");
+      BmTurnOnResponse response = await futureResponse.fbmTimeout(timeout, "turnOn");
 
       // check response
       if (response.userAccepted == false) {
-        throw FlutterBlueMaxException(ErrorPlatform.fbp, "turnOn", FbpErrorCode.userRejected.index, "user rejected");
+        throw FlutterBlueMaxException(ErrorPlatform.fbm, "turnOn", FbmErrorCode.userRejected.index, "user rejected");
       }
 
       // wait for adapter to turn on
-      await adapterState.where((s) => s == BluetoothAdapterState.on).first.fbpTimeout(timeout, "turnOn");
+      await adapterState.where((s) => s == BluetoothAdapterState.on).first.fbmTimeout(timeout, "turnOn");
     }
   }
 
@@ -310,7 +310,7 @@ class FlutterBlueMax {
         withServiceData.isNotEmpty;
 
     // Note: `withKeywords` is not compatible with other filters on android
-    // because it is implemented in custom fbp code, not android code, and the
+    // because it is implemented in custom FBM code, not android code, and the
     // android 'name' filter is only available as of android sdk 33 (August 2022)
     assert(!(!kIsWeb && Platform.isAndroid && withKeywords.isNotEmpty && hasOtherFilter),
         "withKeywords is not compatible with other filters on Android");
@@ -429,7 +429,7 @@ class FlutterBlueMax {
       if (isScanningNow) {
         await _stopScan();
       } else if (_logLevel.index >= LogLevel.info.index) {
-        FlutterBlueMaxPlatform.log("[FBP] stopScan: already stopped");
+        FlutterBlueMaxPlatform.log("[FBM] stopScan: already stopped");
       }
     } finally {
       mtx.give();
@@ -469,7 +469,7 @@ class FlutterBlueMax {
   static Future<PhySupport> getPhySupport() async {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "getPhySupport", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "getPhySupport", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     return await _invokeMethod(() => FlutterBlueMaxPlatform.instance.getPhySupport(PhySupportRequest()));
@@ -523,7 +523,7 @@ class FlutterBlueMax {
     // check platform support
     if (kIsWeb) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "listenL2capChannel", FbpErrorCode.applePlatformOnly.index, "not supported on web");
+          ErrorPlatform.fbm, "listenL2capChannel", FbmErrorCode.applePlatformOnly.index, "not supported on web");
     }
 
     // the timeout is applied inside _invokeMethod so that a platform call that
@@ -532,7 +532,7 @@ class FlutterBlueMax {
         .listenL2CapChannel(
           ListenL2CapChannelRequest(secure: secure),
         )
-        .fbpTimeout(timeout, "listenL2capChannel"));
+        .fbmTimeout(timeout, "listenL2capChannel"));
   }
 
   /// Stops the L2CAP server listening on the specified PSM.
@@ -570,7 +570,7 @@ class FlutterBlueMax {
     // check platform support
     if (kIsWeb) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "stopL2capServer", FbpErrorCode.applePlatformOnly.index, "not supported on web");
+          ErrorPlatform.fbm, "stopL2capServer", FbmErrorCode.applePlatformOnly.index, "not supported on web");
     }
 
     await _invokeMethod(() => FlutterBlueMaxPlatform.instance.stopL2capServer(
@@ -603,7 +603,7 @@ class FlutterBlueMax {
           for (DeviceIdentifier d in _autoConnect) {
             BluetoothDevice(remoteId: d).connect(autoConnect: true, mtu: null).onError((e, s) {
               if (logLevel != LogLevel.none) {
-                FlutterBlueMaxPlatform.log("[FBP] [AutoConnect] connection failed: $e");
+                FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
               }
             });
           }
@@ -631,7 +631,7 @@ class FlutterBlueMax {
           _deviceSubscriptions[r.remoteId]?.forEach((s) => s.cancel());
           _deviceSubscriptions.remove(r.remoteId);
 
-          // Note: to make FBP easier to use, we do not clear `knownServices`,
+          // Note: to make FBM easier to use, we do not clear `knownServices`,
           // otherwise `servicesList` would be more annoying to use. We also
           // do not clear `bondState`, for faster performance.
 
@@ -642,7 +642,7 @@ class FlutterBlueMax {
                 var d = BluetoothDevice(remoteId: r.remoteId);
                 d.connect(autoConnect: true, mtu: null).onError((e, s) {
                   if (logLevel != LogLevel.none) {
-                    FlutterBlueMaxPlatform.log("[FBP] [AutoConnect] connection failed: $e");
+                    FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
                   }
                 });
               }
@@ -785,7 +785,7 @@ class FlutterBlueMax {
 
     // only wait if bluetooth was on
     if (changed) {
-      await futureResponse.fbpTimeout(timeout, "turnOff");
+      await futureResponse.fbmTimeout(timeout, "turnOff");
     }
   }
 
@@ -958,11 +958,14 @@ class AdvertisementData {
 }
 
 enum ErrorPlatform {
-  fbp,
+  fbm,
   android,
   apple,
   linux,
-  web,
+  web;
+
+  @Deprecated('Use fbm instead')
+  static const ErrorPlatform fbp = fbm;
 }
 
 final ErrorPlatform _nativeError = (() {
@@ -975,11 +978,14 @@ final ErrorPlatform _nativeError = (() {
   } else if (Platform.isLinux) {
     return ErrorPlatform.linux;
   } else {
-    return ErrorPlatform.fbp;
+    return ErrorPlatform.fbm;
   }
 })();
 
-enum FbpErrorCode {
+@Deprecated('Use FbmErrorCode instead')
+typedef FbpErrorCode = FbmErrorCode;
+
+enum FbmErrorCode {
   success,
   timeout,
   androidOnly,

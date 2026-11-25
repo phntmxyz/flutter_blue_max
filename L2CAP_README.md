@@ -304,10 +304,10 @@ try {
 } catch (e) {
   if (e is FlutterBlueMaxException) {
     switch (e.errorCode) {
-      case FbpErrorCode.deviceIsDisconnected.index:
+      case FbmErrorCode.deviceIsDisconnected.index:
         print('Device not connected');
         break;
-      case FbpErrorCode.applePlatformOnly.index:
+      case FbmErrorCode.applePlatformOnly.index:
         print('L2CAP not supported on this platform');
         break;
       default:
