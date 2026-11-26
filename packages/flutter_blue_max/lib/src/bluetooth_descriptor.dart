@@ -185,8 +185,6 @@ class BluetoothDescriptor {
     } finally {
       mtx.give();
     }
-
-    return Future.value();
   }
 
   @override

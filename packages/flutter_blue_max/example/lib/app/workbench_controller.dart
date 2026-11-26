@@ -1006,7 +1006,6 @@ class _CharacteristicValue(BluetoothCharacteristic characteristic, void Function
 /// Identifies an operation for [WorkbenchController.run] and [WorkbenchController.busy].
 /// Operations with a [scope], such as one channel, run independently of each other.
 class const Operation._(final _OperationKind _kind, [final Object? scope, final String? _detail]) {
-
   new rssi(BluetoothDevice device) : this._(_OperationKind.rssi, device.remoteId);
   new channel(ChannelSession session) : this._(_OperationKind.channel, session.key);
   new characteristic(BluetoothCharacteristic c)

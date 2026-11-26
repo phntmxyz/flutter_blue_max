@@ -6,7 +6,6 @@ import "package:flutter_blue_max/flutter_blue_max.dart";
 /// A service name and its known characteristics.
 /// A [test] service must contain every listed characteristic with exactly its properties.
 class KnownService(Guid uuid, final String name, List<KnownCharacteristic> characteristics, {final bool test = false}) {
-
   /// Throws a [FormatException] for stored data that no longer describes a service.
   factory fromJson(Map<String, dynamic> json) => KnownService.fromPick(pick(json).required());
 
@@ -104,7 +103,6 @@ enum GattProperty(final String label) {
 
 /// A characteristic name and, for test services, the exact properties it must report.
 class KnownCharacteristic(Guid uuid, final String name, {Set<GattProperty>? properties}) {
-
   /// Throws a [FormatException] for stored data that no longer describes a characteristic.
   factory fromJson(Map<String, dynamic> json) => KnownCharacteristic.fromPick(pick(json).required());
 
