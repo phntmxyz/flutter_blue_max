@@ -1,4 +1,4 @@
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 extension AddOrUpdate<T> on List<T> {
   /// add an item to a list, or update item if it already exists
@@ -82,15 +82,15 @@ extension FutureTimeout<T> on Future<T> {
     return completer.future;
   }
 
-  @Deprecated('Use fbmTimeout instead')
+  @Deprecated("Use fbmTimeout instead")
   Future<T> fbpTimeout(int seconds, String function) => fbmTimeout(seconds, function);
 
-  @Deprecated('Use fbmEnsureDeviceIsConnected instead')
+  @Deprecated("Use fbmEnsureDeviceIsConnected instead")
   Future<T> fbpEnsureDeviceIsConnected(BluetoothDevice device, String function) {
     return fbmEnsureDeviceIsConnected(device, function);
   }
 
-  @Deprecated('Use fbmEnsureAdapterIsOn instead')
+  @Deprecated("Use fbmEnsureAdapterIsOn instead")
   Future<T> fbpEnsureAdapterIsOn(String function) => fbmEnsureAdapterIsOn(function);
 }
 

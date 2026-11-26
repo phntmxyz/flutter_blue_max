@@ -8,7 +8,7 @@ class Guid {
 
   Guid.empty() : bytes = List.filled(16, 0);
 
-  Guid.fromBytes(this.bytes) : assert(_checkLen(bytes.length), 'GUID must be 16, 32, or 128 bit.');
+  Guid.fromBytes(this.bytes) : assert(_checkLen(bytes.length), "GUID must be 16, 32, or 128 bit.");
 
   Guid.fromString(String input) : bytes = _toBytes(input);
   final List<int> bytes;
@@ -26,7 +26,7 @@ class Guid {
       return List.filled(16, 0);
     }
 
-    final String hex = input.replaceAll('-', '');
+    final String hex = input.replaceAll("-", "");
 
     final List<int>? bytes = _tryHexDecode(hex);
     if (bytes == null) {
@@ -49,11 +49,11 @@ class Guid {
   String get str128 {
     if (bytes.length == 2) {
       // 16-bit uuid
-      return '0000${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb'.toLowerCase();
+      return "0000${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb".toLowerCase();
     }
     if (bytes.length == 4) {
       // 32-bit uuid
-      return '${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb'.toLowerCase();
+      return "${_hexEncode(bytes)}-0000-1000-8000-00805f9b34fb".toLowerCase();
     }
     // 128-bit uuid
     final String one = _hexEncode(bytes.sublist(0, 4));
@@ -66,8 +66,8 @@ class Guid {
 
   // shortest representation
   String get str {
-    final bool starts = str128.startsWith('0000');
-    final bool ends = str128.contains('-0000-1000-8000-00805f9b34fb');
+    final bool starts = str128.startsWith("0000");
+    final bool ends = str128.contains("-0000-1000-8000-00805f9b34fb");
     if (starts && ends) {
       // 16-bit
       return str128.substring(4, 8);
@@ -89,15 +89,15 @@ class Guid {
   @override
   int get hashCode => str128.hashCode;
 
-  @Deprecated('use str128 instead')
+  @Deprecated("use str128 instead")
   String get uuid128 => str128;
 
-  @Deprecated('use str instead')
+  @Deprecated("use str instead")
   String get uuid => str;
 }
 
 String _hexEncode(List<int> numbers) {
-  return numbers.map((n) => (n & 0xFF).toRadixString(16).padLeft(2, '0')).join();
+  return numbers.map((n) => (n & 0xFF).toRadixString(16).padLeft(2, "0")).join();
 }
 
 List<int>? _tryHexDecode(String hex) {

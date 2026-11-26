@@ -1,13 +1,13 @@
-import 'dart:async';
-import 'dart:convert';
+import "dart:async";
+import "dart:convert";
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter/services.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
 
 final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   @visibleForTesting
-  final methodChannel = const MethodChannel('flutter_blue_max/methods');
+  final methodChannel = const MethodChannel("flutter_blue_max/methods");
 
   Future<void>? _restartHandshake;
   var _logLevel = LogLevel.none;
@@ -113,7 +113,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmConnectRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'connect',
+          "connect",
           request.toMap(),
         ) ==
         true;
@@ -124,7 +124,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmDisconnectRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'disconnect',
+          "disconnect",
           request.remoteId.str,
         ) ==
         true;
@@ -135,7 +135,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmDiscoverServicesRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'discoverServices',
+          "discoverServices",
           request.remoteId.str,
         ) ==
         true;
@@ -147,7 +147,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   ) async {
     return BmBluetoothAdapterName(
       adapterName: await _invokeMethod(
-        'getAdapterName',
+        "getAdapterName",
       ) as String,
     );
   }
@@ -158,7 +158,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   ) async {
     return BmBluetoothAdapterState.fromMap(
       await _invokeMethod(
-        'getAdapterState',
+        "getAdapterState",
       ) as Map<dynamic, dynamic>,
     );
   }
@@ -169,7 +169,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   ) async {
     return BmDevicesList.fromMap(
       await _invokeMethod(
-        'getSystemDevices',
+        "getSystemDevices",
         request.toMap(),
       ) as Map<dynamic, dynamic>,
     );
@@ -180,7 +180,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmIsSupportedRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'isSupported',
+          "isSupported",
         ) ==
         true;
   }
@@ -190,7 +190,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmReadCharacteristicRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'readCharacteristic',
+          "readCharacteristic",
           request.toMap(),
         ) ==
         true;
@@ -201,7 +201,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmReadDescriptorRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'readDescriptor',
+          "readDescriptor",
           request.toMap(),
         ) ==
         true;
@@ -212,7 +212,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmReadRssiRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'readRssi',
+          "readRssi",
           request.remoteId.str,
         ) ==
         true;
@@ -226,7 +226,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     _logColor = request.logColor;
 
     return await _invokeMethod<bool>(
-          'setLogLevel',
+          "setLogLevel",
           request.logLevel.index,
         ) ==
         true;
@@ -237,7 +237,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmSetNotifyValueRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'setNotifyValue',
+          "setNotifyValue",
           request.toMap(),
         ) ==
         true;
@@ -248,7 +248,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmSetOptionsRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'setOptions',
+          "setOptions",
           request.toMap(),
         ) ==
         true;
@@ -259,7 +259,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmScanSettings request,
   ) async {
     return await _invokeMethod<bool>(
-          'startScan',
+          "startScan",
           request.toMap(),
         ) ==
         true;
@@ -270,7 +270,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmStopScanRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'stopScan',
+          "stopScan",
         ) ==
         true;
   }
@@ -279,7 +279,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   Future<bool> turnOn(
     BmTurnOnRequest request,
   ) {
-    return Future.error(UnsupportedError('iOS and macOS do not let apps turn Bluetooth on'));
+    return Future.error(UnsupportedError("iOS and macOS do not let apps turn Bluetooth on"));
   }
 
   @override
@@ -287,7 +287,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmWriteCharacteristicRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'writeCharacteristic',
+          "writeCharacteristic",
           request.toMap(),
         ) ==
         true;
@@ -298,7 +298,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     BmWriteDescriptorRequest request,
   ) async {
     return await _invokeMethod<bool>(
-          'writeDescriptor',
+          "writeDescriptor",
           request.toMap(),
         ) ==
         true;
@@ -308,29 +308,29 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   Future<void> closeL2CapChannel(
     CloseL2CapChannelRequest request,
   ) async {
-    await _invokeMethod('closeL2CapChannel', request.toMap());
+    await _invokeMethod("closeL2CapChannel", request.toMap());
   }
 
   @override
   Future<int> listenL2CapChannel(
     ListenL2CapChannelRequest request,
   ) async {
-    final result = await _invokeMethod('listenL2CapChannel', request.toMap());
-    return result is Map ? (result['psm'] as int? ?? 4097) : 4097;
+    final result = await _invokeMethod("listenL2CapChannel", request.toMap());
+    return result is Map ? (result["psm"] as int? ?? 4097) : 4097;
   }
 
   @override
   Future<void> openL2CapChannel(
     OpenL2CapChannelRequest request,
   ) async {
-    return await _invokeMethod('openL2CapChannel', request.toMap());
+    return await _invokeMethod("openL2CapChannel", request.toMap());
   }
 
   @override
   Future<List<int>> readL2CapChannel(
     ReadL2CapChannelRequest request,
   ) async {
-    final result = await _invokeMethod('readL2CapChannel', request.toMap());
+    final result = await _invokeMethod("readL2CapChannel", request.toMap());
     // iOS returns raw bytes (NSData -> Uint8List), Android returns a Map
     if (result is List) {
       return List<int>.from(result);
@@ -344,14 +344,14 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   Future<void> stopL2capServer(
     StopListenL2CapChannelRequest request,
   ) async {
-    return await _invokeMethod('stopL2capServer', request.toMap());
+    return await _invokeMethod("stopL2capServer", request.toMap());
   }
 
   @override
   Future<void> writeL2CapChannel(
     WriteL2CapChannelRequest request,
   ) async {
-    await _invokeMethod('writeL2CapChannel', request.toMap());
+    await _invokeMethod("writeL2CapChannel", request.toMap());
   }
 
   Future<T?> _invokeMethod<T>(
@@ -367,7 +367,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     // first calls so no operation can race the old native session teardown.
     // Options and logging must be delivered before the handshake creates a
     // CBCentralManager, otherwise options such as restoreState are too late.
-    if (method != 'setOptions' && method != 'setLogLevel') {
+    if (method != "setOptions" && method != "setLogLevel") {
       final handshake = _restartHandshake ??= _drainOldSession();
       try {
         await handshake;
@@ -383,11 +383,11 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
 
     // log args
     if (_logLevel == LogLevel.verbose) {
-      var func = '<$method>';
+      var func = "<$method>";
       var args = arguments.toString();
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      args = _logColor ? '\x1B[1;35m$args\x1B[0m' : args;
-      FlutterBlueMaxPlatform.log('[FBM] $func args: $args');
+      func = _logColor ? "\x1B[1;30m$func\x1B[0m" : func;
+      args = _logColor ? "\x1B[1;35m$args\x1B[0m" : args;
+      FlutterBlueMaxPlatform.log("[FBM] $func args: $args");
     }
 
     // invoke
@@ -395,11 +395,11 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
 
     // log result
     if (_logLevel == LogLevel.verbose) {
-      var func = '($method)';
+      var func = "($method)";
       var result = out.toString();
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      result = _logColor ? '\x1B[1;33m$result\x1B[0m' : result;
-      FlutterBlueMaxPlatform.log('[FBM] $func result: $result');
+      func = _logColor ? "\x1B[1;30m$func\x1B[0m" : func;
+      result = _logColor ? "\x1B[1;33m$result\x1B[0m" : result;
+      FlutterBlueMaxPlatform.log("[FBM] $func result: $result");
     }
 
     return out;
@@ -410,17 +410,17 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     const timeout = Duration(seconds: 10);
     final stopwatch = Stopwatch()..start();
 
-    var remaining = await _readRestartConnectionCount('flutterRestart');
+    var remaining = await _readRestartConnectionCount("flutterRestart");
     while (remaining != 0) {
       if (stopwatch.elapsed >= timeout) {
         throw TimeoutException(
-          'Timed out waiting for native BLE restart cleanup '
-          'or adapter initialization',
+          "Timed out waiting for native BLE restart cleanup "
+          "or adapter initialization",
           timeout,
         );
       }
       await Future<void>.delayed(pollInterval);
-      remaining = await _readRestartConnectionCount('connectedCount');
+      remaining = await _readRestartConnectionCount("connectedCount");
     }
   }
 
@@ -428,8 +428,8 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     final count = await methodChannel.invokeMethod<int>(method);
     if (count == null) {
       throw PlatformException(
-        code: 'invalidRestartCount',
-        message: 'Native $method returned no BLE restart connection count',
+        code: "invalidRestartCount",
+        message: "Native $method returned no BLE restart connection count",
       );
     }
     return count;
@@ -440,103 +440,103 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
   ) async {
     // log result
     if (_logLevel == LogLevel.verbose) {
-      var func = '[[ ${call.method} ]]';
+      var func = "[[ ${call.method} ]]";
       var result = switch (call.method) {
-        'OnDiscoveredServices' => _prettyPrint(call.arguments),
+        "OnDiscoveredServices" => _prettyPrint(call.arguments),
         _ => call.arguments.toString(),
       };
-      func = _logColor ? '\x1B[1;30m$func\x1B[0m' : func;
-      result = _logColor ? '\x1B[1;33m$result\x1B[0m' : result;
-      FlutterBlueMaxPlatform.log('[FBM] $func result: $result');
+      func = _logColor ? "\x1B[1;30m$func\x1B[0m" : func;
+      result = _logColor ? "\x1B[1;33m$result\x1B[0m" : result;
+      FlutterBlueMaxPlatform.log("[FBM] $func result: $result");
     }
 
     // handle method call
     switch (call.method) {
-      case 'OnAdapterStateChanged':
+      case "OnAdapterStateChanged":
         return _onAdapterStateChangedController.add(
           BmBluetoothAdapterState.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnCharacteristicReceived':
+      case "OnCharacteristicReceived":
         return _onCharacteristicReceivedController.add(
           BmCharacteristicData.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnCharacteristicWritten':
+      case "OnCharacteristicWritten":
         return _onCharacteristicWrittenController.add(
           BmCharacteristicData.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnConnectionStateChanged':
+      case "OnConnectionStateChanged":
         return _onConnectionStateChangedController.add(
           BmConnectionStateResponse.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnDescriptorRead':
+      case "OnDescriptorRead":
         return _onDescriptorReadController.add(
           BmDescriptorData.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnDescriptorWritten':
+      case "OnDescriptorWritten":
         return _onDescriptorWrittenController.add(
           BmDescriptorData.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnDiscoveredServices':
+      case "OnDiscoveredServices":
         return _onDiscoveredServicesController.add(
           BmDiscoverServicesResult.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnMtuChanged':
+      case "OnMtuChanged":
         return _onMtuChangedController.add(
           BmMtuChangedResponse.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnNameChanged':
+      case "OnNameChanged":
         return _onNameChangedController.add(
           BmNameChanged.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnReadRssi':
+      case "OnReadRssi":
         return _onReadRssiController.add(
           BmReadRssiResult.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnScanResponse':
+      case "OnScanResponse":
         return _onScanResponseController.add(
           BmScanResponse.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnServicesReset':
+      case "OnServicesReset":
         return _onServicesResetController.add(
           BmBluetoothDevice.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnL2CapChannelReceived':
+      case "OnL2CapChannelReceived":
         return _onL2CapChannelReceivedController.add(
           L2CapChannelData.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnL2CapChannelClosed':
+      case "OnL2CapChannelClosed":
         return _onL2CapChannelClosedController.add(
           L2CapChannelClosed.fromMap(
             call.arguments as Map<dynamic, dynamic>,
           ),
         );
-      case 'OnL2CapChannelConnected':
+      case "OnL2CapChannelConnected":
         return _onL2CapChannelConnectedController.add(
           L2CapChannelConnected.fromMap(
             call.arguments as Map<dynamic, dynamic>,
@@ -549,7 +549,7 @@ final class FlutterBlueMaxDarwin extends FlutterBlueMaxPlatform {
     dynamic data,
   ) {
     if (data is Map || data is List) {
-      return const JsonEncoder.withIndent('  ').convert(data);
+      return const JsonEncoder.withIndent("  ").convert(data);
     } else {
       return data.toString();
     }

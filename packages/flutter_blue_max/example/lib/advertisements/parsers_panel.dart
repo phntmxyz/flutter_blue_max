@@ -1,16 +1,16 @@
-import 'dart:developer' as developer;
+import "dart:developer" as developer;
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_files.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/shared/json_files.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
-import 'package:flutter_blue_max_example/shared/prompts.dart';
-import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/advertisements/parser_editor_page.dart";
+import "package:flutter_blue_max_example/advertisements/parser_examples.dart";
+import "package:flutter_blue_max_example/advertisements/parser_files.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/shared/json_files.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
+import "package:flutter_blue_max_example/shared/prompts.dart";
+import "package:flutter_blue_max_example/shared/selection_dialog.dart";
 
 /// Parsers section of `LibraryPanel`.
 /// Manages every saved parser, including those bound to devices that are not nearby.
@@ -22,11 +22,11 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('Advertisement parsers', style: Theme.of(context).textTheme.headlineMedium),
+        Text("Advertisement parsers", style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const Text(
-          'Parsers read named values from manufacturer or service data and are saved on this device. '
-          'Values appear in a device’s advertisement and tracker history.',
+          "Parsers read named values from manufacturer or service data and are saved on this device. "
+          "Values appear in a device’s advertisement and tracker history.",
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -36,17 +36,17 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
             FilledButton.icon(
               onPressed: () => ParserEditorPage.open(context),
               icon: const Icon(Icons.add),
-              label: const Text('Add parser'),
+              label: const Text("Add parser"),
             ),
             OutlinedButton.icon(
               onPressed: () => c.addParsers(testDongleParsers),
               icon: const Icon(Icons.restore),
-              label: const Text('Add test dongle parsers'),
+              label: const Text("Add test dongle parsers"),
             ),
             OutlinedButton.icon(
               onPressed: () => _import(context),
               icon: const Icon(Icons.file_open_outlined),
-              label: const Text('Import'),
+              label: const Text("Import"),
             ),
             Builder(
               // The share sheet on iPad anchors to this button.
@@ -54,20 +54,20 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
                 return OutlinedButton.icon(
                   onPressed: c.parsers.isEmpty ? null : () => _export(button),
                   icon: const Icon(Icons.save_alt),
-                  label: const Text('Export'),
+                  label: const Text("Export"),
                 );
               },
             ),
             TextButton.icon(
               onPressed: () => _reset(context),
               icon: const Icon(Icons.restart_alt),
-              label: const Text('Reset parsers'),
+              label: const Text("Reset parsers"),
             ),
           ],
         ),
         const SizedBox(height: 20),
         if (c.parsers.isEmpty)
-          const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text('No parsers yet.')),
+          const Padding(padding: EdgeInsets.symmetric(vertical: 20), child: Text("No parsers yet.")),
         for (final parser in c.parsers)
           Card(
             margin: const EdgeInsets.only(bottom: 10),
@@ -75,19 +75,19 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
               contentPadding: const EdgeInsets.fromLTRB(16, 8, 8, 8),
               title: Text(parser.name),
               subtitle: Text(
-                [parser.summary, for (final field in parser.fields) field.summary(parser.records)].join('\n'),
+                [parser.summary, for (final field in parser.fields) field.summary(parser.records)].join("\n"),
               ),
               isThreeLine: true,
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   IconButton(
-                    tooltip: 'Edit parser',
+                    tooltip: "Edit parser",
                     onPressed: () => ParserEditorPage.open(context, previous: parser),
                     icon: const Icon(Icons.edit_outlined),
                   ),
                   IconButton(
-                    tooltip: 'Remove parser',
+                    tooltip: "Remove parser",
                     onPressed: () => c.remove(parser),
                     icon: const Icon(Icons.delete_outline),
                   ),
@@ -106,7 +106,7 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
       parsers = await openParserFile();
     } on Exception catch (exception, stackTrace) {
       if (exception is! FormatException) {
-        developer.log('Import parsers failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+        developer.log("Import parsers failed", name: "workbench", error: exception, stackTrace: stackTrace);
       }
       if (context.mounted) {
         tell(
@@ -120,10 +120,10 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
       return;
     }
     if (parsers.isEmpty) {
-      tell(context, 'The file holds no parsers.');
+      tell(context, "The file holds no parsers.");
       return;
     }
-    final chosen = await _choose(context, title: 'Import parsers', action: 'Import', parsers: parsers);
+    final chosen = await _choose(context, title: "Import parsers", action: "Import", parsers: parsers);
     if (chosen == null) {
       return;
     }
@@ -137,9 +137,9 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
       tell(
         context,
         [
-          'Imported ${counted(added, parserNoun)}',
+          "Imported ${counted(added, parserNoun)}",
           if (present > 0) '${present == 1 ? '1 was' : '$present were'} already present',
-        ].join(', '),
+        ].join(", "),
       );
     }
   }
@@ -147,8 +147,8 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
   Future<void> _export(BuildContext button) async {
     final chosen = await _choose(
       button,
-      title: 'Export parsers',
-      action: 'Export',
+      title: "Export parsers",
+      action: "Export",
       parsers: parserLibraryRef.of(button).parsers,
     );
     if (chosen == null || !button.mounted) {
@@ -164,17 +164,17 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
       if (button.mounted) {
         switch (outcome) {
           case ExportOutcome.saved:
-            tell(button, 'Exported ${counted(chosen.length, parserNoun)}');
+            tell(button, "Exported ${counted(chosen.length, parserNoun)}");
           case ExportOutcome.unconfirmed:
-            tell(button, 'The share sheet could not confirm that the file was exported.');
+            tell(button, "The share sheet could not confirm that the file was exported.");
           case ExportOutcome.cancelled:
             break;
         }
       }
     } on Exception catch (exception, stackTrace) {
-      developer.log('Export parsers failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      developer.log("Export parsers failed", name: "workbench", error: exception, stackTrace: stackTrace);
       if (button.mounted) {
-        tell(button, 'Export failed: $exception');
+        tell(button, "Export failed: $exception");
       }
     }
   }
@@ -183,9 +183,9 @@ class const ParsersPanel({super.key, final ShareFile? shareFile}) extends Statel
     final controller = parserLibraryRef.of(context);
     final confirmed = await confirm(
       context,
-      title: 'Reset parsers?',
-      message: 'Every parser is replaced with the test dongle parsers. Export your own parsers first to keep them.',
-      action: 'Reset',
+      title: "Reset parsers?",
+      message: "Every parser is replaced with the test dongle parsers. Export your own parsers first to keep them.",
+      action: "Reset",
     );
     if (confirmed) {
       await controller.reset();

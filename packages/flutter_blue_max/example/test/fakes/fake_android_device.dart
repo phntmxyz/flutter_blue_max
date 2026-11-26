@@ -1,6 +1,6 @@
-import 'dart:typed_data';
+import "dart:typed_data";
 
-import 'package:flutter_blue_max/flutter_blue_max.dart';
+import "package:flutter_blue_max/flutter_blue_max.dart";
 
 /// Replaces only the Android-only operations that dart:io blocks on the VM test host.
 /// Connection state and all other operations still use the real plugin and fake platform.

@@ -1,19 +1,19 @@
-import 'dart:async';
-import 'dart:developer' as developer;
+import "dart:async";
+import "dart:developer" as developer;
 
-import 'package:clock/clock.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
-import 'package:flutter_blue_max_example/shared/persisted_library.dart';
-import 'package:flutter_blue_max_example/shared/stored_list.dart';
+import "package:clock/clock.dart";
+import "package:flutter/foundation.dart";
+import "package:flutter/services.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_tracker.dart";
+import "package:flutter_blue_max_example/advertisements/parser_library.dart";
+import "package:flutter_blue_max_example/gatt/gatt_catalog_library.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/l2cap/channel_session.dart";
+import "package:flutter_blue_max_example/shared/payload_codec.dart";
+import "package:flutter_blue_max_example/shared/persisted_library.dart";
+import "package:flutter_blue_max_example/shared/stored_list.dart";
 
 /// Owns the example's Bluetooth session across navigation and device selection.
 /// The package remains responsible for platform I/O and operation serialization.
@@ -70,7 +70,7 @@ class WorkbenchController({
   bool scanning = false;
   int? serverPsm;
   String? error;
-  String query = '';
+  String query = "";
   int? rssi;
   int? mtu;
 
@@ -195,8 +195,8 @@ class WorkbenchController({
     final search = query.trim().toLowerCase();
     return scanResults.where((result) {
       final searchable =
-          '${nameOf(result.device)} ${result.device.remoteId} '
-                  '${result.advertisementData.advName} ${result.advertisementData.serviceUuids}'
+          "${nameOf(result.device)} ${result.device.remoteId} "
+                  "${result.advertisementData.advName} ${result.advertisementData.serviceUuids}"
               .toLowerCase();
       return searchable.contains(search);
     }).toList();
@@ -210,7 +210,7 @@ class WorkbenchController({
     final advertised = scanResults
         .where((r) => r.device == device && r.advertisementData.advName.isNotEmpty)
         .firstOrNull;
-    return advertised?.advertisementData.advName ?? 'Unnamed device';
+    return advertised?.advertisementData.advName ?? "Unnamed device";
   }
 
   /// Starts once, subscribing to plugin events and loading the saved parser/catalog libraries.
@@ -253,7 +253,7 @@ class WorkbenchController({
       final channel = BluetoothL2capChannel(deviceId: event.remoteId, psm: event.psm);
       if (event.psm == serverPsm || _startingServer) {
         _trackChannel(channel, incoming: true);
-        log('L2CAP accepted ${event.remoteId} / PSM ${event.psm}');
+        log("L2CAP accepted ${event.remoteId} / PSM ${event.psm}");
       } else {
         unawaited(_closeUnownedChannel(channel));
       }
@@ -266,8 +266,8 @@ class WorkbenchController({
         }
         session.onStreamed(event.value);
         log(
-          'RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · '
-          '${PayloadCodec.hex(event.value.take(64).toList())}',
+          "RX ${event.remoteId} / ${event.psm} · ${event.value.length} B · "
+          "${PayloadCodec.hex(event.value.take(64).toList())}",
         );
       }),
     );
@@ -275,7 +275,7 @@ class WorkbenchController({
       FlutterBlueMax.onL2capClosed.listen((event) {
         _channels[(event.remoteId, event.psm)]?.markClosed();
         _retireIdlePeer(event.remoteId);
-        log('L2CAP closed ${event.remoteId} / PSM ${event.psm}');
+        log("L2CAP closed ${event.remoteId} / PSM ${event.psm}");
       }),
     );
     await run(Operation.initialize, () async {
@@ -314,7 +314,7 @@ class WorkbenchController({
     error = problem.message;
     log(problem.activity, severity: ActivitySeverity.error);
     if (problem.stackTrace != null) {
-      developer.log(problem.activity, name: 'workbench', error: problem.error, stackTrace: problem.stackTrace);
+      developer.log(problem.activity, name: "workbench", error: problem.error, stackTrace: problem.stackTrace);
     }
   }
 
@@ -327,8 +327,8 @@ class WorkbenchController({
     try {
       localName = (await FlutterBlueMax.adapterName).trim();
     } catch (exception, stackTrace) {
-      log('Local device name: $exception');
-      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      log("Local device name: $exception");
+      developer.log("Bluetooth operation failed", name: "workbench", error: exception, stackTrace: stackTrace);
     }
     _update();
   }
@@ -344,7 +344,7 @@ class WorkbenchController({
       subscriptions.add(
         device.onServicesReset.listen((_) {
           _invalidateServices(device.remoteId);
-          log('Services changed on ${nameOf(device)}. Discover services again.');
+          log("Services changed on ${nameOf(device)}. Discover services again.");
         }),
       );
       // The stream first replays the cached state, which is `disconnected` for peers never connected over GATT.
@@ -366,7 +366,7 @@ class WorkbenchController({
             mtu = device.mtuNow;
           }
           log(
-            '${nameOf(device)}: ${state.name}'
+            "${nameOf(device)}: ${state.name}"
             '${state == BluetoothConnectionState.disconnected ? ' · ${device.disconnectReason}' : ''}',
           );
           if (state == BluetoothConnectionState.connected && selected == device) {
@@ -453,7 +453,7 @@ class WorkbenchController({
         timeout: const Duration(seconds: 15),
         androidUsesFineLocation: true,
         // Preserve the original example's browser service permissions.
-        webOptionalServices: [Guid('180f'), Guid('180a'), Guid('1800'), Guid('6e400001-b5a3-f393-e0a9-e50e24dcca9e')],
+        webOptionalServices: [Guid("180f"), Guid("180a"), Guid("1800"), Guid("6e400001-b5a3-f393-e0a9-e50e24dcca9e")],
       ),
     );
   });
@@ -467,7 +467,7 @@ class WorkbenchController({
   /// Reports every advertisement of one peer until stopped, replacing any running scan.
   Future<void> trackAdvertisements(BluetoothDevice device) => run(Operation.scan, () async {
     if (!supportsAdvertisementTracking) {
-      throw const _Unsupported('Continuous per-peer advertisements are unavailable.');
+      throw const _Unsupported("Continuous per-peer advertisements are unavailable.");
     }
     if (scanning) {
       await FlutterBlueMax.stopScan();
@@ -493,7 +493,7 @@ class WorkbenchController({
       _trackingScan = false;
       rethrow;
     }
-    log('Tracking advertisements of ${nameOf(device)}');
+    log("Tracking advertisements of ${nameOf(device)}");
   });
 
   Future<void> _startOwnedScan(Future<void> Function() start) async {
@@ -517,7 +517,7 @@ class WorkbenchController({
   });
 
   Future<void> refreshSystemDevices() => run(Operation.systemDevices, () async {
-    systemDevices = await FlutterBlueMax.systemDevices([Guid('180f')]);
+    systemDevices = await FlutterBlueMax.systemDevices([Guid("180f")]);
   });
 
   Future<void> connect() => run(Operation.connection, () async {
@@ -574,7 +574,7 @@ class WorkbenchController({
       return;
     }
     _services[remoteId] = List.unmodifiable(result);
-    log('${result.length} services discovered on ${nameOf(device)}');
+    log("${result.length} services discovered on ${nameOf(device)}");
     await _readUserDescriptions(device, result, generation);
   });
 
@@ -595,8 +595,8 @@ class WorkbenchController({
       try {
         await descriptor.read();
       } catch (exception, stackTrace) {
-        log('User description of ${descriptor.characteristicUuid}: $exception');
-        developer.log('Read user description failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+        log("User description of ${descriptor.characteristicUuid}: $exception");
+        developer.log("Read user description failed", name: "workbench", error: exception, stackTrace: stackTrace);
       }
       _update();
     }
@@ -609,8 +609,8 @@ class WorkbenchController({
     try {
       await _refreshRssi(device);
     } catch (exception, stackTrace) {
-      log('Automatic RSSI read failed: $exception', severity: ActivitySeverity.error);
-      developer.log('Automatic RSSI read failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      log("Automatic RSSI read failed: $exception", severity: ActivitySeverity.error);
+      developer.log("Automatic RSSI read failed", name: "workbench", error: exception, stackTrace: stackTrace);
     }
   }
 
@@ -639,7 +639,7 @@ class WorkbenchController({
 
   Future<void> startServer({required bool secure}) => _runServer(() async {
     if (!supportsL2cap) {
-      throw const _Unsupported('L2CAP is not available on this platform.');
+      throw const _Unsupported("L2CAP is not available on this platform.");
     }
     if (serverPsm != null) {
       return;
@@ -674,14 +674,14 @@ class WorkbenchController({
       }
       _update();
     } catch (exception, stackTrace) {
-      developer.log('Closing late L2CAP accept', name: 'workbench', error: exception, stackTrace: stackTrace);
+      developer.log("Closing late L2CAP accept", name: "workbench", error: exception, stackTrace: stackTrace);
       if (_disposed) {
         return;
       }
       // Keep a failed native close reachable through the card's Close action.
       _trackChannel(channel, incoming: true);
-      error = 'Closing late L2CAP accept: $exception';
-      log('ERROR $error', severity: ActivitySeverity.error);
+      error = "Closing late L2CAP accept: $exception";
+      log("ERROR $error", severity: ActivitySeverity.error);
     }
   }
 
@@ -737,11 +737,11 @@ class WorkbenchController({
 
   Future<void> _openChannel(int psm, BluetoothDevice device, {required bool secure}) async {
     if (!supportsL2cap) {
-      throw const _Unsupported('L2CAP is not available on this platform.');
+      throw const _Unsupported("L2CAP is not available on this platform.");
     }
     final key = (device.remoteId, psm);
     if (_channels[key]?.closed == false) {
-      throw StateError('This peer already has a channel on PSM $psm.');
+      throw StateError("This peer already has a channel on PSM $psm.");
     }
     final disconnects = _disconnectRequests[device.remoteId] ?? 0;
     final channel = await () async {
@@ -754,8 +754,8 @@ class WorkbenchController({
         if (_disposed || !ready || userDisconnected || device.isConnected || _isUnsupported(error)) {
           Error.throwWithStackTrace(error, stackTrace);
         }
-        log('L2CAP open failed; retrying once: $error');
-        developer.log('L2CAP open failed; retrying', name: 'workbench', error: error, stackTrace: stackTrace);
+        log("L2CAP open failed; retrying once: $error");
+        developer.log("L2CAP open failed; retrying", name: "workbench", error: error, stackTrace: stackTrace);
         await device.connect(mtu: null);
         if (_disposed || !ready || (_disconnectRequests[device.remoteId] ?? 0) != disconnects) {
           Error.throwWithStackTrace(error, stackTrace);
@@ -768,15 +768,15 @@ class WorkbenchController({
       return;
     }
     _trackChannel(channel, incoming: false);
-    log('L2CAP opened ${device.remoteId} / PSM $psm');
+    log("L2CAP opened ${device.remoteId} / PSM $psm");
   }
 
   Future<void> send(ChannelSession session, List<int> bytes) => run(Operation.channel(session), () async {
     await session.channel.write(bytes);
     session.onTransmitted(bytes);
     log(
-      'TX ${session.channel.deviceId} / ${session.channel.psm} · ${bytes.length} B · '
-      '${PayloadCodec.hex(bytes.take(64).toList())}',
+      "TX ${session.channel.deviceId} / ${session.channel.psm} · ${bytes.length} B · "
+      "${PayloadCodec.hex(bytes.take(64).toList())}",
     );
   });
 
@@ -785,14 +785,14 @@ class WorkbenchController({
   Future<void> readChannel(ChannelSession session) => run(Operation.channel(session), () async {
     final bytes = await session.channel.read();
     session.onBufferRead(bytes);
-    log('Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B');
+    log("Buffer read ${session.channel.deviceId} / ${session.channel.psm}: ${bytes.length} B");
   });
 
   /// Patterned traffic exposes truncation; concurrent writes exercise native backpressure.
   Future<void> sendTestTraffic(ChannelSession session, {required int size, required int count}) =>
       run(Operation.channel(session), () async {
         if (size <= 0 || count <= 0) {
-          throw const FormatException('Payload size and write count must be positive.');
+          throw const FormatException("Payload size and write count must be positive.");
         }
         final payload = List<int>.generate(size, (i) => i & 0xff);
         var successes = 0;
@@ -805,8 +805,8 @@ class WorkbenchController({
           }),
         ).whenComplete(() {
           log(
-            'Test traffic ${session.channel.deviceId} / ${session.channel.psm}: '
-            '$successes/$count writes of $size B completed',
+            "Test traffic ${session.channel.deviceId} / ${session.channel.psm}: "
+            "$successes/$count writes of $size B completed",
           );
         });
       });
@@ -825,8 +825,8 @@ class WorkbenchController({
       session.markClosed();
       unawaited(
         session.channel.close().catchError((Object exception, StackTrace stackTrace) {
-          log('L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception');
-          developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+          log("L2CAP close after link loss ${session.channel.deviceId} / ${session.channel.psm}: $exception");
+          developer.log("Bluetooth operation failed", name: "workbench", error: exception, stackTrace: stackTrace);
         }),
       );
     }
@@ -858,12 +858,12 @@ class WorkbenchController({
       await action();
     } catch (exception, stackTrace) {
       if (_isUnsupported(exception)) {
-        error = 'This operation is not supported on this device.';
+        error = "This operation is not supported on this device.";
       } else {
-        error = '${operation.label}: $exception';
+        error = "${operation.label}: $exception";
       }
-      log('ERROR ${operation.label}: $exception', severity: ActivitySeverity.error);
-      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      log("ERROR ${operation.label}: $exception", severity: ActivitySeverity.error);
+      developer.log("Bluetooth operation failed", name: "workbench", error: exception, stackTrace: stackTrace);
     } finally {
       _busy.remove(operation);
       _update();
@@ -896,15 +896,15 @@ class WorkbenchController({
     final previous = _activity.value;
     _activity.value = List.unmodifiable([
       ...previous.skip(previous.length >= maxLogEntries ? 1 : 0),
-      ActivityEntry('${clock.now().toIso8601String()}  $message', severity: severity),
+      ActivityEntry("${clock.now().toIso8601String()}  $message", severity: severity),
     ]);
     _update();
   }
 
   void _streamError(Object exception, StackTrace stackTrace) {
     error = exception.toString();
-    log('ERROR $error', severity: ActivitySeverity.error);
-    developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+    log("ERROR $error", severity: ActivitySeverity.error);
+    developer.log("Bluetooth operation failed", name: "workbench", error: exception, stackTrace: stackTrace);
   }
 
   void _update() {
@@ -979,7 +979,7 @@ class WorkbenchController({
     try {
       await action();
     } catch (exception, stackTrace) {
-      developer.log('Bluetooth operation failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      developer.log("Bluetooth operation failed", name: "workbench", error: exception, stackTrace: stackTrace);
     }
   }
 }
@@ -1039,7 +1039,7 @@ class const Operation._(final _OperationKind _kind, [final Object? scope, final 
   static const open = Operation._(_OperationKind.open);
 
   /// Prefixes the error the operation reports.
-  String get label => _detail == null ? _kind.label : '${_kind.label} $_detail';
+  String get label => _detail == null ? _kind.label : "${_kind.label} $_detail";
 
   @override
   bool operator ==(Object other) => other is Operation && other._kind == _kind && other.scope == scope;
@@ -1049,22 +1049,22 @@ class const Operation._(final _OperationKind _kind, [final Object? scope, final 
 }
 
 enum _OperationKind(final String label) {
-  initialize('Initialize'),
-  clipboard('Copy to clipboard'),
-  scan('Scan'),
-  systemDevices('System devices'),
-  connection('Connection'),
-  cancelConnection('Cancel connection'),
-  adapter('Turn on Bluetooth'),
-  discover('Service discovery'),
-  bond('Bond'),
-  mtu('MTU request'),
-  server('L2CAP server'),
-  open('Open L2CAP channel'),
-  rssi('Read RSSI'),
-  channel('L2CAP channel'),
-  characteristic('Characteristic'),
-  descriptor('Descriptor'),
+  initialize("Initialize"),
+  clipboard("Copy to clipboard"),
+  scan("Scan"),
+  systemDevices("System devices"),
+  connection("Connection"),
+  cancelConnection("Cancel connection"),
+  adapter("Turn on Bluetooth"),
+  discover("Service discovery"),
+  bond("Bond"),
+  mtu("MTU request"),
+  server("L2CAP server"),
+  open("Open L2CAP channel"),
+  rssi("Read RSSI"),
+  channel("L2CAP channel"),
+  characteristic("Characteristic"),
+  descriptor("Descriptor"),
 }
 
 enum ActivitySeverity() {
@@ -1078,7 +1078,7 @@ class const ActivityEntry(final String text, {required final ActivitySeverity se
 /// A capability the platform lacks, as opposed to a failure of the operation.
 class const _Unsupported(final Object cause) implements Exception {
   @override
-  String toString() => '$cause';
+  String toString() => "$cause";
 }
 
 extension<T> on Future<T> {
@@ -1096,7 +1096,7 @@ bool _isUnsupported(Object exception) {
     return true;
   }
   if (exception is PlatformException) {
-    return exception.code == 'platform_not_supported';
+    return exception.code == "platform_not_supported";
   }
   return exception is FlutterBlueMaxException &&
       exception.platform == ErrorPlatform.fbm &&

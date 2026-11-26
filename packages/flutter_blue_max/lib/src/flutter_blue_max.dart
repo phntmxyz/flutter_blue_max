@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 // Platforms without an implementation throw UnimplementedError for optional calls, which is expected here.
 // ignore_for_file: avoid_catching_errors
@@ -775,7 +775,7 @@ class FlutterBlueMax {
   }
 
   /// Turn off Bluetooth (Android only),
-  @Deprecated('Deprecated in Android SDK 33 with no replacement')
+  @Deprecated("Deprecated in Android SDK 33 with no replacement")
   static Future<void> turnOff({int timeout = 10}) async {
     final responseStream =
         FlutterBlueMaxPlatform.instance.onAdapterStateChanged.where((p) => p.adapterState == BmAdapterStateEnum.off);
@@ -793,26 +793,26 @@ class FlutterBlueMax {
   }
 
   /// Checks if Bluetooth functionality is turned on
-  @Deprecated('Use adapterState.first == BluetoothAdapterState.on instead')
+  @Deprecated("Use adapterState.first == BluetoothAdapterState.on instead")
   static Future<bool> get isOn async => await adapterState.first == BluetoothAdapterState.on;
 
-  @Deprecated('Use adapterName instead')
+  @Deprecated("Use adapterName instead")
   static Future<String> get name => adapterName;
 
-  @Deprecated('Use adapterState instead')
+  @Deprecated("Use adapterState instead")
   static Stream<BluetoothAdapterState> get state => adapterState;
 
-  @Deprecated('Use systemDevices instead')
+  @Deprecated("Use systemDevices instead")
   static Future<List<BluetoothDevice>> get connectedSystemDevices => systemDevices([Guid("1800")]);
 
-  @Deprecated('No longer needed, remove this from your code')
+  @Deprecated("No longer needed, remove this from your code")
   // ignore: avoid_returning_null_for_void
   static void get instance => null;
 
-  @Deprecated('Use isSupported instead')
+  @Deprecated("Use isSupported instead")
   static Future<bool> get isAvailable async => await isSupported;
 
-  @Deprecated('removed. read MIGRATION.md for simple alternatives')
+  @Deprecated("removed. read MIGRATION.md for simple alternatives")
   static Stream<ScanResult> scan() => throw Exception;
 }
 
@@ -893,12 +893,12 @@ class ScanResult {
 
   @override
   String toString() {
-    return 'ScanResult{'
-        'device: $device, '
-        'advertisementData: $advertisementData, '
-        'rssi: $rssi, '
-        'timeStamp: $timeStamp'
-        '}';
+    return "ScanResult{"
+        "device: $device, "
+        "advertisementData: $advertisementData, "
+        "rssi: $rssi, "
+        "timeStamp: $timeStamp"
+        "}";
   }
 }
 
@@ -945,18 +945,18 @@ class AdvertisementData {
 
   @override
   String toString() {
-    return 'AdvertisementData{'
-        'advName: $advName, '
-        'txPowerLevel: $txPowerLevel, '
-        'appearance: $appearance, '
-        'connectable: $connectable, '
-        'manufacturerData: $manufacturerData, '
-        'serviceData: $serviceData, '
-        'serviceUuids: $serviceUuids'
-        '}';
+    return "AdvertisementData{"
+        "advName: $advName, "
+        "txPowerLevel: $txPowerLevel, "
+        "appearance: $appearance, "
+        "connectable: $connectable, "
+        "manufacturerData: $manufacturerData, "
+        "serviceData: $serviceData, "
+        "serviceUuids: $serviceUuids"
+        "}";
   }
 
-  @Deprecated('use advName instead')
+  @Deprecated("use advName instead")
   String get localName => advName;
 }
 
@@ -967,7 +967,7 @@ enum ErrorPlatform {
   linux,
   web;
 
-  @Deprecated('Use fbm instead')
+  @Deprecated("Use fbm instead")
   static const ErrorPlatform fbp = fbm;
 }
 
@@ -985,7 +985,7 @@ final ErrorPlatform _nativeError = (() {
   }
 })();
 
-@Deprecated('Use FbmErrorCode instead')
+@Deprecated("Use FbmErrorCode instead")
 typedef FbpErrorCode = FbmErrorCode;
 
 enum FbmErrorCode {
@@ -1020,16 +1020,16 @@ class FlutterBlueMaxException implements Exception {
 
   @override
   String toString() {
-    final String sPlatform = platform.toString().split('.').last;
-    return 'FlutterBlueMaxException | $function | $sPlatform-code: $code | $description';
+    final String sPlatform = platform.toString().split(".").last;
+    return "FlutterBlueMaxException | $function | $sPlatform-code: $code | $description";
   }
 
-  @Deprecated('Use function instead')
+  @Deprecated("Use function instead")
   String get errorName => function;
 
-  @Deprecated('Use code instead')
+  @Deprecated("Use code instead")
   int? get errorCode => code;
 
-  @Deprecated('Use description instead')
+  @Deprecated("Use description instead")
   String? get errorString => description;
 }

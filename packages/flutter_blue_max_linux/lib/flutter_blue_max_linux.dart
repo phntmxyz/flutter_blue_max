@@ -1,8 +1,8 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:bluez/bluez.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:rxdart/rxdart.dart';
+import "package:bluez/bluez.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:rxdart/rxdart.dart";
 
 final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
   final _client = BlueZClient();
@@ -28,7 +28,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
       (adapters) {
         return adapters.first.propertiesChanged.where(
           (properties) {
-            return properties.contains('Powered');
+            return properties.contains("Powered");
           },
         ).map(
           (properties) {
@@ -50,7 +50,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
             (device) {
               return device.propertiesChanged.where(
                 (properties) {
-                  return properties.contains('Paired');
+                  return properties.contains("Paired");
                 },
               ).map(
                 (properties) {
@@ -81,7 +81,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 streams.add(
                   characteristic.propertiesChanged.where(
                     (properties) {
-                      return properties.contains('Value');
+                      return properties.contains("Value");
                     },
                   ).map(
                     (properties) {
@@ -97,7 +97,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                         value: characteristic.value,
                         success: true,
                         errorCode: 0,
-                        errorString: '',
+                        errorString: "",
                       );
                     },
                   ),
@@ -126,7 +126,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
             (device) {
               return device.propertiesChanged.where(
                 (properties) {
-                  return properties.contains('Connected');
+                  return properties.contains("Connected");
                 },
               ).map(
                 (properties) {
@@ -175,7 +175,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
             (device) {
               return device.propertiesChanged.where(
                 (properties) {
-                  return properties.contains('Name');
+                  return properties.contains("Name");
                 },
               ).map(
                 (properties) {
@@ -230,7 +230,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           ],
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         );
       },
     );
@@ -245,7 +245,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
             (device) {
               return device.propertiesChanged.where(
                 (properties) {
-                  return properties.contains('UUIDs');
+                  return properties.contains("UUIDs");
                 },
               ).map(
                 (properties) {
@@ -413,7 +413,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           ).toList(),
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -425,7 +425,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           services: [],
           success: false,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -440,7 +440,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     await _initFlutterBlueMax();
 
     return BmBluetoothAdapterName(
-      adapterName: _client.adapters.firstOrNull?.name ?? '',
+      adapterName: _client.adapters.firstOrNull?.name ?? "",
     );
   }
 
@@ -577,7 +577,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           value: value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -664,7 +664,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           value: value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -708,7 +708,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           rssi: device.rssi,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -918,7 +918,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -1005,7 +1005,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -1047,7 +1047,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
       (devices) {
         if (_logLevel == LogLevel.verbose) {
           FlutterBlueMaxPlatform.log(
-            '[FBM-Linux] devices changed ${devices.map((device) => device.remoteId).toList()}',
+            "[FBM-Linux] devices changed ${devices.map((device) => device.remoteId).toList()}",
           );
         }
 
@@ -1058,7 +1058,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 (properties) {
                   if (_logLevel == LogLevel.verbose) {
                     FlutterBlueMaxPlatform.log(
-                      '[FBM-Linux] device ${device.remoteId} properties changed $properties',
+                      "[FBM-Linux] device ${device.remoteId} properties changed $properties",
                     );
                   }
 
@@ -1071,7 +1071,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                           (properties) {
                             if (_logLevel == LogLevel.verbose) {
                               FlutterBlueMaxPlatform.log(
-                                '[FBM-Linux] device ${device.remoteId} service ${service.uuid} characteristic ${characteristic.uuid} properties changed $properties',
+                                "[FBM-Linux] device ${device.remoteId} service ${service.uuid} characteristic ${characteristic.uuid} properties changed $properties",
                               );
                             }
                           },

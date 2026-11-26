@@ -1,27 +1,27 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_max_darwin/flutter_blue_max_darwin.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_test/flutter_test.dart';
+import "package:flutter/services.dart";
+import "package:flutter_blue_max_darwin/flutter_blue_max_darwin.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_test/flutter_test.dart";
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('concurrent first calls share one hot-restart handshake', () async {
+  test("concurrent first calls share one hot-restart handshake", () async {
     var restartCalls = 0;
     var supportedCalls = 0;
     final plugin = createPlugin((call) async {
       switch (call.method) {
-        case 'flutterRestart':
+        case "flutterRestart":
           restartCalls++;
           await Future<void>.delayed(const Duration(milliseconds: 10));
           return 0;
-        case 'isSupported':
+        case "isSupported":
           supportedCalls++;
           return true;
         default:
-          fail('Unexpected method ${call.method}');
+          fail("Unexpected method ${call.method}");
       }
     });
 
@@ -35,20 +35,20 @@ void main() {
     expect(supportedCalls, 2);
   });
 
-  test('a failed hot-restart handshake is retried', () async {
+  test("a failed hot-restart handshake is retried", () async {
     var restartCalls = 0;
     final plugin = createPlugin((call) async {
       switch (call.method) {
-        case 'flutterRestart':
+        case "flutterRestart":
           restartCalls++;
           if (restartCalls == 1) {
-            throw PlatformException(code: 'restartFailed');
+            throw PlatformException(code: "restartFailed");
           }
           return 0;
-        case 'isSupported':
+        case "isSupported":
           return true;
         default:
-          fail('Unexpected method ${call.method}');
+          fail("Unexpected method ${call.method}");
       }
     });
 
@@ -60,19 +60,19 @@ void main() {
     expect(restartCalls, 2);
   });
 
-  test('options are sent before the restart handshake', () async {
+  test("options are sent before the restart handshake", () async {
     final callOrder = <String>[];
     final plugin = createPlugin((call) async {
       callOrder.add(call.method);
       switch (call.method) {
-        case 'setOptions':
+        case "setOptions":
           return true;
-        case 'flutterRestart':
+        case "flutterRestart":
           return 0;
-        case 'isSupported':
+        case "isSupported":
           return true;
         default:
-          fail('Unexpected method ${call.method}');
+          fail("Unexpected method ${call.method}");
       }
     });
 
@@ -83,55 +83,55 @@ void main() {
       isTrue,
     );
     expect(await plugin.isSupported(BmIsSupportedRequest()), isTrue);
-    expect(callOrder, ['setOptions', 'flutterRestart', 'isSupported']);
+    expect(callOrder, ["setOptions", "flutterRestart", "isSupported"]);
   });
 
-  test('platform work waits until native restart cleanup completes', () async {
+  test("platform work waits until native restart cleanup completes", () async {
     var connectedCountCalls = 0;
     final callOrder = <String>[];
     final plugin = createPlugin((call) async {
       callOrder.add(call.method);
       switch (call.method) {
-        case 'flutterRestart':
+        case "flutterRestart":
           return 2;
-        case 'connectedCount':
+        case "connectedCount":
           connectedCountCalls++;
           return connectedCountCalls == 1 ? 1 : 0;
-        case 'isSupported':
+        case "isSupported":
           return true;
         default:
-          fail('Unexpected method ${call.method}');
+          fail("Unexpected method ${call.method}");
       }
     });
 
     expect(await plugin.isSupported(BmIsSupportedRequest()), isTrue);
     expect(callOrder, [
-      'flutterRestart',
-      'connectedCount',
-      'connectedCount',
-      'isSupported',
+      "flutterRestart",
+      "connectedCount",
+      "connectedCount",
+      "isSupported",
     ]);
   });
-  for (final missingMethod in ['flutterRestart', 'connectedCount']) {
-    test('rejects missing $missingMethod count and retries', () async {
+  for (final missingMethod in ["flutterRestart", "connectedCount"]) {
+    test("rejects missing $missingMethod count and retries", () async {
       var missingResponse = true;
       var restartCalls = 0;
       var supportedCalls = 0;
       final plugin = createPlugin((call) async {
         switch (call.method) {
-          case 'flutterRestart':
+          case "flutterRestart":
             restartCalls++;
-            if (missingResponse && missingMethod == 'flutterRestart') {
+            if (missingResponse && missingMethod == "flutterRestart") {
               return null;
             }
             return missingResponse ? 1 : 0;
-          case 'connectedCount':
+          case "connectedCount":
             return null;
-          case 'isSupported':
+          case "isSupported":
             supportedCalls++;
             return true;
           default:
-            fail('Unexpected method ${call.method}');
+            fail("Unexpected method ${call.method}");
         }
       });
 
@@ -139,8 +139,8 @@ void main() {
         plugin.isSupported(BmIsSupportedRequest()),
         throwsA(isA<PlatformException>().having(
           (e) => e.code,
-          'code',
-          'invalidRestartCount',
+          "code",
+          "invalidRestartCount",
         )),
       );
       expect(supportedCalls, 0);
@@ -150,24 +150,24 @@ void main() {
       expect(supportedCalls, 1);
     });
   }
-  test('timeout releases concurrent callers and allows a retry', () async {
+  test("timeout releases concurrent callers and allows a retry", () async {
     var draining = true;
     var restartCalls = 0;
     var pollCalls = 0;
     var supportedCalls = 0;
     final plugin = createPlugin((call) async {
       switch (call.method) {
-        case 'flutterRestart':
+        case "flutterRestart":
           restartCalls++;
           return draining ? 1 : 0;
-        case 'connectedCount':
+        case "connectedCount":
           pollCalls++;
           return 1;
-        case 'isSupported':
+        case "isSupported":
           supportedCalls++;
           return true;
         default:
-          fail('Unexpected method ${call.method}');
+          fail("Unexpected method ${call.method}");
       }
     });
 

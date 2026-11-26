@@ -1,5 +1,5 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_max_example/shared/stored_list.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter_blue_max_example/shared/stored_list.dart";
 
 /// App-lifetime list state shared by parser and catalog libraries, independent of Bluetooth.
 /// Every mutation awaits loading, and writes serialize immutable snapshots while retaining unreadable entries.
@@ -30,12 +30,12 @@ class PersistedLibrary<T>({
       _items.addAll(stored?.items ?? defaults);
       _unreadable = stored?.unreadable ?? const [];
       if (_unreadable.isNotEmpty) {
-        final entries = _unreadable.length == 1 ? '1 stored entry' : '${_unreadable.length} stored entries';
+        final entries = _unreadable.length == 1 ? "1 stored entry" : "${_unreadable.length} stored entries";
         onProblem(
           LibraryProblem(
-            'Loading $label: $entries could not be read and stay stored unchanged. '
+            "Loading $label: $entries could not be read and stay stored unchanged. "
                 '$resetAction removes them. ${stored?.problem?.message ?? ''}',
-            'ERROR loading $label: $entries unreadable: ${stored?.problem?.message}',
+            "ERROR loading $label: $entries unreadable: ${stored?.problem?.message}",
             error: stored?.problem,
             stackTrace: stored?.problemStack,
           ),
@@ -45,8 +45,8 @@ class PersistedLibrary<T>({
       _storeUnreadable = true;
       onProblem(
         LibraryProblem(
-          'Loading $label: $exception\nChanges are not saved until you reset the $resetNoun.',
-          'ERROR loading $label: $exception',
+          "Loading $label: $exception\nChanges are not saved until you reset the $resetNoun.",
+          "ERROR loading $label: $exception",
           error: exception,
           stackTrace: stackTrace,
         ),
@@ -98,8 +98,8 @@ class PersistedLibrary<T>({
       _notify();
       onProblem(
         LibraryProblem(
-          'Saving $label: the stored $label could not be read, so changes are not saved. $resetAction replaces them.',
-          'ERROR saving $label: stored value unreadable',
+          "Saving $label: the stored $label could not be read, so changes are not saved. $resetAction replaces them.",
+          "ERROR saving $label: stored value unreadable",
         ),
       );
       return Future.value(false);
@@ -113,8 +113,8 @@ class PersistedLibrary<T>({
       } catch (exception, stackTrace) {
         onProblem(
           LibraryProblem(
-            'Saving $label: $exception',
-            'ERROR saving $label: $exception',
+            "Saving $label: $exception",
+            "ERROR saving $label: $exception",
             error: exception,
             stackTrace: stackTrace,
           ),

@@ -1,6 +1,6 @@
-import 'package:clock/clock.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import "package:clock/clock.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/shared/payload_codec.dart";
 
 /// UI state for one L2CAP channel, retained by the workbench controller.
 /// Reopening the same remote peer, PSM and direction reuses this session, so
@@ -66,6 +66,6 @@ class ChannelReceipt({required final DateTime time, required final ReceiveSource
 
 /// Distinguishes pushed data from buffer snapshots, which may repeat streamed bytes.
 enum ReceiveSource(final String label) {
-  stream('Stream'),
-  bufferRead('Buffer read'),
+  stream("Stream"),
+  bufferRead("Buffer read"),
 }

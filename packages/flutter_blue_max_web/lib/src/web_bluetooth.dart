@@ -13,9 +13,9 @@
 @JS()
 library;
 
-import 'dart:js_interop';
+import "dart:js_interop";
 
-import 'package:web/web.dart' show AbortSignal, BufferSource, Event, EventHandler, EventInit, EventTarget, PermissionStatus;
+import "package:web/web.dart" show AbortSignal, BufferSource, Event, EventHandler, EventInit, EventTarget, PermissionStatus;
 
 typedef UUID = String;
 typedef BluetoothServiceUUID = JSAny;

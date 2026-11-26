@@ -1,12 +1,12 @@
-import 'dart:async';
-import 'dart:js_interop';
-import 'dart:typed_data';
+import "dart:async";
+import "dart:js_interop";
+import "dart:typed_data";
 
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_blue_max_web/src/html.dart';
-import 'package:flutter_blue_max_web/src/web_bluetooth.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-import 'package:web/web.dart' show Event;
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_blue_max_web/src/html.dart";
+import "package:flutter_blue_max_web/src/web_bluetooth.dart";
+import "package:flutter_web_plugins/flutter_web_plugins.dart";
+import "package:web/web.dart" show Event;
 
 final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
   late final _characteristicValueChangedEventListener = _handleCharacteristicValueChanged.toJS;
@@ -227,7 +227,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           services: services,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -310,7 +310,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: value.buffer.asUint8List(),
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -378,7 +378,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: value.buffer.asUint8List(),
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -432,7 +432,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
 
     if (request.enable) {
       characteristic.addEventListener(
-        'characteristicvaluechanged',
+        "characteristicvaluechanged",
         _characteristicValueChangedEventListener,
       );
 
@@ -441,7 +441,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
       await characteristic.stopNotifications().toDart;
 
       characteristic.removeEventListener(
-        'characteristicvaluechanged',
+        "characteristicvaluechanged",
         _characteristicValueChangedEventListener,
       );
     }
@@ -536,7 +536,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           ],
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -599,7 +599,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
           instanceId: request.instanceId,
         ),
       );
@@ -668,7 +668,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -708,7 +708,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
         value: characteristic.value?.toDart.buffer.asUint8List() ?? [],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
   }

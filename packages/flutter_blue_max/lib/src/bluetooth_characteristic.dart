@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 final Guid cccdUuid = Guid("00002902-0000-1000-8000-00805f9b34fb");
 
@@ -332,25 +332,25 @@ class BluetoothCharacteristic {
 
   @override
   String toString() {
-    return 'BluetoothCharacteristic{'
-        'remoteId: $remoteId, '
-        'serviceUuid: $serviceUuid, '
-        'characteristicUuid: $characteristicUuid, '
-        'primaryServiceUuid: $primaryServiceUuid, '
-        'instanceId: $instanceId, '
-        'descriptors: $descriptors, '
-        'properties: $properties, '
-        'value: $lastValue'
-        '}';
+    return "BluetoothCharacteristic{"
+        "remoteId: $remoteId, "
+        "serviceUuid: $serviceUuid, "
+        "characteristicUuid: $characteristicUuid, "
+        "primaryServiceUuid: $primaryServiceUuid, "
+        "instanceId: $instanceId, "
+        "descriptors: $descriptors, "
+        "properties: $properties, "
+        "value: $lastValue"
+        "}";
   }
 
-  @Deprecated('Use remoteId instead')
+  @Deprecated("Use remoteId instead")
   DeviceIdentifier get deviceId => remoteId;
 
-  @Deprecated('Use lastValueStream instead')
+  @Deprecated("Use lastValueStream instead")
   Stream<List<int>> get value => lastValueStream;
 
-  @Deprecated('Use onValueReceived instead')
+  @Deprecated("Use onValueReceived instead")
   Stream<List<int>> get onValueChangedStream => onValueReceived;
 }
 
@@ -392,17 +392,17 @@ class CharacteristicProperties {
 
   @override
   String toString() {
-    return 'CharacteristicProperties{'
-        'broadcast: $broadcast, '
-        'read: $read, '
-        'writeWithoutResponse: $writeWithoutResponse, '
-        'write: $write, '
-        'notify: $notify, '
-        'indicate: $indicate, '
-        'authenticatedSignedWrites: $authenticatedSignedWrites, '
-        'extendedProperties: $extendedProperties, '
-        'notifyEncryptionRequired: $notifyEncryptionRequired, '
-        'indicateEncryptionRequired: $indicateEncryptionRequired'
-        '}';
+    return "CharacteristicProperties{"
+        "broadcast: $broadcast, "
+        "read: $read, "
+        "writeWithoutResponse: $writeWithoutResponse, "
+        "write: $write, "
+        "notify: $notify, "
+        "indicate: $indicate, "
+        "authenticatedSignedWrites: $authenticatedSignedWrites, "
+        "extendedProperties: $extendedProperties, "
+        "notifyEncryptionRequired: $notifyEncryptionRequired, "
+        "indicateEncryptionRequired: $indicateEncryptionRequired"
+        "}";
   }
 }

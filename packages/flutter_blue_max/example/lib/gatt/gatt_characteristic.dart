@@ -1,14 +1,14 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
-import 'package:flutter_blue_max_example/shared/payload_editor.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/foundation.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/payload_codec.dart";
+import "package:flutter_blue_max_example/shared/payload_editor.dart";
 
 /// Characteristic row inside `GattService`.
 /// Inspects the actual characteristic instance and its descriptors.
@@ -41,7 +41,7 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
           }
         });
       }
-      if (!kIsWeb && descriptor.uuid == Guid('2902') && _notificationChanges == null) {
+      if (!kIsWeb && descriptor.uuid == Guid("2902") && _notificationChanges == null) {
         // CCCD events may arrive after the operation future and also after direct writes.
         _notificationChanges = descriptor.lastValueStream.listen((value) {
           if (mounted) {
@@ -113,19 +113,19 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
       tilePadding: const EdgeInsets.symmetric(horizontal: 8),
       title: GattTitle(
-        title: Text(name ?? uuid, style: name == null ? const TextStyle(fontFamily: 'monospace', fontSize: 13) : null),
+        title: Text(name ?? uuid, style: name == null ? const TextStyle(fontFamily: "monospace", fontSize: 13) : null),
         expected: expected,
       ),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          if (name != null) Text(uuid, style: const TextStyle(fontFamily: 'monospace', fontSize: 11)),
+          if (name != null) Text(uuid, style: const TextStyle(fontFamily: "monospace", fontSize: 11)),
           if (description != null && description != name) Text(description),
           Text(
             [
               for (final property in GattProperty.of(p)) property.label,
-              if (c.instanceId != null) 'Instance ${c.instanceId}',
-            ].join(' · '),
+              if (c.instanceId != null) "Instance ${c.instanceId}",
+            ].join(" · "),
           ),
           if (expected == false)
             Text(
@@ -154,13 +154,13 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         if (bytes == null)
-                          const Text('No value yet')
+                          const Text("No value yet")
                         else ...[
-                          Text('${bytes.length} bytes', style: Theme.of(context).textTheme.labelSmall),
+                          Text("${bytes.length} bytes", style: Theme.of(context).textTheme.labelSmall),
                           const SizedBox(height: 6),
                           SelectableText(
-                            bytes.isEmpty ? 'Empty' : PayloadCodec.hex(bytes),
-                            style: const TextStyle(fontFamily: 'monospace'),
+                            bytes.isEmpty ? "Empty" : PayloadCodec.hex(bytes),
+                            style: const TextStyle(fontFamily: "monospace"),
                           ),
                           if (bytes.isNotEmpty)
                             Text(PayloadCodec.text(bytes), maxLines: 3, overflow: TextOverflow.ellipsis),
@@ -179,13 +179,13 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                     OutlinedButton.icon(
                       onPressed: enabled ? _readCharacteristic : null,
                       icon: const Icon(Icons.download_rounded, size: 16),
-                      label: const Text('Read'),
+                      label: const Text("Read"),
                     ),
                   if (p.write || p.writeWithoutResponse)
                     OutlinedButton.icon(
                       onPressed: enabled ? () => setState(() => _writing = !_writing) : null,
                       icon: const Icon(Icons.edit_outlined, size: 16),
-                      label: const Text('Write'),
+                      label: const Text("Write"),
                     ),
                   if (p.notify || p.indicate)
                     SubscribeButton(notifying: notifying, onPressed: enabled ? _toggleNotifications : null),
@@ -196,13 +196,13 @@ class _GattCharacteristicState() extends State<GattCharacteristic> {
                 if (p.write && p.writeWithoutResponse)
                   SwitchListTile.adaptive(
                     contentPadding: EdgeInsets.zero,
-                    title: const Text('Without response'),
+                    title: const Text("Without response"),
                     value: _withoutResponse,
                     onChanged: enabled ? (value) => setState(() => _withoutResponse = value) : null,
                   ),
                 PayloadEditor(
                   enabled: enabled,
-                  label: const Text('Write characteristic'),
+                  label: const Text("Write characteristic"),
                   onSend: (value) {
                     return workbenchRef.of(context).run(operation, () async {
                       await c.write(value, withoutResponse: !p.write || _withoutResponse);
@@ -227,7 +227,7 @@ String? _displayName(KnownCharacteristic? known, String? description, {required 
     return description;
   }
   if (expected == true) {
-    return 'Test · ${known.name}';
+    return "Test · ${known.name}";
   }
   return known.name;
 }
@@ -275,7 +275,7 @@ class _DescriptorState() extends State<GattDescriptorTile> {
     final enabled = !workbenchRef.watchOnly(context, (c) => c.busy(operation)) && d.device.isConnected;
     return ExpansionTile(
       expandedCrossAxisAlignment: CrossAxisAlignment.start,
-      title: Text('Descriptor ${d.uuid.str.toUpperCase()}', style: Theme.of(context).textTheme.bodySmall),
+      title: Text("Descriptor ${d.uuid.str.toUpperCase()}", style: Theme.of(context).textTheme.bodySmall),
       children: [
         StreamBuilder<List<int>>(
           stream: _values,
@@ -283,21 +283,21 @@ class _DescriptorState() extends State<GattDescriptorTile> {
         ),
         Align(
           alignment: Alignment.centerLeft,
-          child: TextButton(onPressed: enabled ? _readDescriptor : null, child: const Text('Read descriptor')),
+          child: TextButton(onPressed: enabled ? _readDescriptor : null, child: const Text("Read descriptor")),
         ),
         PayloadEditor(
           enabled: enabled,
-          label: const Text('Write descriptor'),
+          label: const Text("Write descriptor"),
           onSend: (value) {
             return workbenchRef.of(context).run(operation, () async {
               await d.write(value);
             });
           },
         ),
-        if (d.uuid == Guid('2902'))
+        if (d.uuid == Guid("2902"))
           const Padding(
             padding: EdgeInsets.all(8),
-            child: Text('Subscribe configures this descriptor. Direct CCCD writes may be rejected by the platform.'),
+            child: Text("Subscribe configures this descriptor. Direct CCCD writes may be rejected by the platform."),
           ),
       ],
     );
@@ -313,13 +313,13 @@ class const SubscribeButton({super.key, required final bool notifying, required 
       return OutlinedButton.icon(
         onPressed: onPressed,
         icon: const Icon(Icons.notifications_active_outlined, size: 16),
-        label: const Text('Unsubscribe'),
+        label: const Text("Unsubscribe"),
       );
     }
     return OutlinedButton.icon(
       onPressed: onPressed,
       icon: const Icon(Icons.notifications_none, size: 16),
-      label: const Text('Subscribe'),
+      label: const Text("Subscribe"),
     );
   }
 }

@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 /// Represents an L2CAP (Logical Link Control and Adaptation Protocol) channel
 /// for communication with a Bluetooth device.
@@ -160,10 +160,10 @@ class BluetoothL2capChannel {
 
   @override
   String toString() {
-    return 'BluetoothL2capChannel{'
-        'deviceId: $deviceId, '
-        'psm: $psm'
-        '}';
+    return "BluetoothL2capChannel{"
+        "deviceId: $deviceId, "
+        "psm: $psm"
+        "}";
   }
 
   @override

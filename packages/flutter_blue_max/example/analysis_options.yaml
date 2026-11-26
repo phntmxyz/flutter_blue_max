@@ -22,6 +22,5 @@ linter:
     sort_constructors_first: true
 
     # Choose wisely, but you don't have to
-    # prefer_double_quotes: true
-    prefer_single_quotes: true
+    prefer_double_quotes: true
     directives_ordering: true

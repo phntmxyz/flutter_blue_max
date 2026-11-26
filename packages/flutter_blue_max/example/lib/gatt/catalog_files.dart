@@ -1,13 +1,13 @@
-import 'dart:ui';
+import "dart:ui";
 
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/json_files.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/json_files.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
 
-const catalogFileName = 'blue_max_gatt_catalog.json';
-const Noun serviceNoun = Noun(singular: 'service', plural: 'services');
-const _key = 'services';
+const catalogFileName = "blue_max_gatt_catalog.json";
+const Noun serviceNoun = Noun(singular: "service", plural: "services");
+const _key = "services";
 
 String encodeCatalogFile(List<KnownService> services) => encodeJsonList(_key, services);
 
@@ -17,7 +17,7 @@ List<KnownService> decodeCatalogFile(String text) {
   final seen = <Guid>{};
   for (final service in services) {
     if (!seen.add(service.uuid)) {
-      throw FormatException('The file repeats service UUID ${service.uuid}.');
+      throw FormatException("The file repeats service UUID ${service.uuid}.");
     }
   }
   return services;

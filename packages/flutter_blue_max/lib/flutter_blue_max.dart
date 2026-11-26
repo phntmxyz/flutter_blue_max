@@ -4,21 +4,21 @@
 
 library;
 
-import 'dart:async';
-import 'dart:io';
+import "dart:async";
+import "dart:io";
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
 
-export 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart'
+export "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart"
     show DeviceIdentifier, Guid, L2CapChannelClosed, L2CapChannelConnected, L2CapChannelData, LogLevel, PhySupport;
 
-part 'src/bluetooth_characteristic.dart';
-part 'src/bluetooth_descriptor.dart';
-part 'src/bluetooth_device.dart';
-part 'src/bluetooth_events.dart';
-part 'src/bluetooth_l2cap_channel.dart';
-part 'src/bluetooth_service.dart';
-part 'src/bluetooth_utils.dart';
-part 'src/flutter_blue_max.dart';
-part 'src/utils.dart';
+part "src/bluetooth_characteristic.dart";
+part "src/bluetooth_descriptor.dart";
+part "src/bluetooth_device.dart";
+part "src/bluetooth_events.dart";
+part "src/bluetooth_l2cap_channel.dart";
+part "src/bluetooth_service.dart";
+part "src/bluetooth_utils.dart";
+part "src/flutter_blue_max.dart";
+part "src/utils.dart";

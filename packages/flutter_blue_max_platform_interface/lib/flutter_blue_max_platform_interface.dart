@@ -1,11 +1,11 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:flutter_blue_max_platform_interface/src/bluetooth_msgs.dart';
+import "package:flutter_blue_max_platform_interface/src/bluetooth_msgs.dart";
 
-export 'src/bluetooth_msgs.dart';
-export 'src/device_identifier.dart';
-export 'src/guid.dart';
-export 'src/log_level.dart';
+export "src/bluetooth_msgs.dart";
+export "src/device_identifier.dart";
+export "src/guid.dart";
+export "src/log_level.dart";
 
 /// The interface that implementations of flutter_blue_max must implement.
 abstract base class FlutterBlueMaxPlatform {
@@ -19,7 +19,7 @@ abstract base class FlutterBlueMaxPlatform {
       return instance;
     } else {
       throw UnsupportedError(
-        'flutter_blue_max is unsupported on this platform',
+        "flutter_blue_max is unsupported on this platform",
       );
     }
   }
@@ -153,7 +153,7 @@ abstract base class FlutterBlueMaxPlatform {
   ) {
     return Future.value(
       BmBluetoothAdapterName(
-        adapterName: '',
+        adapterName: "",
       ),
     );
   }

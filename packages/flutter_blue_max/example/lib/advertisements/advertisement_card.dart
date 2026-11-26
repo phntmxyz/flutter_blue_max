@@ -1,11 +1,11 @@
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_tracker.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_editor_page.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_tracker.dart";
+import "package:flutter_blue_max_example/advertisements/parser_editor_page.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
 
 /// Advertisement section of the selected device in `DevicesPanel`.
 /// The inspected peer's latest advertisement, its parsers and an optional live history of all of them.
@@ -66,34 +66,34 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
 
     final relevant = parsers.where(isRelevant).toList();
     final tracking = tracker != null && c.tracking;
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
+    const mono = TextStyle(fontFamily: "monospace", fontSize: 12);
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
       child: ExpansionTile(
-        title: const Text('Advertisement'),
+        title: const Text("Advertisement"),
         subtitle: Text(
           [
             if (advertisement != null) ...[
-              '${advertisement.rssi} dBm',
-              if (advertisement.advertisementData.connectable) 'Connectable' else 'Broadcast only',
+              "${advertisement.rssi} dBm",
+              if (advertisement.advertisementData.connectable) "Connectable" else "Broadcast only",
             ],
-            if (tracking) 'Tracking ${tracker.count}' else if (tracker != null) '${tracker.count} tracked',
-          ].join(' · '),
+            if (tracking) "Tracking ${tracker.count}" else if (tracker != null) "${tracker.count} tracked",
+          ].join(" · "),
         ),
         expandedCrossAxisAlignment: CrossAxisAlignment.start,
         childrenPadding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         children: [
           if (advertisement != null)
             SelectableText(
-              describeAdvertisement(advertisement.advertisementData, parsers: parsers).join('\n'),
+              describeAdvertisement(advertisement.advertisementData, parsers: parsers).join("\n"),
               style: mono,
             ),
           if (c.supportsAdvertisementTracking) ...[
             const Divider(height: 32),
-            Text('Parsers', style: Theme.of(context).textTheme.titleSmall),
+            Text("Parsers", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Parsers for the payloads of this device. Manage all parsers in the Library tab.',
+              "Parsers for the payloads of this device. Manage all parsers in the Library tab.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
             for (final parser in relevant)
@@ -105,12 +105,12 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     IconButton(
-                      tooltip: 'Edit parser',
+                      tooltip: "Edit parser",
                       onPressed: () => _editParser(previous: parser),
                       icon: const Icon(Icons.edit_outlined),
                     ),
                     IconButton(
-                      tooltip: 'Remove parser',
+                      tooltip: "Remove parser",
                       onPressed: () => c.parserLibrary.remove(parser),
                       icon: const Icon(Icons.delete_outline),
                     ),
@@ -118,12 +118,12 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
                 ),
               ),
             const SizedBox(height: 8),
-            OutlinedButton.icon(onPressed: _editParser, icon: const Icon(Icons.add), label: const Text('Add parser')),
+            OutlinedButton.icon(onPressed: _editParser, icon: const Icon(Icons.add), label: const Text("Add parser")),
             const Divider(height: 32),
-            Text('Tracker', style: Theme.of(context).textTheme.titleSmall),
+            Text("Tracker", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Scans for this device only, including repeated advertisements. Connecting stops the scan.',
+              "Scans for this device only, including repeated advertisements. Connecting stops the scan.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 14),
@@ -134,13 +134,13 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
                   return FilledButton.icon(
                     onPressed: enabled ? c.stopTracking : null,
                     icon: const Icon(Icons.stop_rounded),
-                    label: const Text('Stop tracking'),
+                    label: const Text("Stop tracking"),
                   );
                 }
                 return OutlinedButton.icon(
                   onPressed: enabled ? () => c.trackAdvertisements(device) : null,
                   icon: const Icon(Icons.timeline_rounded),
-                  label: const Text('Track advertisements'),
+                  label: const Text("Track advertisements"),
                 );
               },
             ),
@@ -152,18 +152,18 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
               spacing: 8,
               runSpacing: 8,
               children: [
-                Chip(label: Text('${tracker.count} advertisements')),
+                Chip(label: Text("${tracker.count} advertisements")),
                 if (tracker.averageInterval != null)
-                  Chip(label: Text('Ø ${tracker.averageInterval!.inMilliseconds} ms')),
-                if (tracker.minRssi != null) Chip(label: Text('${tracker.minRssi} … ${tracker.maxRssi} dBm')),
-                Chip(label: Text('${tracker.payloadChanges} payload changes')),
+                  Chip(label: Text("Ø ${tracker.averageInterval!.inMilliseconds} ms")),
+                if (tracker.minRssi != null) Chip(label: Text("${tracker.minRssi} … ${tracker.maxRssi} dBm")),
+                Chip(label: Text("${tracker.payloadChanges} payload changes")),
               ],
             ),
             const SizedBox(height: 14),
             TextField(
               controller: _query,
               onChanged: (_) => setState(() {}),
-              decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list), hintText: 'Filter history'),
+              decoration: const InputDecoration(prefixIcon: Icon(Icons.filter_list), hintText: "Filter history"),
             ),
             const SizedBox(height: 10),
             Wrap(
@@ -171,12 +171,12 @@ class _AdvertisementCardState() extends State<AdvertisementCard> {
               runSpacing: 8,
               children: [
                 FilterChip(
-                  label: const Text('Changes only'),
+                  label: const Text("Changes only"),
                   selected: _changesOnly,
                   onSelected: (value) => setState(() => _changesOnly = value),
                 ),
                 FilterChip(
-                  label: const Text('Parsed only'),
+                  label: const Text("Parsed only"),
                   selected: _parsedOnly,
                   onSelected: (value) => setState(() => _parsedOnly = value),
                 ),
@@ -207,12 +207,12 @@ class const AdvertisementHistory({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
+    const mono = TextStyle(fontFamily: "monospace", fontSize: 12);
     final history = tracker.history;
     if (history.isEmpty) {
       return const Padding(
         padding: EdgeInsets.symmetric(vertical: 20),
-        child: Text('Waiting for the first advertisement…'),
+        child: Text("Waiting for the first advertisement…"),
       );
     }
     final search = query.trim().toLowerCase();
@@ -234,9 +234,9 @@ class const AdvertisementHistory({
           }
           final searchable = [
             row.time,
-            '${row.entry.rssi} dBm',
+            "${row.entry.rssi} dBm",
             ...describeAdvertisement(row.entry.data, parsers: parsers),
-          ].join('\n').toLowerCase();
+          ].join("\n").toLowerCase();
           return searchable.contains(search);
         }).toList();
     return Column(
@@ -245,7 +245,7 @@ class const AdvertisementHistory({
         Padding(
           padding: const EdgeInsets.only(top: 10),
           child: Text(
-            '${rows.length} of ${history.length} recent advertisements',
+            "${rows.length} of ${history.length} recent advertisements",
             style: Theme.of(context).textTheme.labelMedium,
           ),
         ),
@@ -257,7 +257,7 @@ class const AdvertisementHistory({
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${row.time} · ${row.entry.rssi} dBm'
+                  "${row.time} · ${row.entry.rssi} dBm"
                   '${row.entry.interval == null ? '' : ' · +${row.entry.interval!.inMilliseconds} ms'}',
                   style: mono,
                 ),
@@ -276,7 +276,7 @@ class const AdvertisementHistory({
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(color: background, borderRadius: BorderRadius.circular(8)),
                         child: SelectableText(
-                          describeAdvertisement(row.entry.data, parsers: parsers).join('\n'),
+                          describeAdvertisement(row.entry.data, parsers: parsers).join("\n"),
                           style: mono,
                         ),
                       );
@@ -285,7 +285,7 @@ class const AdvertisementHistory({
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         for (final value in row.parsed)
-                          Text('  ↳ $value', style: mono.copyWith(color: Theme.of(context).colorScheme.primary)),
+                          Text("  ↳ $value", style: mono.copyWith(color: Theme.of(context).colorScheme.primary)),
                       ],
                     );
                   },

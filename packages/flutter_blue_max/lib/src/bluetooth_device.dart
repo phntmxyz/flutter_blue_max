@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 class BluetoothDevice {
 
@@ -16,7 +16,7 @@ class BluetoothDevice {
   ///   - Android uses 48-bit mac addresses as the remoteId, e.g. 06:E5:28:3B:FD:E0
   BluetoothDevice.fromId(String remoteId) : remoteId = DeviceIdentifier(remoteId);
 
-  @Deprecated('Use fromId instead')
+  @Deprecated("Use fromId instead")
   BluetoothDevice.fromProto(BmBluetoothDevice p) : remoteId = p.remoteId;
   final DeviceIdentifier remoteId;
 
@@ -688,11 +688,11 @@ class BluetoothDevice {
 
   @override
   String toString() {
-    return 'BluetoothDevice{'
-        'remoteId: $remoteId, '
-        'platformName: $platformName, '
-        'services: ${FlutterBlueMax._knownServices[remoteId]}'
-        '}';
+    return "BluetoothDevice{"
+        "remoteId: $remoteId, "
+        "platformName: $platformName, "
+        "services: ${FlutterBlueMax._knownServices[remoteId]}"
+        "}";
   }
 
   /// Opens an L2CAP (Logical Link Control and Adaptation Protocol) channel to this device.
@@ -780,19 +780,19 @@ class BluetoothDevice {
     yield false;
   }
 
-  @Deprecated('Use createBond() instead')
+  @Deprecated("Use createBond() instead")
   Future<void> pair() async => await createBond();
 
-  @Deprecated('Use remoteId instead')
+  @Deprecated("Use remoteId instead")
   DeviceIdentifier get id => remoteId;
 
-  @Deprecated('Use platformName instead')
+  @Deprecated("Use platformName instead")
   String get localName => platformName;
 
-  @Deprecated('Use platformName instead')
+  @Deprecated("Use platformName instead")
   String get name => platformName;
 
-  @Deprecated('Use connectionState instead')
+  @Deprecated("Use connectionState instead")
   Stream<BluetoothConnectionState> get state => connectionState;
 
   @Deprecated("removed. no replacement")

@@ -1,4 +1,4 @@
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 class BluetoothEvents {
   Stream<OnConnectionStateChangedEvent> get onConnectionStateChanged {
@@ -51,7 +51,7 @@ class BluetoothEvents {
   }
 }
 
-@Deprecated('Use FbmError instead')
+@Deprecated("Use FbmError instead")
 typedef FbpError = FbmError;
 
 class FbmError {

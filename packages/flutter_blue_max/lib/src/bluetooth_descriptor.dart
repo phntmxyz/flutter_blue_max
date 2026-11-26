@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 class BluetoothDescriptor {
 
@@ -191,20 +191,20 @@ class BluetoothDescriptor {
 
   @override
   String toString() {
-    return 'BluetoothDescriptor{'
-        'remoteId: $remoteId, '
-        'serviceUuid: $serviceUuid, '
-        'characteristicUuid: $characteristicUuid, '
-        'descriptorUuid: $descriptorUuid, '
-        'primaryServiceUuid: $primaryServiceUuid, '
-        'instanceId: $instanceId, '
-        'lastValue: $lastValue'
-        '}';
+    return "BluetoothDescriptor{"
+        "remoteId: $remoteId, "
+        "serviceUuid: $serviceUuid, "
+        "characteristicUuid: $characteristicUuid, "
+        "descriptorUuid: $descriptorUuid, "
+        "primaryServiceUuid: $primaryServiceUuid, "
+        "instanceId: $instanceId, "
+        "lastValue: $lastValue"
+        "}";
   }
 
-  @Deprecated('Use onValueReceived instead')
+  @Deprecated("Use onValueReceived instead")
   Stream<List<int>> get value => onValueReceived;
 
-  @Deprecated('Use remoteId instead')
+  @Deprecated("Use remoteId instead")
   DeviceIdentifier get deviceId => remoteId;
 }

@@ -1,22 +1,22 @@
-import 'dart:async';
-import 'dart:convert';
+import "dart:async";
+import "dart:convert";
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_store.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/l2cap/channel_session.dart';
-import 'package:flutter_blue_max_example/shared/stored_list.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_test/flutter_test.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter/services.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/advertisements/parser_examples.dart";
+import "package:flutter_blue_max_example/advertisements/parser_store.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/gatt/catalog_store.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/l2cap/channel_session.dart";
+import "package:flutter_blue_max_example/shared/stored_list.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_test/flutter_test.dart";
+import "package:shared_preferences/shared_preferences.dart";
 
-import '../fakes/fake_bluetooth_platform.dart';
+import "../fakes/fake_bluetooth_platform.dart";
 
 // The plugin owns process-wide native subscriptions, just as it does in the app.
 final _platform = FakeBluetoothPlatform();
@@ -24,7 +24,7 @@ final _platform = FakeBluetoothPlatform();
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('a new workbench starts with no discoveries after scanning stops', () async {
+  test("a new workbench starts with no discoveries after scanning stops", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     await controller.scan();
     platform.advertise();
@@ -38,13 +38,13 @@ void main() {
     expect(next.scanResults, isEmpty);
   });
 
-  test('the device snapshot changes when an unselected peer disconnects', () async {
+  test("the device snapshot changes when an unselected peer disconnects", () async {
     final (:controller, :platform) = await _setup();
-    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:45');
+    final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:45");
     controller.select(peer);
     await controller.connect();
     await _until(() => controller.rssi != null);
-    controller.select(BluetoothDevice.fromId('AA:BB:CC:DD:EE:46'));
+    controller.select(BluetoothDevice.fromId("AA:BB:CC:DD:EE:46"));
     final before = controller.discoveryState;
 
     await platform.disconnect(BmDisconnectRequest(remoteId: peer.remoteId));
@@ -53,12 +53,12 @@ void main() {
     expect(controller.discoveryState, isNot(equals(before)));
   });
 
-  test('unselected peers keep listeners only while connected or busy', () async {
+  test("unselected peers keep listeners only while connected or busy", () async {
     final (:controller, :platform) = await _setup();
-    final first = BluetoothDevice.fromId('AA:BB:CC:DD:EE:41');
-    final second = BluetoothDevice.fromId('AA:BB:CC:DD:EE:42');
-    final reset = BmBluetoothDevice(remoteId: first.remoteId, platformName: '');
-    int changes() => controller.logs.where((line) => line.contains('Services changed')).length;
+    final first = BluetoothDevice.fromId("AA:BB:CC:DD:EE:41");
+    final second = BluetoothDevice.fromId("AA:BB:CC:DD:EE:42");
+    final reset = BmBluetoothDevice(remoteId: first.remoteId, platformName: "");
+    int changes() => controller.logs.where((line) => line.contains("Services changed")).length;
 
     controller.select(first);
     controller.select(second);
@@ -83,9 +83,9 @@ void main() {
     await _until(() => changes() == 2);
   });
 
-  test('link loss clears measurements before a reconnect with no new RSSI', () async {
+  test("link loss clears measurements before a reconnect with no new RSSI", () async {
     final (:controller, :platform) = await _setup();
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:47');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:47");
     controller.select(device);
     await controller.connect();
     await _until(() => controller.rssi == -47);
@@ -95,15 +95,15 @@ void main() {
     await _until(() => controller.rssi == null);
     expect(controller.mtu, isNull);
 
-    platform.overrideReadRssi = (_) => Future<bool>.error(StateError('No new sample'));
+    platform.overrideReadRssi = (_) => Future<bool>.error(StateError("No new sample"));
     await controller.connect();
-    await _until(() => controller.logs.any((line) => line.contains('No new sample')));
+    await _until(() => controller.logs.any((line) => line.contains("No new sample")));
     expect(controller.rssi, isNull);
   });
 
-  test('a service reset retires pending discovery and a new discovery yields a read-only list', () async {
+  test("a service reset retires pending discovery and a new discovery yields a read-only list", () async {
     final (:controller, :platform) = await _setup();
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:48');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:48");
     controller.select(device);
     await controller.connect();
     final requested = Completer<BmDiscoverServicesRequest>();
@@ -115,8 +115,8 @@ void main() {
 
     final discovery = controller.discover();
     final request = await requested.future;
-    platform.serviceResets.add(BmBluetoothDevice(remoteId: device.remoteId, platformName: ''));
-    await _until(() => controller.logs.any((line) => line.contains('Services changed')));
+    platform.serviceResets.add(BmBluetoothDevice(remoteId: device.remoteId, platformName: ""));
+    await _until(() => controller.logs.any((line) => line.contains("Services changed")));
     platform.overrideDiscoverServices = null;
     await platform.discoverServices(request);
     release.complete(true);
@@ -128,11 +128,11 @@ void main() {
     expect(controller.services.clear, throwsUnsupportedError);
   });
 
-  test('Linux workbench declines per-peer tracking and leaves MTU unavailable', () async {
+  test("Linux workbench declines per-peer tracking and leaves MTU unavailable", () async {
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final (:controller, :platform) = await _setup();
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:44');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:44");
     controller.select(device);
     await controller.connect();
     await _until(() => controller.rssi != null);
@@ -143,10 +143,10 @@ void main() {
     expect(controller.mtu, isNull);
     expect(platform.scanStarts, 0);
     expect(controller.advertisementTracker, isNull);
-    expect(controller.error, contains('not supported'));
+    expect(controller.error, contains("not supported"));
   });
 
-  test('dispose stops tracking that was queued behind a native scan stop', () async {
+  test("dispose stops tracking that was queued behind a native scan stop", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     await controller.scan();
     await _until(() => controller.scanning);
@@ -162,7 +162,7 @@ void main() {
     final externalStop = FlutterBlueMax.stopScan();
     await stopping.future;
     await _until(() => !controller.scanning);
-    final tracking = controller.trackAdvertisements(BluetoothDevice.fromId('AA:BB:CC:DD:EE:01'));
+    final tracking = controller.trackAdvertisements(BluetoothDevice.fromId("AA:BB:CC:DD:EE:01"));
     await _until(() => controller.advertisementTracker != null);
     controller.dispose();
     release.complete();
@@ -172,7 +172,7 @@ void main() {
     expect(FlutterBlueMax.isScanningNow, isFalse);
   });
 
-  test('dispose does not start tracking after a slow scan stop', () async {
+  test("dispose does not start tracking after a slow scan stop", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     await controller.scan();
     await _until(() => controller.scanning);
@@ -184,7 +184,7 @@ void main() {
       return true;
     };
     final before = platform.scanStarts;
-    final pending = controller.trackAdvertisements(BluetoothDevice.fromId('AA:BB:CC:DD:EE:01'));
+    final pending = controller.trackAdvertisements(BluetoothDevice.fromId("AA:BB:CC:DD:EE:01"));
     await _until(() => stopping);
     controller.dispose();
     release.complete();
@@ -195,7 +195,7 @@ void main() {
     expect(FlutterBlueMax.isScanningNow, isFalse);
   });
 
-  test('dispose does not start scanning after slow system discovery', () async {
+  test("dispose does not start scanning after slow system discovery", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     final release = Completer<BmDevicesList>();
     var discovering = false;
@@ -215,31 +215,31 @@ void main() {
     expect(FlutterBlueMax.isScanningNow, isFalse);
   });
 
-  test('automatic RSSI refresh preserves the error banner while explicit reads report errors', () async {
+  test("automatic RSSI refresh preserves the error banner while explicit reads report errors", () async {
     final (:controller, :platform) = await _setup();
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:57');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:57");
     controller.select(device);
     await controller.connect();
     await _until(() => controller.rssi != null);
-    controller.error = 'Unread parser data';
+    controller.error = "Unread parser data";
     final before = platform.rssiRequests.length;
     controller.select(device);
     await _until(() => platform.rssiRequests.length > before);
-    expect(controller.error, 'Unread parser data');
-    platform.overrideReadRssi = (_) async => throw StateError('RSSI unavailable');
+    expect(controller.error, "Unread parser data");
+    platform.overrideReadRssi = (_) async => throw StateError("RSSI unavailable");
     controller.select(device);
     await Future<void>.delayed(Duration.zero);
-    expect(controller.error, 'Unread parser data');
-    expect(controller.logs.any((l) => l.contains('Automatic RSSI') && l.contains('RSSI unavailable')), isTrue);
+    expect(controller.error, "Unread parser data");
+    expect(controller.logs.any((l) => l.contains("Automatic RSSI") && l.contains("RSSI unavailable")), isTrue);
     await controller.readRssi();
-    expect(controller.error, contains('RSSI unavailable'));
+    expect(controller.error, contains("RSSI unavailable"));
   });
 
-  test('channels with the same PSM remain isolated by peer', () async {
+  test("channels with the same PSM remain isolated by peer", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    const first = DeviceIdentifier('AA:BB:CC:DD:EE:01');
-    const second = DeviceIdentifier('AA:BB:CC:DD:EE:02');
+    const first = DeviceIdentifier("AA:BB:CC:DD:EE:01");
+    const second = DeviceIdentifier("AA:BB:CC:DD:EE:02");
     platform.accepted.add(L2CapChannelConnected(remoteId: first, psm: 129));
     platform.accepted.add(L2CapChannelConnected(remoteId: second, psm: 129));
     expect(controller.channels, hasLength(2));
@@ -259,15 +259,15 @@ void main() {
     expect(controller.channels, isEmpty);
   });
 
-  test('disconnect clears peer services and channels but keeps the local server', () async {
+  test("disconnect clears peer services and channels but keeps the local server", () async {
     final (:controller, :platform) = await _setup();
-    controller.select(BluetoothDevice.fromId('AA:BB:CC:DD:EE:03'));
+    controller.select(BluetoothDevice.fromId("AA:BB:CC:DD:EE:03"));
     await controller.connect();
     await controller.discover();
     expect(controller.services, hasLength(1));
     await controller.openChannel(131, device: controller.selected!, secure: true);
     await controller.startServer(secure: true);
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("server"), psm: 129));
     expect(controller.channels, hasLength(2));
     await controller.disconnect();
     await Future<void>.delayed(Duration.zero);
@@ -275,22 +275,22 @@ void main() {
     expect(controller.channels.single.incoming, isTrue);
     expect(controller.serverPsm, 129);
     final outgoing = controller.channelSessions.singleWhere((s) => !s.incoming);
-    expect(outgoing.closed, isTrue, reason: 'Link loss keeps the closed session for its diagnostics');
+    expect(outgoing.closed, isTrue, reason: "Link loss keeps the closed session for its diagnostics");
     expect(platform.closeRequests.single.psm, 131);
   });
 
-  test('a late accept from a stopped server is closed instead of orphaned', () async {
+  test("a late accept from a stopped server is closed instead of orphaned", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
     await controller.stopServer();
     final before = platform.closeRequests.length;
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('late'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("late"), psm: 129));
     await Future<void>.delayed(Duration.zero);
     expect(platform.closeRequests.skip(before).map((r) => r.psm), [129]);
     expect(controller.channels, isEmpty);
   });
 
-  test('a restarted server closes provisional accepts with a different PSM', () async {
+  test("a restarted server closes provisional accepts with a different PSM", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
     await controller.stopServer();
@@ -298,39 +298,39 @@ void main() {
     platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await Future<void>.delayed(Duration.zero);
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('stale'), psm: 129));
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('current'), psm: 131));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("stale"), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("current"), psm: 131));
     pending.complete(131);
     await starting;
     platform.overrideListenL2CapChannel = null;
     expect(controller.channels.map((s) => s.channel.psm), [131]);
-    expect(platform.closeRequests.any((r) => r.remoteId == 'stale' && r.psm == 129), isTrue);
+    expect(platform.closeRequests.any((r) => r.remoteId == "stale" && r.psm == 129), isTrue);
     await controller.stopServer();
     expect(controller.channels, isEmpty);
   });
 
-  test('a failed late-accept close remains visible for a manual retry', () async {
+  test("a failed late-accept close remains visible for a manual retry", () async {
     final (:controller, :platform) = await _setup();
-    platform.overrideCloseL2CapChannel = (_) async => throw StateError('late close failed');
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('retry'), psm: 129));
+    platform.overrideCloseL2CapChannel = (_) async => throw StateError("late close failed");
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("retry"), psm: 129));
     await Future<void>.delayed(Duration.zero);
     expect(controller.channels, hasLength(1));
-    expect(controller.error, contains('late close failed'));
+    expect(controller.error, contains("late close failed"));
     platform.overrideCloseL2CapChannel = null;
     await controller.closeChannel(controller.channels.single);
     expect(controller.channels, isEmpty);
   });
 
-  test('stopping the server keeps an accepted channel whose close fails open for a retry', () async {
+  test("stopping the server keeps an accepted channel whose close fails open for a retry", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    const closing = DeviceIdentifier('AA:BB:CC:DD:EE:61');
-    const failing = DeviceIdentifier('AA:BB:CC:DD:EE:62');
+    const closing = DeviceIdentifier("AA:BB:CC:DD:EE:61");
+    const failing = DeviceIdentifier("AA:BB:CC:DD:EE:62");
     platform.accepted.add(L2CapChannelConnected(remoteId: closing, psm: 129));
     platform.accepted.add(L2CapChannelConnected(remoteId: failing, psm: 129));
     platform.overrideCloseL2CapChannel = (r) async {
       if (r.remoteId == failing.str) {
-        throw StateError('close rejected');
+        throw StateError("close rejected");
       }
     };
 
@@ -339,29 +339,29 @@ void main() {
     expect(controller.channels.single.channel.deviceId, failing);
     expect(controller.channelSessions.singleWhere((s) => s.channel.deviceId == closing).closed, isTrue);
     expect(controller.serverPsm, isNull);
-    expect(controller.error, contains('close rejected'));
+    expect(controller.error, contains("close rejected"));
     expect(controller.busy(Operation.server), isFalse);
   });
 
-  test('a failed channel close keeps the channel open and releases its controls', () async {
+  test("a failed channel close keeps the channel open and releases its controls", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: false);
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:63'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("AA:BB:CC:DD:EE:63"), psm: 129));
     final session = controller.channels.single;
-    platform.overrideCloseL2CapChannel = (_) async => throw StateError('close rejected');
+    platform.overrideCloseL2CapChannel = (_) async => throw StateError("close rejected");
 
     await controller.closeChannel(session);
 
     expect(session.closed, isFalse);
     expect(controller.channels, [session]);
-    expect(controller.error, contains('close rejected'));
+    expect(controller.error, contains("close rejected"));
     expect(controller.busy(Operation.channel(session)), isFalse);
   });
 
-  test('selecting a peer keeps the channel it opened to the local server', () async {
+  test("selecting a peer keeps the channel it opened to the local server", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    const remoteId = DeviceIdentifier('AA:BB:CC:DD:EE:05');
+    const remoteId = DeviceIdentifier("AA:BB:CC:DD:EE:05");
     platform.accepted.add(L2CapChannelConnected(remoteId: remoteId, psm: 129));
 
     controller.select(BluetoothDevice(remoteId: remoteId));
@@ -375,9 +375,9 @@ void main() {
     expect(platform.closeRequests.single.remoteId, remoteId.str);
   });
 
-  test('a tracking scan that fails to start keeps the previous session', () async {
+  test("a tracking scan that fails to start keeps the previous session", () async {
     final (:controller, :platform) = await _setup();
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:01');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:01");
     await controller.trackAdvertisements(device);
     platform.advertise(
       manufacturerData: {
@@ -388,42 +388,42 @@ void main() {
     await controller.stopTracking();
     final recorded = controller.advertisementTracker;
 
-    platform.overrideStartScan = (_) => throw StateError('Location services are off');
+    platform.overrideStartScan = (_) => throw StateError("Location services are off");
     await controller.trackAdvertisements(device);
 
-    expect(controller.error, contains('Location services are off'));
+    expect(controller.error, contains("Location services are off"));
     expect(controller.tracking, isFalse);
     expect(controller.advertisementTracker, same(recorded));
     expect(recorded!.count, 1);
   });
 
-  test('selecting a peer logs connection changes but not its replayed state', () async {
+  test("selecting a peer logs connection changes but not its replayed state", () async {
     final (:controller, :platform) = await _setup();
-    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:47');
-    bool logged(String state) => controller.logs.any((line) => line.contains(': $state'));
+    final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:47");
+    bool logged(String state) => controller.logs.any((line) => line.contains(": $state"));
 
     controller.select(peer);
     await Future<void>.delayed(Duration.zero);
-    expect(logged('disconnected'), isFalse, reason: 'Nothing disconnected by selecting a peer');
+    expect(logged("disconnected"), isFalse, reason: "Nothing disconnected by selecting a peer");
 
     await controller.connect();
-    await _until(() => logged('connected'));
+    await _until(() => logged("connected"));
     await platform.disconnect(BmDisconnectRequest(remoteId: peer.remoteId));
-    await _until(() => logged('disconnected'));
+    await _until(() => logged("disconnected"));
   });
 
-  test('tracking records every advertisement of one peer and keeps the device list', () async {
+  test("tracking records every advertisement of one peer and keeps the device list", () async {
     final (:controller, :platform) = await _setup();
     await controller.scan();
-    platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
+    platform.advertise(id: "AA:BB:CC:DD:EE:02", name: "Other peripheral");
     await Future<void>.delayed(Duration.zero);
-    final device = BluetoothDevice.fromId('AA:BB:CC:DD:EE:01');
+    final device = BluetoothDevice.fromId("AA:BB:CC:DD:EE:01");
 
     await controller.trackAdvertisements(device);
     final request = platform.scanRequests.last;
     expect(request.withRemoteIds, [device.remoteId.str]);
     expect(request.continuousUpdates, isTrue);
-    expect(request.androidUsesFineLocation, isTrue, reason: 'Android filters beacons from scans without location');
+    expect(request.androidUsesFineLocation, isTrue, reason: "Android filters beacons from scans without location");
     expect(controller.tracking, isTrue);
     final originalBytes = [1];
     platform.advertise(
@@ -449,113 +449,113 @@ void main() {
         0x5a: [7],
       },
     );
-    platform.advertise(id: 'AA:BB:CC:DD:EE:02', name: 'Other peripheral');
+    platform.advertise(id: "AA:BB:CC:DD:EE:02", name: "Other peripheral");
     await Future<void>.delayed(Duration.zero);
 
     final tracker = controller.advertisementTracker!;
-    expect(tracker.count, 3, reason: 'Duplicates are recorded; other peers are not');
+    expect(tracker.count, 3, reason: "Duplicates are recorded; other peers are not");
     expect((tracker.minRssi, tracker.maxRssi), (-60, -40));
     expect(tracker.payloadChanges, 1);
     expect(tracker.history.map((entry) => entry.changed), [true, false, true]);
     expect(tracker.history.last.data.manufacturerData[0x59], [1]);
     expect(tracker.history.clear, throwsUnsupportedError);
     expect(tracker.history.last.data.manufacturerData[0x59]!.clear, throwsUnsupportedError);
-    expect(describeAdvertisement(tracker.history.first.data).join('\n'), contains('Manufacturer 0x59: 02'));
+    expect(describeAdvertisement(tracker.history.first.data).join("\n"), contains("Manufacturer 0x59: 02"));
     expect(tracker.averageInterval, isNotNull);
     expect(controller.scanResults.map((result) => result.device.remoteId.str), {
-      'AA:BB:CC:DD:EE:01',
-      'AA:BB:CC:DD:EE:02',
+      "AA:BB:CC:DD:EE:01",
+      "AA:BB:CC:DD:EE:02",
     });
 
     await controller.stopTracking();
     expect(controller.tracking, isFalse);
-    expect(controller.advertisementTracker!.count, 3, reason: 'History stays available after stopping');
+    expect(controller.advertisementTracker!.count, 3, reason: "History stays available after stopping");
     await controller.scan();
     expect(platform.scanRequests.last.withRemoteIds, isEmpty);
     expect(controller.tracking, isFalse);
   });
 
-  group('Saved parsers', () {
-    test('a future stored format cannot be overwritten by an older build', () async {
+  group("Saved parsers", () {
+    test("a future stored format cannot be overwritten by an older build", () async {
       const future = '{"version": 99, "items": [{"newer": "data"}]}';
       SharedPreferences.setMockInitialValues({parserStoreKey: future});
       final (:controller, platform: _) = await _setup(resetStorage: false);
-      expect(controller.error, contains('newer format'));
+      expect(controller.error, contains("newer format"));
       await controller.parserLibrary.save(testDongleParsers.first);
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(parserStoreKey), future);
     });
 
-    test('legacy bare lists migrate to a versioned store on the next save', () async {
+    test("legacy bare lists migrate to a versioned store on the next save", () async {
       SharedPreferences.setMockInitialValues({parserStoreKey: jsonEncode(testDongleParsers)});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.parsers, hasLength(testDongleParsers.length));
       await controller.parserLibrary.remove(controller.parsers.last);
       final preferences = await SharedPreferences.getInstance();
       final envelope = jsonDecode(preferences.getString(parserStoreKey)!);
-      expect(envelope, allOf(containsPair('version', 1), containsPair('items', hasLength(1))));
+      expect(envelope, allOf(containsPair("version", 1), containsPair("items", hasLength(1))));
       expect((await loadParsers())!.items, hasLength(1));
     });
 
-    test('the first launch starts with the test dongle parsers', () async {
+    test("the first launch starts with the test dongle parsers", () async {
       final (:controller, platform: _) = await _setup();
-      expect(controller.parsers.map((parser) => parser.name), ['FBM status', 'FBM sensor']);
+      expect(controller.parsers.map((parser) => parser.name), ["FBM status", "FBM sensor"]);
       expect(controller.error, isNull);
     });
 
-    test('changes survive a restart, including removing every parser', () async {
+    test("changes survive a restart, including removing every parser", () async {
       final (:controller, platform: _) = await _setup();
       for (final parser in controller.parsers.skip(1).toList()) {
         await controller.parserLibrary.remove(parser);
       }
       const climate = AdvertisementParser(
-        name: 'Climate',
+        name: "Climate",
         source: AdvertisementSource.manufacturer,
         companyId: 0xffff,
-        device: DeviceIdentifier('AA:BB:CC:DD:EE:01'),
-        fields: [AdvertisementField('Temperature', 1, AdvertisementFieldType.int16be, scale: 0.005, unit: '°C')],
+        device: DeviceIdentifier("AA:BB:CC:DD:EE:01"),
+        fields: [AdvertisementField("Temperature", 1, AdvertisementFieldType.int16be, scale: 0.005, unit: "°C")],
       );
       await controller.parserLibrary.save(climate, previous: controller.parsers.first);
 
       final restarted = await _setup(resetStorage: false);
       final restored = restarted.controller.parsers.single;
       expect(jsonEncode(restored), jsonEncode(climate));
-      expect(restored.appliesTo(const DeviceIdentifier('AA:BB:CC:DD:EE:02')), isFalse);
+      expect(restored.appliesTo(const DeviceIdentifier("AA:BB:CC:DD:EE:02")), isFalse);
 
       await restarted.controller.parserLibrary.remove(restored);
       final emptied = await _setup(resetStorage: false);
-      expect(emptied.controller.parsers, isEmpty, reason: 'Deleting the examples must not bring them back');
+      expect(emptied.controller.parsers, isEmpty, reason: "Deleting the examples must not bring them back");
     });
 
-    test('own catalog services survive a restart and replace built-in ones', () async {
+    test("own catalog services survive a restart and replace built-in ones", () async {
       final (:controller, platform: _) = await _setup();
       expect(controller.catalog, isEmpty);
-      final battery = KnownService(Guid('180f'), 'Pack', test: true, [
-        KnownCharacteristic(Guid('2a19'), 'Charge', properties: {GattProperty.read, GattProperty.notify}),
+      final battery = KnownService(Guid("180f"), "Pack", test: true, [
+        KnownCharacteristic(Guid("2a19"), "Charge", properties: {GattProperty.read, GattProperty.notify}),
       ]);
       await controller.catalogLibrary.save(battery);
-      expect(controller.knownService(Guid('180f'))?.name, 'Pack');
+      expect(controller.knownService(Guid("180f"))?.name, "Pack");
 
       final restarted = await _setup(resetStorage: false);
       expect(jsonEncode(restarted.controller.catalog.single), jsonEncode(battery));
       await restarted.controller.catalogLibrary.remove(restarted.controller.catalog.single);
-      expect(restarted.controller.knownService(Guid('180f'))?.name, 'Battery');
+      expect(restarted.controller.knownService(Guid("180f"))?.name, "Battery");
       final emptied = await _setup(resetStorage: false);
       expect(emptied.controller.catalog, isEmpty);
     });
 
-    test('an unreadable stored catalog is reported instead of crashing the app', () async {
+    test("an unreadable stored catalog is reported instead of crashing the app", () async {
       SharedPreferences.setMockInitialValues({catalogStoreKey: '[{"name": "Broken"}]'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.catalog, isEmpty);
-      expect(controller.error, startsWith('Loading GATT catalog'));
+      expect(controller.error, startsWith("Loading GATT catalog"));
     });
 
-    test('adding catalog services replaces own entries with the same UUID and skips identical ones', () async {
+    test("adding catalog services replaces own entries with the same UUID and skips identical ones", () async {
       final (:controller, platform: _) = await _setup();
-      final thermostat = KnownService(Guid('fff0'), 'Thermostat', [KnownCharacteristic(Guid('fff1'), 'Level')]);
-      final renamed = KnownService(Guid('fff0'), 'Room thermostat', thermostat.characteristics);
-      final lamp = KnownService(Guid('ffe0'), 'Lamp', []);
+      final thermostat = KnownService(Guid("fff0"), "Thermostat", [KnownCharacteristic(Guid("fff1"), "Level")]);
+      final renamed = KnownService(Guid("fff0"), "Room thermostat", thermostat.characteristics);
+      final lamp = KnownService(Guid("ffe0"), "Lamp", []);
       final first = await controller.catalogLibrary.addCatalogServices([thermostat]);
       expect(first.saved, isTrue);
       expect([first.value.added, first.value.replaced, first.value.present], [1, 0, 0]);
@@ -564,20 +564,20 @@ void main() {
       final next = await controller.catalogLibrary.addCatalogServices(imports, confirmedReplacements: preview);
       expect(next.saved, isTrue);
       expect([next.value.added, next.value.replaced, next.value.present], [1, 1, 1]);
-      expect(controller.catalog.map((s) => s.name), ['Room thermostat', 'Lamp']);
+      expect(controller.catalog.map((s) => s.name), ["Room thermostat", "Lamp"]);
     });
 
-    test('a catalog reset repairs an unreadable stored catalog', () async {
+    test("a catalog reset repairs an unreadable stored catalog", () async {
       SharedPreferences.setMockInitialValues({catalogStoreKey: '[{"name": "Broken"}]'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
-      expect(controller.error, startsWith('Loading GATT catalog'));
+      expect(controller.error, startsWith("Loading GATT catalog"));
       await controller.catalogLibrary.reset();
       final stored = await loadCatalog();
       expect(stored?.items, isEmpty);
       expect(stored?.unreadable, isEmpty);
     });
 
-    test('restoring the examples adds only missing ones', () async {
+    test("restoring the examples adds only missing ones", () async {
       final (:controller, platform: _) = await _setup();
       await controller.parserLibrary.remove(controller.parsers.first);
       await controller.parserLibrary.addParsers(testDongleParsers);
@@ -585,10 +585,10 @@ void main() {
       expect(controller.parsers, hasLength(testDongleParsers.length));
     });
 
-    test('adding parsers skips present ones and reports how many were added', () async {
+    test("adding parsers skips present ones and reports how many were added", () async {
       final (:controller, platform: _) = await _setup();
       const own = AdvertisementParser(
-        name: 'Own',
+        name: "Own",
         source: AdvertisementSource.manufacturer,
         companyId: 0x1234,
         fields: [],
@@ -596,10 +596,10 @@ void main() {
       final imported = await controller.parserLibrary.addParsers([testDongleParsers.first, own, own]);
       expect(imported.saved, isTrue);
       expect(imported.value, 1);
-      expect(controller.parsers.map((parser) => parser.name), [...testDongleParsers.map((p) => p.name), 'Own']);
+      expect(controller.parsers.map((parser) => parser.name), [...testDongleParsers.map((p) => p.name), "Own"]);
     });
 
-    test('a reset repairs unreadable stored parsers', () async {
+    test("a reset repairs unreadable stored parsers", () async {
       SharedPreferences.setMockInitialValues({parserStoreKey: '[{"name": "Broken"}]'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.parsers, isEmpty);
@@ -610,33 +610,33 @@ void main() {
       expect(stored?.unreadable, isEmpty);
     });
 
-    test('a stored entry that no longer decodes survives saving the readable ones', () async {
-      final own = KnownService(Guid('fff0'), 'Own', []);
-      const broken = {'name': 'Broken'};
+    test("a stored entry that no longer decodes survives saving the readable ones", () async {
+      final own = KnownService(Guid("fff0"), "Own", []);
+      const broken = {"name": "Broken"};
       SharedPreferences.setMockInitialValues({
         catalogStoreKey: jsonEncode([own, broken]),
         parserStoreKey: jsonEncode([testDongleParsers.first, broken]),
       });
       final (:controller, platform: _) = await _setup(resetStorage: false);
-      expect(controller.catalog.single.name, 'Own');
+      expect(controller.catalog.single.name, "Own");
       expect(controller.parsers.single.name, testDongleParsers.first.name);
-      expect(controller.error, contains('1 stored entry could not be read'));
+      expect(controller.error, contains("1 stored entry could not be read"));
 
-      await controller.catalogLibrary.save(KnownService(Guid('ffe0'), 'Lamp', []));
+      await controller.catalogLibrary.save(KnownService(Guid("ffe0"), "Lamp", []));
       await controller.parserLibrary.remove(controller.parsers.single);
       final catalog = await loadCatalog();
-      expect(catalog?.items.map((s) => s.name), ['Own', 'Lamp']);
+      expect(catalog?.items.map((s) => s.name), ["Own", "Lamp"]);
       expect(catalog?.unreadable, [broken]);
       final parsers = await loadParsers();
       expect(parsers?.items, isEmpty);
       expect(parsers?.unreadable, [broken]);
     });
 
-    test('a store that is not a list is never overwritten by an ordinary save', () async {
+    test("a store that is not a list is never overwritten by an ordinary save", () async {
       SharedPreferences.setMockInitialValues({catalogStoreKey: '{"not": "a list"}'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
-      await controller.catalogLibrary.save(KnownService(Guid('ffe0'), 'Lamp', []));
-      expect(controller.error, contains('changes are not saved'));
+      await controller.catalogLibrary.save(KnownService(Guid("ffe0"), "Lamp", []));
+      expect(controller.error, contains("changes are not saved"));
       final preferences = await SharedPreferences.getInstance();
       expect(preferences.getString(catalogStoreKey), '{"not": "a list"}');
 
@@ -644,28 +644,28 @@ void main() {
       expect((await loadCatalog())?.items, isEmpty);
     });
 
-    test('a failed save is reported and later saves still run', () async {
+    test("a failed save is reported and later saves still run", () async {
       var fail = true;
       final saved = <String, List<Object?>>{};
       final (:controller, platform: _) = await _setup(
         saveList: (key, items, {unreadable = const []}) async {
           if (fail) {
-            throw StateError('disk full');
+            throw StateError("disk full");
           }
           saved[key] = items;
         },
       );
 
       await controller.parserLibrary.remove(controller.parsers.first);
-      expect(controller.error, 'Saving parsers: Bad state: disk full');
-      expect(controller.logs.last, contains('ERROR saving parsers'));
+      expect(controller.error, "Saving parsers: Bad state: disk full");
+      expect(controller.logs.last, contains("ERROR saving parsers"));
 
       fail = false;
       await controller.parserLibrary.remove(controller.parsers.single);
       expect(saved[parserStoreKey], isEmpty);
     });
 
-    test('a slow save never overwrites a newer one', () async {
+    test("a slow save never overwrites a newer one", () async {
       final slow = Completer<void>();
       final saved = <List<Object?>>[];
       var saves = 0;
@@ -686,27 +686,27 @@ void main() {
       expect(saved.map((items) => items.length), [1, 0]);
     });
 
-    test('unreadable stored parsers are reported instead of crashing the app', () async {
+    test("unreadable stored parsers are reported instead of crashing the app", () async {
       SharedPreferences.setMockInitialValues({parserStoreKey: '{"not": "a list"}'});
       final (:controller, platform: _) = await _setup(resetStorage: false);
       expect(controller.parsers, isEmpty);
-      expect(controller.error, contains('parsers'));
+      expect(controller.error, contains("parsers"));
       expect(controller.ready, isTrue);
     });
   });
 
-  test('a failed log level still subscribes to the adapter state', () async {
+  test("a failed log level still subscribes to the adapter state", () async {
     final (:controller, :platform) = await _setup(
       configure: (it) {
-        it.overrideSetLogLevel = (_) async => throw PlatformException(code: 'bluez', message: 'No bluetoothd');
+        it.overrideSetLogLevel = (_) async => throw PlatformException(code: "bluez", message: "No bluetoothd");
       },
     );
 
-    expect(controller.error, contains('No bluetoothd'));
+    expect(controller.error, contains("No bluetoothd"));
     expect(controller.ready, isTrue);
   });
 
-  test('duplicate server submission is ignored and late startup is cleaned up on disposal', () async {
+  test("duplicate server submission is ignored and late startup is cleaned up on disposal", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     final pending = Completer<int>();
     platform.overrideListenL2CapChannel = (_) => pending.future;
@@ -723,37 +723,37 @@ void main() {
     expect(controller.serverPsm, isNull);
   });
 
-  test('a peer accepted before the server reports its PSM is kept', () async {
+  test("a peer accepted before the server reports its PSM is kept", () async {
     final (:controller, :platform) = await _setup();
     final pending = Completer<int>();
     platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await Future<void>.delayed(Duration.zero);
 
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('early'), psm: 135));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("early"), psm: 135));
     pending.complete(135);
     await starting;
 
     expect(controller.serverPsm, 135);
     expect(controller.channels.single.incoming, isTrue);
-    expect(controller.channels.single.channel.deviceId, const DeviceIdentifier('early'));
+    expect(controller.channels.single.channel.deviceId, const DeviceIdentifier("early"));
   });
 
-  test('a failed listener start closes provisional accepts and permits a new start', () async {
+  test("a failed listener start closes provisional accepts and permits a new start", () async {
     final (:controller, :platform) = await _setup();
     final pending = Completer<int>();
     platform.overrideListenL2CapChannel = (_) => pending.future;
     final starting = controller.startServer(secure: true);
     await _until(() => platform.listenRequests.isNotEmpty);
 
-    const remoteId = DeviceIdentifier('provisional');
+    const remoteId = DeviceIdentifier("provisional");
     platform.accepted.add(L2CapChannelConnected(remoteId: remoteId, psm: 135));
     final provisional = controller.channels.single;
-    pending.completeError(StateError('Publishing failed'));
+    pending.completeError(StateError("Publishing failed"));
     await starting;
 
     expect(controller.serverPsm, isNull);
-    expect(controller.error, contains('Publishing failed'));
+    expect(controller.error, contains("Publishing failed"));
     expect(provisional.closed, isTrue);
     expect(platform.closeRequests.single.remoteId, remoteId.str);
     expect(platform.closeRequests.single.psm, 135);
@@ -765,7 +765,7 @@ void main() {
     expect(controller.error, isNull);
   });
 
-  test('disposal closes a peer accepted while the listener is stopping', () async {
+  test("disposal closes a peer accepted while the listener is stopping", () async {
     final (:controller, :platform) = await _setup(dispose: false);
     await controller.startServer(secure: true);
     final stopping = Completer<void>();
@@ -779,21 +779,21 @@ void main() {
     controller.dispose();
     try {
       await stopping.future;
-      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('during-stop'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("during-stop"), psm: 129));
       expect(platform.closeRequests, isEmpty);
     } finally {
       finishStop.complete();
     }
     await _until(() => platform.closeRequests.isNotEmpty);
-    expect(platform.closeRequests.single.remoteId, 'during-stop');
+    expect(platform.closeRequests.single.remoteId, "during-stop");
     expect(platform.closeRequests.single.psm, 129);
     expect(controller.channels, isEmpty);
     expect(controller.serverPsm, isNull);
   });
 
-  test('disposal stops the scan, closes channels, stops the server and disconnects peers', () async {
+  test("disposal stops the scan, closes channels, stops the server and disconnects peers", () async {
     final (:controller, :platform) = await _setup(dispose: false);
-    final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:07');
+    final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:07");
     controller.select(peer);
     await controller.connect();
     await controller.openChannel(131, device: peer, secure: true);
@@ -811,17 +811,17 @@ void main() {
     expect(peer.isConnected, isFalse);
   });
 
-  test('failed write exposes an error, releases busy state and does not count bytes', () async {
+  test("failed write exposes an error, releases busy state and does not count bytes", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: false);
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("server"), psm: 129));
     final session = controller.channels.single;
     platform.overrideWriteL2CapChannel = (_) {
       platform.overrideWriteL2CapChannel = null;
-      return Future<void>.error(StateError('Peer rejected the write'));
+      return Future<void>.error(StateError("Peer rejected the write"));
     };
     await controller.send(session, [1]);
-    expect(controller.error, 'L2CAP channel: Bad state: Peer rejected the write');
+    expect(controller.error, "L2CAP channel: Bad state: Peer rejected the write");
     expect(session.transmitted, 0);
     expect(controller.busy(Operation.channel(session)), isFalse);
     await controller.send(session, [2, 3]);
@@ -829,27 +829,27 @@ void main() {
     expect(session.transmitted, 2);
   });
 
-  test('adapter shutdown clears native resources and activity is bounded', () async {
+  test("adapter shutdown clears native resources and activity is bounded", () async {
     final (:controller, :platform) = await _setup();
     await controller.startServer(secure: true);
-    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('server'), psm: 129));
-    platform.received.add(L2CapChannelData(remoteId: const DeviceIdentifier('server'), psm: 129, value: [1, 2]));
+    platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("server"), psm: 129));
+    platform.received.add(L2CapChannelData(remoteId: const DeviceIdentifier("server"), psm: 129, value: [1, 2]));
     platform.adapters.add(BmBluetoothAdapterState(adapterState: BmAdapterStateEnum.off));
     await Future<void>.delayed(Duration.zero);
     expect(controller.channels, isEmpty);
     expect(controller.serverPsm, isNull);
     final session = controller.channelSessions.single;
-    expect(session.closed, isTrue, reason: 'Adapter loss keeps the closed session for its diagnostics');
+    expect(session.closed, isTrue, reason: "Adapter loss keeps the closed session for its diagnostics");
     expect(session.received, 2);
     expect(session.history.single.bytes, [1, 2]);
     for (var i = 0; i < WorkbenchController.maxLogEntries + 10; i++) {
-      controller.log('entry $i');
+      controller.log("entry $i");
     }
     expect(controller.logs, hasLength(WorkbenchController.maxLogEntries));
-    expect(controller.logs.first, endsWith('entry 10'));
+    expect(controller.logs.first, endsWith("entry 10"));
   });
 
-  test('an unimplemented server reports unsupported without leaving a pending session', () async {
+  test("an unimplemented server reports unsupported without leaving a pending session", () async {
     final (:controller, :platform) = await _setup();
     platform.overrideListenL2CapChannel = (_) {
       return Future<int>.error(UnimplementedError());
@@ -857,40 +857,40 @@ void main() {
 
     await controller.startServer(secure: true);
 
-    expect(controller.error, 'This operation is not supported on this device.');
+    expect(controller.error, "This operation is not supported on this device.");
     expect(controller.serverPsm, isNull);
     expect(controller.channels, isEmpty);
     expect(controller.busy(Operation.server), isFalse);
-    expect(controller.logs.last, contains('UnimplementedError'));
+    expect(controller.logs.last, contains("UnimplementedError"));
   });
 
-  test('an unsupported error outside a plugin call is reported with its message', () async {
+  test("an unsupported error outside a plugin call is reported with its message", () async {
     final (:controller, platform: _) = await _setup();
 
     await controller.run(Operation.bond, () async => controller.catalog.clear());
 
-    expect(controller.error, startsWith('Bond: Unsupported operation'));
+    expect(controller.error, startsWith("Bond: Unsupported operation"));
   });
 
-  test('the server reports unsupported on a platform without L2CAP', () async {
+  test("the server reports unsupported on a platform without L2CAP", () async {
     final (:controller, :platform) = await _setup();
     debugDefaultTargetPlatformOverride = TargetPlatform.linux;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
 
     await controller.startServer(secure: true);
 
-    expect(controller.error, 'This operation is not supported on this device.');
+    expect(controller.error, "This operation is not supported on this device.");
     expect(platform.listenRequests, isEmpty);
   });
 
   for (final failure in [
     UnimplementedError(),
-    UnsupportedError('L2CAP is unavailable'),
-    PlatformException(code: 'platform_not_supported', message: 'Requires Android 10 or newer.'),
+    UnsupportedError("L2CAP is unavailable"),
+    PlatformException(code: "platform_not_supported", message: "Requires Android 10 or newer."),
   ]) {
-    test('unsupported channel errors are shown without retrying: ${failure.runtimeType}', () async {
+    test("unsupported channel errors are shown without retrying: ${failure.runtimeType}", () async {
       final (:controller, :platform) = await _setup();
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:04');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:04");
       controller.select(peer);
       await controller.connect();
       final before = platform.openRequests.length;
@@ -902,19 +902,19 @@ void main() {
       await controller.openChannel(131, device: peer, secure: true);
 
       expect(platform.openRequests, hasLength(before + 1));
-      expect(controller.error, 'This operation is not supported on this device.');
+      expect(controller.error, "This operation is not supported on this device.");
       expect(controller.channels, isEmpty);
       expect(controller.busy(Operation.open), isFalse);
       expect(peer.isConnected, isTrue);
       expect(controller.logs.last, contains(failure.toString()));
     });
   }
-  group('Connection and diagnostic workflows', () {
-    test('cancellation interrupts a pending real plugin connection without waiting for its timeout', () async {
+  group("Connection and diagnostic workflows", () {
+    test("cancellation interrupts a pending real plugin connection without waiting for its timeout", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:51');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:51");
       c.select(peer);
       platform.overrideConnect = (req) async {
         platform.connectRequests.add(req);
@@ -931,18 +931,18 @@ void main() {
       expect(c.busy(Operation.connection), isFalse);
     });
 
-    test('channel open reconnects its original peer and retries once after a transient drop', () async {
+    test("channel open reconnects its original peer and retries once after a transient drop", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:52');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:52");
       c.select(peer);
       await c.connect();
       platform.overrideOpenL2CapChannel = (req) async {
         platform.overrideOpenL2CapChannel = null;
         platform.openRequests.add(req);
         await platform.disconnect(BmDisconnectRequest(remoteId: DeviceIdentifier(req.remoteId)));
-        throw StateError('Temporary channel failure');
+        throw StateError("Temporary channel failure");
       };
       final attempts = platform.openRequests.length;
       final connections = platform.connectRequests.length;
@@ -954,14 +954,14 @@ void main() {
       expect(peer.isConnected, isTrue);
     });
 
-    test('a rejected channel open does not retry while the peer remains connected', () async {
+    test("a rejected channel open does not retry while the peer remains connected", () async {
       final (:controller, :platform) = await _setup();
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:53');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:53");
       controller.select(peer);
       await controller.connect();
       platform.overrideOpenL2CapChannel = (req) {
         platform.openRequests.add(req);
-        return Future<void>.error(StateError('Peer rejected the channel'));
+        return Future<void>.error(StateError("Peer rejected the channel"));
       };
 
       await controller.openChannel(131, device: peer, secure: true);
@@ -969,21 +969,21 @@ void main() {
       expect(platform.openRequests, hasLength(1));
       expect(peer.isConnected, isTrue);
       expect(controller.channels, isEmpty);
-      expect(controller.error, contains('Peer rejected the channel'));
+      expect(controller.error, contains("Peer rejected the channel"));
     });
 
-    test('channel open does not reconnect a peer the user disconnected while opening', () async {
+    test("channel open does not reconnect a peer the user disconnected while opening", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:55');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:55");
       c.select(peer);
       await c.connect();
       final gate = Completer<void>();
       platform.overrideOpenL2CapChannel = (r) async {
         platform.openRequests.add(r);
         await gate.future;
-        throw StateError('Temporary channel failure');
+        throw StateError("Temporary channel failure");
       };
       final attempts = platform.openRequests.length;
       final connections = platform.connectRequests.length;
@@ -995,19 +995,19 @@ void main() {
       await opening;
       await disconnecting;
 
-      expect(c.error, contains('Temporary channel failure'));
+      expect(c.error, contains("Temporary channel failure"));
       expect(platform.openRequests.length, attempts + 1);
       expect(platform.connectRequests.length, connections);
       expect(peer.isConnected, isFalse);
       expect(c.channels, isEmpty);
     });
 
-    test('test traffic preserves large payloads and drains the public plugin write queue', () async {
+    test("test traffic preserves large payloads and drains the public plugin write queue", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('traffic'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("traffic"), psm: 129));
       final session = c.channels.single;
       await c.sendTestTraffic(session, size: 10 * 1024, count: 1);
       final large = platform.writes.last;
@@ -1015,7 +1015,7 @@ void main() {
       expect(large.value.take(4), [0, 1, 2, 3]);
       expect(large.value.sublist(254, 258), [254, 255, 0, 1]);
       expect(large.value.last, 255);
-      expect(large.remoteId, 'traffic');
+      expect(large.remoteId, "traffic");
       final gate = Completer<void>();
       platform.overrideWriteL2CapChannel = (_) => gate.future;
       addTearDown(() {
@@ -1036,10 +1036,10 @@ void main() {
       expect(c.busy(Operation.channel(session)), isFalse);
     });
 
-    test('burst listeners see successful bytes before the final write completes', () async {
+    test("burst listeners see successful bytes before the final write completes", () async {
       final (:controller, :platform) = await _setup();
       await controller.startServer(secure: true);
-      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('progress'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("progress"), psm: 129));
       final session = controller.channels.single;
       final release = Completer<void>();
       var writes = 0;
@@ -1062,32 +1062,32 @@ void main() {
       expect(session.transmitted, 2048);
     });
 
-    test('a failed burst write preserves successful byte counts and releases the channel controls', () async {
+    test("a failed burst write preserves successful byte counts and releases the channel controls", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('burst-failure'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("burst-failure"), psm: 129));
       final session = c.channels.single;
       platform.overrideWriteL2CapChannel = (_) {
         platform.overrideWriteL2CapChannel = null;
-        return Future<void>.error(StateError('Peer rejected the write'));
+        return Future<void>.error(StateError("Peer rejected the write"));
       };
       await c.sendTestTraffic(session, size: 1024, count: 20);
       expect(session.transmitted, 19 * 1024);
-      expect(c.error, contains('Peer rejected'));
+      expect(c.error, contains("Peer rejected"));
       expect(c.busy(Operation.channel(session)), isFalse);
-      expect(c.logs.any((line) => line.contains('19/20 writes')), isTrue);
+      expect(c.logs.any((line) => line.contains("19/20 writes")), isTrue);
     });
 
-    test('buffer reads are per peer and preserve history without double-counting stream bytes', () async {
+    test("buffer reads are per peer and preserve history without double-counting stream bytes", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
       await c.startServer(secure: true);
-      const peer = DeviceIdentifier('buffer');
+      const peer = DeviceIdentifier("buffer");
       platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
-      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier('other'), psm: 129));
+      platform.accepted.add(L2CapChannelConnected(remoteId: const DeviceIdentifier("other"), psm: 129));
       final session = c.channels.first;
       platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [65, 66]));
       platform.bufferedBytes = [65, 66];
@@ -1100,26 +1100,26 @@ void main() {
       expect(session.history.map((e) => e.source), [
         ReceiveSource.bufferRead,
         ReceiveSource.stream,
-      ], reason: 'An empty read adds no entry');
+      ], reason: "An empty read adds no entry");
       expect(session.lastReceived, [65, 66]);
-      expect(c.logs.last, endsWith(': 0 B'));
+      expect(c.logs.last, endsWith(": 0 B"));
       for (var i = 0; i < ChannelSession.maxHistoryEntries + 1; i++) {
         platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [i]));
       }
       expect(session.history, hasLength(ChannelSession.maxHistoryEntries));
     });
 
-    test('system peers can be selected and connected without receiving an advertisement', () async {
+    test("system peers can be selected and connected without receiving an advertisement", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
       platform.systemPeers.add(
-        BmBluetoothDevice(remoteId: const DeviceIdentifier('AA:BB:CC:DD:EE:53'), platformName: 'System peer'),
+        BmBluetoothDevice(remoteId: const DeviceIdentifier("AA:BB:CC:DD:EE:53"), platformName: "System peer"),
       );
       await c.scan();
       await c.scan();
-      expect(platform.systemDeviceRequests.last.withServices, [Guid('180f')]);
-      expect(c.systemDevices.single.platformName, 'System peer');
+      expect(platform.systemDeviceRequests.last.withServices, [Guid("180f")]);
+      expect(c.systemDevices.single.platformName, "System peer");
       c.select(c.systemDevices.single);
       await c.connect();
       await _until(() => c.rssi != null);
@@ -1134,7 +1134,7 @@ void main() {
         final c = fixture.controller;
         final platform = fixture.platform;
         await c.startServer(secure: false);
-        const peer = DeviceIdentifier('history');
+        const peer = DeviceIdentifier("history");
         platform.accepted.add(L2CapChannelConnected(remoteId: peer, psm: 129));
         final session = c.channels.single;
         platform.received.add(L2CapChannelData(remoteId: peer, psm: 129, value: [65, 66]));
@@ -1172,9 +1172,9 @@ void main() {
       });
     }
 
-    test('opposite channel directions retain independent diagnostics for the same peer and PSM', () async {
+    test("opposite channel directions retain independent diagnostics for the same peer and PSM", () async {
       final (:controller, :platform) = await _setup();
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:56');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:56");
       controller.select(peer);
       await controller.connect();
       await controller.startServer(secure: true);
@@ -1204,11 +1204,11 @@ void main() {
       expect(incoming.history.single.bytes, [4]);
     });
 
-    test('outgoing channels reopen after closing and retain the original 200-entry history', () async {
+    test("outgoing channels reopen after closing and retain the original 200-entry history", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
-      final peer = BluetoothDevice.fromId('AA:BB:CC:DD:EE:54');
+      final peer = BluetoothDevice.fromId("AA:BB:CC:DD:EE:54");
       c.select(peer);
       await c.connect();
       await c.openChannel(131, device: peer, secure: false);
@@ -1225,7 +1225,7 @@ void main() {
       expect(c.channels.single.received, 201);
     });
 
-    test('adapter turn-on uses the real library request and adapter state stream', () async {
+    test("adapter turn-on uses the real library request and adapter state stream", () async {
       final fixture = await _setup();
       final c = fixture.controller;
       final platform = fixture.platform;
@@ -1271,7 +1271,7 @@ Future<void> _until(bool Function() complete, {Duration timeout = const Duration
   final stopwatch = Stopwatch()..start();
   while (!complete()) {
     if (stopwatch.elapsed >= timeout) {
-      throw TimeoutException('Condition was not met before the polling deadline', timeout);
+      throw TimeoutException("Condition was not met before the polling deadline", timeout);
     }
     await Future<void>.delayed(Duration.zero);
   }

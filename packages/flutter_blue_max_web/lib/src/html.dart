@@ -13,10 +13,10 @@
 @JS()
 library;
 
-import 'dart:js_interop';
+import "dart:js_interop";
 
-import 'package:flutter_blue_max_web/src/web_bluetooth.dart';
-import 'package:web/web.dart' show EventTarget;
+import "package:flutter_blue_max_web/src/web_bluetooth.dart";
+import "package:web/web.dart" show EventTarget;
 
 @JS()
 external Window get window;

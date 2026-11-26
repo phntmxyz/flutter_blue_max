@@ -1,17 +1,17 @@
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_test/flutter_test.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_test/flutter_test.dart";
 
-import '../fakes/fake_bluetooth_platform.dart';
-import '../robot/advertisement_robot.dart';
-import '../robot/catalog_files_robot.dart';
-import '../robot/diagnostics_robot.dart';
-import '../robot/file_dialogs_robot.dart';
-import '../robot/gatt_catalog_robot.dart';
-import '../robot/parser_files_robot.dart';
-import '../robot/workbench_robot.dart';
+import "../fakes/fake_bluetooth_platform.dart";
+import "../robot/advertisement_robot.dart";
+import "../robot/catalog_files_robot.dart";
+import "../robot/diagnostics_robot.dart";
+import "../robot/file_dialogs_robot.dart";
+import "../robot/gatt_catalog_robot.dart";
+import "../robot/parser_files_robot.dart";
+import "../robot/workbench_robot.dart";
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -22,27 +22,27 @@ void main() {
     await FlutterBlueMax.setLogLevel(LogLevel.verbose, color: false);
   });
 
-  testWidgets('discovery: a peer in both lists can be selected unambiguously', (tester) async {
+  testWidgets("discovery: a peer in both lists can be selected unambiguously", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
     await robot.selectAdvertisedPeerAlsoConnectedToTheSystem();
   });
 
-  testWidgets('parser editor: hidden inputs do not prevent saving after a type change', (tester) async {
+  testWidgets("parser editor: hidden inputs do not prevent saving after a type change", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
     await robot.scanForSensor();
     await robot.saveAfterChangingFieldType();
   });
 
-  testWidgets('parser editor: rejects negative hex identifiers', (tester) async {
+  testWidgets("parser editor: rejects negative hex identifiers", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 1000));
     await robot.scanForSensor();
     await robot.rejectNegativeHexIdentifiers();
   });
 
-  testWidgets('desktop: discover GATT, validate PSM and preserve server across navigation', (tester) async {
+  testWidgets("desktop: discover GATT, validate PSM and preserve server across navigation", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     robot.expectLocalDeviceName();
@@ -64,7 +64,7 @@ void main() {
     robot.expectStopped();
   });
 
-  testWidgets('phone: local server is available without selecting a peripheral', (tester) async {
+  testWidgets("phone: local server is available without selecting a peripheral", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     robot.expectLocalDeviceName();
@@ -80,7 +80,7 @@ void main() {
     robot.expectStopped();
   });
 
-  testWidgets('compact phone: keyboard and landscape keep workspaces scrollable', (tester) async {
+  testWidgets("compact phone: keyboard and landscape keep workspaces scrollable", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(360, 640));
     await robot.scanForPeripheral();
@@ -93,7 +93,7 @@ void main() {
     await robot.stopServer();
   });
 
-  testWidgets('phone: track the advertisements of a selected device', (tester) async {
+  testWidgets("phone: track the advertisements of a selected device", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral();
@@ -101,7 +101,7 @@ void main() {
     await robot.trackAdvertisements();
   });
 
-  testWidgets('phone: parse sensor values and filter the tracked history', (tester) async {
+  testWidgets("phone: parse sensor values and filter the tracked history", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForSensor();
@@ -110,52 +110,52 @@ void main() {
     await robot.removeParser();
   });
 
-  testWidgets('phone: parse a record-based sensor frame', (tester) async {
+  testWidgets("phone: parse a record-based sensor frame", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForRecordSensor();
     await robot.addRecordParser();
   });
 
-  testWidgets('desktop: manage saved parsers globally', (tester) async {
+  testWidgets("desktop: manage saved parsers globally", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.manageGlobalParsers();
   });
 
-  group('File dialog outcomes', () {
+  group("File dialog outcomes", () {
     for (final library in LibraryFile.values) {
-      testWidgets('$library: a failing share reports the export error', (tester) async {
+      testWidgets("$library: a failing share reports the export error", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(390, 844));
         await robot.rejectShareFailure(library);
       }, variant: TargetPlatformVariant.only(TargetPlatform.android));
-      testWidgets('$library: dismissing a share does not claim an export', (tester) async {
+      testWidgets("$library: dismissing a share does not claim an export", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(390, 844));
         await robot.dismissShare(library);
       }, variant: TargetPlatformVariant.only(TargetPlatform.android));
-      testWidgets('$library: a picker failure keeps the library intact', (tester) async {
+      testWidgets("$library: a picker failure keeps the library intact", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(1200, 850));
         await robot.rejectPickerFailure(library);
       });
-      testWidgets('$library: cancelling a picker leaves the library alone', (tester) async {
+      testWidgets("$library: cancelling a picker leaves the library alone", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(1200, 850));
         await robot.cancelFilePicker(library);
       });
-      testWidgets('$library: an unconfirmed share does not claim an export', (tester) async {
+      testWidgets("$library: an unconfirmed share does not claim an export", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(390, 844));
         await robot.shareWithoutConfirmation(library);
       }, variant: TargetPlatformVariant.only(TargetPlatform.android));
-      testWidgets('$library: a failing save dialog reports the export error', (tester) async {
+      testWidgets("$library: a failing save dialog reports the export error", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(1200, 850));
         await robot.rejectDesktopSaveFailure(library);
       }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
-      testWidgets('$library: cancelling a save does not claim an export', (tester) async {
+      testWidgets("$library: cancelling a save does not claim an export", (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(1200, 850));
         await robot.cancelDesktopSave(library);
@@ -163,83 +163,83 @@ void main() {
     }
   });
 
-  testWidgets('clipboard rejection is reported from all diagnostic copy actions', (tester) async {
+  testWidgets("clipboard rejection is reported from all diagnostic copy actions", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.rejectDiagnosticClipboardWrites();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  group('Parser files', () {
-    testWidgets('phone: export chosen parsers through the share sheet', (tester) async {
+  group("Parser files", () {
+    testWidgets("phone: export chosen parsers through the share sheet", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.exportChosenThroughShareSheet();
     });
 
-    testWidgets('desktop: export all parsers to a file', (tester) async {
+    testWidgets("desktop: export all parsers to a file", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.exportAllToFile();
     }, variant: TargetPlatformVariant.only(TargetPlatform.macOS));
 
-    testWidgets('desktop: import adds only parsers that are not present', (tester) async {
+    testWidgets("desktop: import adds only parsers that are not present", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.importSkippingPresentParsers();
     });
 
-    testWidgets('desktop: a file without parsers is rejected', (tester) async {
+    testWidgets("desktop: a file without parsers is rejected", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.rejectFileWithoutParsers();
     });
 
-    testWidgets('desktop: a parser the editor would not save is rejected', (tester) async {
+    testWidgets("desktop: a parser the editor would not save is rejected", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.rejectParserWithoutCompanyId();
     });
 
-    testWidgets('desktop: reset replaces every parser with the bundled ones', (tester) async {
+    testWidgets("desktop: reset replaces every parser with the bundled ones", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.resetToBundledParsers();
     });
   });
 
-  group('Catalog files', () {
-    testWidgets('desktop: duplicate service UUIDs fail before the import chooser', (tester) async {
+  group("Catalog files", () {
+    testWidgets("desktop: duplicate service UUIDs fail before the import chooser", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.rejectDuplicateServiceUuids();
     });
 
-    testWidgets('desktop: import replaces own entries with the same UUID and skips identical ones', (tester) async {
+    testWidgets("desktop: import replaces own entries with the same UUID and skips identical ones", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.importReplacingOwnEntries();
     });
 
-    testWidgets('phone: export chosen own services through the share sheet', (tester) async {
+    testWidgets("phone: export chosen own services through the share sheet", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.exportChosenServicesThroughShareSheet();
     });
 
-    testWidgets('desktop: a parser file is rejected as catalog', (tester) async {
+    testWidgets("desktop: a parser file is rejected as catalog", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.rejectParserFileAsCatalog();
     });
 
-    testWidgets('desktop: reset removes own services and keeps the built-in ones', (tester) async {
+    testWidgets("desktop: reset removes own services and keeps the built-in ones", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.resetOwnServices();
     });
   });
 
-  testWidgets('phone: system back returns to the list without dropping the connection', (tester) async {
+  testWidgets("phone: system back returns to the list without dropping the connection", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral();
@@ -248,7 +248,7 @@ void main() {
     await robot.reopenConnectedPeripheral();
   });
 
-  testWidgets('phone: system Back bubbles when another destination hides the inspector', (tester) async {
+  testWidgets("phone: system Back bubbles when another destination hides the inspector", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral();
@@ -256,14 +256,14 @@ void main() {
     await robot.backWithHiddenInspector();
   });
 
-  testWidgets('phone: the search text survives a visit to the device details', (tester) async {
+  testWidgets("phone: the search text survives a visit to the device details", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.scanForPeripheral(includeSecondPeer: true);
     await robot.keepSearchAcrossDetails();
   });
 
-  testWidgets('android: request an MTU in range and create a bond', (tester) async {
+  testWidgets("android: request an MTU in range and create a bond", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.scanForPeripheral();
@@ -272,13 +272,13 @@ void main() {
     await robot.requestMtuAndCreateBond();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('phone: tapping outside a text field closes the keyboard', (tester) async {
+  testWidgets("phone: tapping outside a text field closes the keyboard", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
     await robot.dismissKeyboardByTappingOutside();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('GATT payload keeps its draft when a background tap dismisses the keyboard', (tester) async {
+  testWidgets("GATT payload keeps its draft when a background tap dismisses the keyboard", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.scanForPeripheral();
@@ -286,7 +286,7 @@ void main() {
     await robot.dismissGattPayloadKeyboard();
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('phone: outgoing L2CAP requires a connection but no GATT discovery', (tester) async {
+  testWidgets("phone: outgoing L2CAP requires a connection but no GATT discovery", (tester) async {
     // Only Android lets the client choose encryption.
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(390, 844));
@@ -300,7 +300,7 @@ void main() {
     robot.expectChannelEncryption(secure: false);
   }, variant: TargetPlatformVariant.only(TargetPlatform.android));
 
-  testWidgets('desktop: channels and remote PSM input belong to the inspected device', (tester) async {
+  testWidgets("desktop: channels and remote PSM input belong to the inspected device", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.scanForPeripheral(includeSecondPeer: true);
@@ -308,7 +308,7 @@ void main() {
     await robot.connectSelected();
     await robot.openL2cap();
     await robot.openRemoteChannel();
-    await robot.selectPeripheral(name: 'Other peripheral');
+    await robot.selectPeripheral(name: "Other peripheral");
     await robot.connectSelected();
     await robot.openL2cap();
     robot.expectEmptyPsm();
@@ -318,7 +318,7 @@ void main() {
     await robot.expectOnlySelectedChannel();
   });
 
-  testWidgets('unsupported server reports a dismissible message and GATT remains usable', (tester) async {
+  testWidgets("unsupported server reports a dismissible message and GATT remains usable", (tester) async {
     final robot = WorkbenchRobot(tester, platform);
     await robot.launch(size: const Size(1200, 850));
     await robot.openLocalServer();
@@ -329,14 +329,14 @@ void main() {
     await robot.inspectPeripheral();
     await robot.readAndWriteCharacteristic();
   });
-  group('Platform controls and diagnostics', () {
-    testWidgets('system-connected peers remain discoverable without advertisements', (tester) async {
+  group("Platform controls and diagnostics", () {
+    testWidgets("system-connected peers remain discoverable without advertisements", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.connectSystemPeer();
     });
 
-    testWidgets('phone: cancel a pending connection', (tester) async {
+    testWidgets("phone: cancel a pending connection", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.scanForPeripheral();
@@ -344,7 +344,7 @@ void main() {
       await robot.cancelPendingConnection();
     });
 
-    testWidgets('L2CAP exposes large writes, burst traffic, buffer reads and receive history', (tester) async {
+    testWidgets("L2CAP exposes large writes, burst traffic, buffer reads and receive history", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -356,7 +356,7 @@ void main() {
       await robot.inspectHistoryAfterClosing(fromPeer: false);
     });
 
-    testWidgets('incoming channel history remains visible after the peer closes it', (tester) async {
+    testWidgets("incoming channel history remains visible after the peer closes it", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.openLocalServer();
@@ -366,7 +366,7 @@ void main() {
       await robot.inspectHistoryAfterClosing(fromPeer: true);
     });
 
-    testWidgets('GATT subscriptions and descriptor operations remain reachable', (tester) async {
+    testWidgets("GATT subscriptions and descriptor operations remain reachable", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -374,7 +374,7 @@ void main() {
       await robot.exerciseNotificationsAndDescriptors();
     });
 
-    testWidgets('an unread GATT value differs from a successfully read empty value', (tester) async {
+    testWidgets("an unread GATT value differs from a successfully read empty value", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -382,7 +382,7 @@ void main() {
       await robot.inspectEmptyGattValue();
     });
 
-    testWidgets('known GATT services are named and test services checked against the dongle', (tester) async {
+    testWidgets("known GATT services are named and test services checked against the dongle", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -391,7 +391,7 @@ void main() {
       await robot.inspectTestCharacteristics();
     });
 
-    testWidgets('a discovered service can be added to the GATT catalog and removed again', (tester) async {
+    testWidgets("a discovered service can be added to the GATT catalog and removed again", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -399,32 +399,32 @@ void main() {
       await robot.removeOwnCatalogService();
     });
 
-    testWidgets('a custom GATT entry overrides Battery until removed', (tester) async {
+    testWidgets("a custom GATT entry overrides Battery until removed", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
       await robot.overrideBuiltInBatteryService();
     });
 
-    testWidgets('broadcast advertisements retain appearance and cannot be connected', (tester) async {
+    testWidgets("broadcast advertisements retain appearance and cannot be connected", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.checkBroadcastAndAppearance();
     });
 
-    testWidgets('Android exposes the adapter turn-on action', (tester) async {
+    testWidgets("Android exposes the adapter turn-on action", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.enableBluetooth();
     });
 
-    testWidgets('phone: pull-to-refresh starts a new scan', (tester) async {
+    testWidgets("phone: pull-to-refresh starts a new scan", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(390, 844));
       await robot.pullToRefreshDevices();
     });
 
-    testWidgets('Linux exposes GATT and activity without unsupported L2CAP controls', (tester) async {
+    testWidgets("Linux exposes GATT and activity without unsupported L2CAP controls", (tester) async {
       final robot = WorkbenchRobot(tester, platform);
       await robot.launch(size: const Size(1200, 850));
       await robot.scanForPeripheral();
@@ -438,7 +438,7 @@ void main() {
 
     for (final size in [const Size(1200, 850), const Size(390, 844)]) {
       testWidgets(
-        'web: scan, GATT and navigation at $size',
+        "web: scan, GATT and navigation at $size",
         (tester) async {
           final robot = WorkbenchRobot(tester, platform);
           await robot.launch(size: size);
@@ -457,7 +457,7 @@ void main() {
     }
 
     testWidgets(
-      'web: a subscription survives rebuilding its tile until the link drops',
+      "web: a subscription survives rebuilding its tile until the link drops",
       (tester) async {
         final robot = WorkbenchRobot(tester, platform);
         await robot.launch(size: const Size(1200, 850));

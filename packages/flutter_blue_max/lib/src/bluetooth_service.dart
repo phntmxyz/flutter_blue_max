@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 class BluetoothService {
 
@@ -57,14 +57,14 @@ class BluetoothService {
 
   @override
   String toString() {
-    return 'BluetoothService{'
-        'remoteId: $remoteId, '
-        'serviceUuid: $serviceUuid, '
-        'primaryServiceUuid: $primaryServiceUuid, '
-        'characteristics: $characteristics, '
-        '}';
+    return "BluetoothService{"
+        "remoteId: $remoteId, "
+        "serviceUuid: $serviceUuid, "
+        "primaryServiceUuid: $primaryServiceUuid, "
+        "characteristics: $characteristics, "
+        "}";
   }
 
-  @Deprecated('Use remoteId instead')
+  @Deprecated("Use remoteId instead")
   DeviceIdentifier get deviceId => remoteId;
 }
