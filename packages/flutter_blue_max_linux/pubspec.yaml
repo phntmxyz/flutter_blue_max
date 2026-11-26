@@ -8,7 +8,7 @@ environment:
   flutter: '>=3.7.0'
 
 dependencies:
-  bluez: '>=0.7.8 <0.9.0'
+  bluez: '>=0.7.8 <0.10.0'
   flutter:
     sdk: flutter
   flutter_blue_max_platform_interface: 6.0.0

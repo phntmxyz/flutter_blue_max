@@ -4,6 +4,7 @@ import "package:bluez/bluez.dart";
 import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
 import "package:rxdart/rxdart.dart";
 
+/// Linux implementation of [FlutterBlueMaxPlatform], built on BlueZ.
 final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
   final _client = BlueZClient();
 
@@ -18,6 +19,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
   final _onReadRssiController = StreamController<BmReadRssiResult>.broadcast();
   final _onTurnOnResponseController = StreamController<BmTurnOnResponse>.broadcast();
 
+  /// Emits whenever the Bluetooth adapter state changes.
   @override
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
     return _client.adaptersChanged.where(
@@ -41,6 +43,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Emits whenever the bond state of a device changes.
   @override
   Stream<BmBondStateResponse> get onBondStateChanged {
     return _client.devicesChanged.switchMap(
@@ -68,6 +71,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Emits values received from a characteristic, from a read or a notification.
   @override
   Stream<BmCharacteristicData> get onCharacteristicReceived {
     return _onCharacteristicReadController.stream.mergeWith([
@@ -112,11 +116,13 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     ]);
   }
 
+  /// Emits the result of a characteristic write.
   @override
   Stream<BmCharacteristicData> get onCharacteristicWritten {
     return _onCharacteristicWrittenController.stream;
   }
 
+  /// Emits whenever the connection state of a device changes.
   @override
   Stream<BmConnectionStateResponse> get onConnectionStateChanged {
     return _client.devicesChanged.switchMap(
@@ -146,26 +152,31 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Emits the result of a descriptor read.
   @override
   Stream<BmDescriptorData> get onDescriptorRead {
     return _onDescriptorReadController.stream;
   }
 
+  /// Emits the result of a descriptor write.
   @override
   Stream<BmDescriptorData> get onDescriptorWritten {
     return _onDescriptorWrittenController.stream;
   }
 
+  /// Emits the services found by a service discovery.
   @override
   Stream<BmDiscoverServicesResult> get onDiscoveredServices {
     return _onDiscoveredServicesController.stream;
   }
 
+  /// Emits whenever the MTU of a connection changes.
   @override
   Stream<BmMtuChangedResponse> get onMtuChanged {
     return const Stream.empty();
   }
 
+  /// Emits whenever a device changes its name.
   @override
   Stream<BmNameChanged> get onNameChanged {
     return _client.devicesChanged.switchMap(
@@ -192,11 +203,13 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Emits the result of an RSSI read.
   @override
   Stream<BmReadRssiResult> get onReadRssi {
     return _onReadRssiController.stream;
   }
 
+  /// Emits the advertisements found while scanning.
   @override
   Stream<BmScanResponse> get onScanResponse {
     return _client.deviceAdded.map(
@@ -236,6 +249,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Emits when a device signals that its services changed.
   @override
   Stream<BmBluetoothDevice> get onServicesReset {
     return _client.devicesChanged.switchMap(
@@ -267,6 +281,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return _onTurnOnResponseController.stream;
   }
 
+  /// Connects to the device in [request].
   @override
   Future<bool> connect(
     BmConnectRequest request,
@@ -284,6 +299,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Pairs with the device in [request].
   @override
   Future<bool> createBond(
     BmCreateBondRequest request,
@@ -301,6 +317,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Disconnects from the device in [request].
   @override
   Future<bool> disconnect(
     BmDisconnectRequest request,
@@ -318,6 +335,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Discovers the services of the connected device.
   @override
   Future<bool> discoverServices(
     BmDiscoverServicesRequest request,
@@ -433,6 +451,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Returns the name of the Bluetooth adapter.
   @override
   Future<BmBluetoothAdapterName> getAdapterName(
     BmBluetoothAdapterNameRequest request,
@@ -444,6 +463,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Returns the current state of the Bluetooth adapter.
   @override
   Future<BmBluetoothAdapterState> getAdapterState(
     BmBluetoothAdapterStateRequest request,
@@ -500,6 +520,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Returns the devices already connected to the system.
   @override
   Future<BmDevicesList> getSystemDevices(
     BmSystemDevicesRequest request,
@@ -518,6 +539,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Returns whether the platform supports Bluetooth Low Energy.
   @override
   Future<bool> isSupported(
     BmIsSupportedRequest request,
@@ -527,6 +549,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return _client.adapters.isNotEmpty;
   }
 
+  /// Reads the value of a characteristic.
   @override
   Future<bool> readCharacteristic(
     BmReadCharacteristicRequest request,
@@ -601,6 +624,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Reads the value of a descriptor.
   @override
   Future<bool> readDescriptor(
     BmReadDescriptorRequest request,
@@ -689,6 +713,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Reads the signal strength of the connected device.
   @override
   Future<bool> readRssi(
     BmReadRssiRequest request,
@@ -728,6 +753,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Sets how verbose the platform implementation logs.
   @override
   Future<bool> setLogLevel(
     BmSetLogLevelRequest request,
@@ -739,6 +765,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Enables or disables notifications of a characteristic.
   @override
   Future<bool> setNotifyValue(
     BmSetNotifyValueRequest request,
@@ -781,6 +808,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Starts scanning for advertising devices.
   @override
   Future<bool> startScan(
     BmScanSettings request,
@@ -806,6 +834,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Stops a running scan.
   @override
   Future<bool> stopScan(
     BmStopScanRequest request,
@@ -840,6 +869,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Asks the platform to turn Bluetooth on.
   @override
   Future<bool> turnOn(
     BmTurnOnRequest request,
@@ -863,6 +893,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Writes a value to a characteristic.
   @override
   Future<bool> writeCharacteristic(
     BmWriteCharacteristicRequest request,
@@ -942,6 +973,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Writes a value to a descriptor.
   @override
   Future<bool> writeDescriptor(
     BmWriteDescriptorRequest request,
@@ -1030,6 +1062,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Registers this implementation as the [FlutterBlueMaxPlatform] instance.
   static void registerWith() {
     FlutterBlueMaxPlatform.instance = FlutterBlueMaxLinux();
   }
