@@ -28,12 +28,12 @@ part of "../flutter_blue_max.dart";
 /// await channel.close();
 /// ```
 class BluetoothL2capChannel {
-
   /// Creates a new [BluetoothL2capChannel] instance.
   ///
   /// [deviceId] - The identifier of the Bluetooth device
   /// [psm] - The Protocol Service Multiplexer value for this channel
   BluetoothL2capChannel({required this.deviceId, required this.psm});
+
   /// The device identifier for the connected Bluetooth device
   final DeviceIdentifier deviceId;
 

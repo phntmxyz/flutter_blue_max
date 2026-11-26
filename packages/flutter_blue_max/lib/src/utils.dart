@@ -99,7 +99,6 @@ extension FutureTimeout<T> on Future<T> {
 //  1. we cache the latestValue of the stream
 //  2. the "latestValue" is re-emitted whenever the stream is listened to
 class _StreamControllerReEmit<T> {
-
   _StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
   T latestValue;
 
@@ -137,7 +136,6 @@ class _StreamControllerReEmit<T> {
 // immediately starts listening to a broadcast stream and
 // buffering it in a new single-subscription stream
 class _BufferStream<T> {
-
   _BufferStream.listen(this._inputStream) {
     _controller = StreamController<T>(
       onCancel: () {
@@ -184,8 +182,8 @@ class _BufferStream<T> {
 
 // Helper for 'newStreamWithInitialValue' method for streams.
 class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, T> {
-
   _NewStreamWithInitialValueTransformer(this.initialValue);
+
   /// the initial value to push to the new stream
   final T initialValue;
 

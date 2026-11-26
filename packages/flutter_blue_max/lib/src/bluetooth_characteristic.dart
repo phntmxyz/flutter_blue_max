@@ -7,7 +7,6 @@ part of "../flutter_blue_max.dart";
 final Guid cccdUuid = Guid("00002902-0000-1000-8000-00805f9b34fb");
 
 class BluetoothCharacteristic {
-
   BluetoothCharacteristic({
     required this.remoteId,
     required this.serviceUuid,
@@ -281,7 +280,8 @@ class BluetoothCharacteristic {
       final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      final bool hasCCCD = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
+      final bool hasCCCD =
+          await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
 
       // wait for CCCD descriptor to be written?
       if (hasCCCD) {
@@ -355,7 +355,6 @@ class BluetoothCharacteristic {
 }
 
 class CharacteristicProperties {
-
   const CharacteristicProperties(
       {this.broadcast = false,
       this.read = false,

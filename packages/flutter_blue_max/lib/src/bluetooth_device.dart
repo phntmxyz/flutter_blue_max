@@ -5,7 +5,6 @@
 part of "../flutter_blue_max.dart";
 
 class BluetoothDevice {
-
   BluetoothDevice({
     required this.remoteId,
   });
@@ -279,7 +278,6 @@ class BluetoothDevice {
 
       // return primary services
       result = response.services.map((p) => BluetoothService.fromProto(p)).where((p) => p.isPrimary).toList();
-
     } finally {
       mtx.give();
     }

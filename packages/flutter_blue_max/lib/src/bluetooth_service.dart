@@ -5,7 +5,6 @@
 part of "../flutter_blue_max.dart";
 
 class BluetoothService {
-
   /// for internal use
   BluetoothService.fromProto(BmBluetoothService p)
       : remoteId = p.remoteId,

@@ -155,8 +155,7 @@ void main() {
     ]);
     expect(outcomes, everyElement(isA<TimeoutException>()));
     expect(identical(outcomes[0], outcomes[1]), isTrue);
-    expect((outcomes.first as TimeoutException).duration,
-        const Duration(seconds: 10));
+    expect((outcomes.first as TimeoutException).duration, const Duration(seconds: 10));
     expect(restartCalls, 1);
     expect(pollCalls, greaterThan(0));
     expect(supportedCalls, 0);
@@ -172,8 +171,7 @@ FlutterBlueMaxAndroid createPlugin(
   Future<Object?> Function(MethodCall call) nativeHandler,
 ) {
   final plugin = FlutterBlueMaxAndroid();
-  final messenger =
-      TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+  final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
   messenger.setMockMethodCallHandler(plugin.methodChannel, nativeHandler);
   addTearDown(() {
     messenger.setMockMethodCallHandler(plugin.methodChannel, null);

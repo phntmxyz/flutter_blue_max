@@ -67,7 +67,6 @@ class FbmError {
 
 // On Connection State Changed
 class OnConnectionStateChangedEvent {
-
   OnConnectionStateChangedEvent(this._response);
   final BmConnectionStateResponse _response;
 
@@ -80,7 +79,6 @@ class OnConnectionStateChangedEvent {
 
 // On Mtu Changed
 class OnMtuChangedEvent {
-
   OnMtuChangedEvent(this._response);
   final BmMtuChangedResponse _response;
 
@@ -96,7 +94,6 @@ class OnMtuChangedEvent {
 
 // On Read Rssi
 class OnReadRssiEvent {
-
   OnReadRssiEvent(this._response);
   final BmReadRssiResult _response;
 
@@ -112,7 +109,6 @@ class OnReadRssiEvent {
 
 // On Services Reset
 class OnServicesResetEvent {
-
   OnServicesResetEvent(this._response);
   final BmBluetoothDevice _response;
 
@@ -122,7 +118,6 @@ class OnServicesResetEvent {
 
 // On Discovered Services
 class OnDiscoveredServicesEvent {
-
   OnDiscoveredServicesEvent(this._response);
   final BmDiscoverServicesResult _response;
 
@@ -138,7 +133,6 @@ class OnDiscoveredServicesEvent {
 
 // On Characteristic Received
 class OnCharacteristicReceivedEvent {
-
   OnCharacteristicReceivedEvent(this._response);
   final BmCharacteristicData _response;
 
@@ -161,7 +155,6 @@ class OnCharacteristicReceivedEvent {
 
 // On Characteristic Written
 class OnCharacteristicWrittenEvent {
-
   OnCharacteristicWrittenEvent(this._response);
   final BmCharacteristicData _response;
 
@@ -184,7 +177,6 @@ class OnCharacteristicWrittenEvent {
 
 // On Descriptor Received
 class OnDescriptorReadEvent {
-
   OnDescriptorReadEvent(this._response);
   final BmDescriptorData _response;
 
@@ -207,7 +199,6 @@ class OnDescriptorReadEvent {
 
 // On Descriptor Written
 class OnDescriptorWrittenEvent {
-
   OnDescriptorWrittenEvent(this._response);
   final BmDescriptorData _response;
 
@@ -230,7 +221,6 @@ class OnDescriptorWrittenEvent {
 
 // On Name Changed
 class OnNameChangedEvent {
-
   OnNameChangedEvent(this._response);
   final BmNameChanged _response;
 
@@ -243,7 +233,6 @@ class OnNameChangedEvent {
 
 // On Bond State Changed
 class OnBondStateChangedEvent {
-
   OnBondStateChangedEvent(this._response);
   final BmBondStateResponse _response;
 

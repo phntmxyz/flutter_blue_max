@@ -826,7 +826,6 @@ class AndroidScanMode {
 }
 
 class MsdFilter {
-
   MsdFilter(this.manufacturerId, {this.data = const [], this.mask = const []});
   int manufacturerId;
 
@@ -846,7 +845,6 @@ class MsdFilter {
 }
 
 class ServiceDataFilter {
-
   ServiceDataFilter(this.service, {this.data = const [], this.mask = const []});
   Guid service;
 
@@ -866,7 +864,6 @@ class ServiceDataFilter {
 }
 
 class ScanResult {
-
   ScanResult({
     required this.device,
     required this.advertisementData,
@@ -903,7 +900,6 @@ class ScanResult {
 }
 
 class AdvertisementData {
-
   AdvertisementData({
     required this.advName,
     required this.txPowerLevel,
@@ -1004,8 +1000,8 @@ enum FbmErrorCode {
 }
 
 class FlutterBlueMaxException implements Exception {
-
   FlutterBlueMaxException(this.platform, this.function, this.code, this.description);
+
   /// Which platform did the error occur on?
   final ErrorPlatform platform;
 

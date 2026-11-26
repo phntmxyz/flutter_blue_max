@@ -5,7 +5,6 @@
 part of "../flutter_blue_max.dart";
 
 class BluetoothDescriptor {
-
   BluetoothDescriptor({
     required this.remoteId,
     required this.serviceUuid,
