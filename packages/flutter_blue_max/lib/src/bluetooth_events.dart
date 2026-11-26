@@ -51,11 +51,14 @@ class BluetoothEvents {
   }
 }
 
-class FbpError {
+@Deprecated('Use FbmError instead')
+typedef FbpError = FbmError;
+
+class FbmError {
   final int errorCode;
   final String errorString;
   ErrorPlatform get platform => _nativeError;
-  FbpError(this.errorCode, this.errorString);
+  FbmError(this.errorCode, this.errorString);
 }
 
 //
@@ -88,7 +91,7 @@ class OnMtuChangedEvent {
   int get mtu => _response.mtu;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Read Rssi
@@ -104,7 +107,7 @@ class OnReadRssiEvent {
   int get rssi => _response.rssi;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Services Reset
@@ -130,7 +133,7 @@ class OnDiscoveredServicesEvent {
   List<BluetoothService> get services => _response.services.map((p) => BluetoothService.fromProto(p)).toList();
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Characteristic Received
@@ -153,7 +156,7 @@ class OnCharacteristicReceivedEvent {
   List<int> get value => _response.value!;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Characteristic Written
@@ -176,7 +179,7 @@ class OnCharacteristicWrittenEvent {
   List<int> get value => _response.value!;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Descriptor Received
@@ -199,7 +202,7 @@ class OnDescriptorReadEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Descriptor Written
@@ -222,7 +225,7 @@ class OnDescriptorWrittenEvent {
   List<int> get value => _response.value;
 
   /// failed?
-  FbpError? get error => _response.success ? null : FbpError(_response.errorCode, _response.errorString);
+  FbmError? get error => _response.success ? null : FbmError(_response.errorCode, _response.errorString);
 }
 
 // On Name Changed

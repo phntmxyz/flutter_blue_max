@@ -58,7 +58,7 @@ void main() {
       throwsA(isA<FlutterBlueMaxException>().having(
         (error) => error.code,
         'code',
-        FbpErrorCode.connectionCanceled.index,
+        FbmErrorCode.connectionCanceled.index,
       )),
     );
     await connectStarted.future;

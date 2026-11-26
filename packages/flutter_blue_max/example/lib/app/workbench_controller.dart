@@ -1099,6 +1099,6 @@ bool _isUnsupported(Object exception) {
     return exception.code == 'platform_not_supported';
   }
   return exception is FlutterBlueMaxException &&
-      exception.platform == ErrorPlatform.fbp &&
-      (exception.code == FbpErrorCode.androidOnly.index || exception.code == FbpErrorCode.applePlatformOnly.index);
+      exception.platform == ErrorPlatform.fbm &&
+      (exception.code == FbmErrorCode.androidOnly.index || exception.code == FbmErrorCode.applePlatformOnly.index);
 }

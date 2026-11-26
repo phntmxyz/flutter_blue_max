@@ -4,7 +4,7 @@ title: "[Feature]: "
 labels: ["feature"]
 body:
   - type: input
-    id: fbp-version
+    id: fbm-version
     attributes:
       label: "FlutterBlueMax Version"
       description: "run `flutter pub deps` in your project"

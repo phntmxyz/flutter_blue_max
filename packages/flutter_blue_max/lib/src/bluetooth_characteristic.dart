@@ -111,7 +111,7 @@ class BluetoothCharacteristic {
     // check connected
     if (device.isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "readCharacteristic", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "readCharacteristic", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -145,9 +145,9 @@ class BluetoothCharacteristic {
 
       // wait for response
       BmCharacteristicData response = await futureResponse
-          .fbpEnsureAdapterIsOn("readCharacteristic")
-          .fbpEnsureDeviceIsConnected(device, "readCharacteristic")
-          .fbpTimeout(timeout, "readCharacteristic");
+          .fbmEnsureAdapterIsOn("readCharacteristic")
+          .fbmEnsureDeviceIsConnected(device, "readCharacteristic")
+          .fbmTimeout(timeout, "readCharacteristic");
 
       // failed?
       if (!response.success) {
@@ -183,7 +183,7 @@ class BluetoothCharacteristic {
     // check connected
     if (device.isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "writeCharacteristic", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "writeCharacteristic", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -221,9 +221,9 @@ class BluetoothCharacteristic {
       //  1. check for success (writeWithResponse)
       //  2. wait until the packet has been sent, to prevent iOS & Android dropping packets (writeWithoutResponse)
       BmCharacteristicData response = await futureResponse
-          .fbpEnsureAdapterIsOn("writeCharacteristic")
-          .fbpEnsureDeviceIsConnected(device, "writeCharacteristic")
-          .fbpTimeout(timeout, "writeCharacteristic");
+          .fbmEnsureAdapterIsOn("writeCharacteristic")
+          .fbmEnsureDeviceIsConnected(device, "writeCharacteristic")
+          .fbmTimeout(timeout, "writeCharacteristic");
 
       // failed?
       if (!response.success) {
@@ -244,7 +244,7 @@ class BluetoothCharacteristic {
     // check connected
     if (device.isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "setNotifyValue", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "setNotifyValue", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // check
@@ -286,9 +286,9 @@ class BluetoothCharacteristic {
       // wait for CCCD descriptor to be written?
       if (hasCCCD) {
         BmDescriptorData response = await futureResponse
-            .fbpEnsureAdapterIsOn("setNotifyValue")
-            .fbpEnsureDeviceIsConnected(device, "setNotifyValue")
-            .fbpTimeout(timeout, "setNotifyValue");
+            .fbmEnsureAdapterIsOn("setNotifyValue")
+            .fbmEnsureDeviceIsConnected(device, "setNotifyValue")
+            .fbmTimeout(timeout, "setNotifyValue");
 
         // failed?
         if (!response.success) {

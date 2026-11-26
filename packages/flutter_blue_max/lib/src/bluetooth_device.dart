@@ -141,11 +141,11 @@ class BluetoothDevice {
       // only wait for connection if we weren't already connected
       if (changed && !autoConnect) {
         BmConnectionStateResponse response = await futureState
-            .fbpEnsureAdapterIsOn("connect")
-            .fbpTimeout(timeout.inSeconds, "connect")
+            .fbmEnsureAdapterIsOn("connect")
+            .fbmTimeout(timeout.inSeconds, "connect")
             .catchError((e) async {
-          if (e is FlutterBlueMaxException && e.code == FbpErrorCode.timeout.index) {
-            FlutterBlueMaxPlatform.log("[FBP] connection timeout");
+          if (e is FlutterBlueMaxException && e.code == FbmErrorCode.timeout.index) {
+            FlutterBlueMaxPlatform.log("[FBM] connection timeout");
             await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance
                 .disconnect(BmDisconnectRequest(remoteId: remoteId))); // cancel connection attempt
           }
@@ -156,7 +156,7 @@ class BluetoothDevice {
         if (response.connectionState == BmConnectionStateEnum.disconnected) {
           if (response.disconnectReasonCode == bmUserCanceledErrorCode) {
             throw FlutterBlueMaxException(
-                ErrorPlatform.fbp, "connect", FbpErrorCode.connectionCanceled.index, "connection canceled");
+                ErrorPlatform.fbm, "connect", FbmErrorCode.connectionCanceled.index, "connection canceled");
           } else {
             throw FlutterBlueMaxException(
                 _nativeError, "connect", response.disconnectReasonCode, response.disconnectReasonString);
@@ -179,10 +179,10 @@ class BluetoothDevice {
   /// Cancels connection to the Bluetooth Device
   ///   - [queue] If true, this disconnect request will be executed after all other operations complete.
   ///     If false, this disconnect request will be executed right now, i.e. skipping to the front
-  ///     of the fbp operation queue, which is useful to cancel an in-progress connection attempt.
+  ///     of the FBM operation queue, which is useful to cancel an in-progress connection attempt.
   ///   - [androidDelay] Android only. Minimum gap in milliseconds between connect and disconnect to
   ///     workaround a race condition that leaves connection stranded. A stranded connection in this case
-  ///     refers to a connection that FBP and Android Bluetooth stack are not aware of and thus cannot be
+  ///     refers to a connection that FBM and Android Bluetooth stack are not aware of and thus cannot be
   ///     disconnected because there is no gatt handle.
   ///     https://issuetracker.google.com/issues/37121040
   ///     From testing, 2 second delay appears to be enough.
@@ -221,7 +221,7 @@ class BluetoothDevice {
 
       // only wait for disconnection if weren't already disconnected
       if (changed) {
-        await futureState.fbpEnsureAdapterIsOn("disconnect").fbpTimeout(timeout, "disconnect");
+        await futureState.fbmEnsureAdapterIsOn("disconnect").fbmTimeout(timeout, "disconnect");
       }
 
       if (!kIsWeb && Platform.isAndroid) {
@@ -244,7 +244,7 @@ class BluetoothDevice {
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "discoverServices", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "discoverServices", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -265,9 +265,9 @@ class BluetoothDevice {
 
       // wait for response
       BmDiscoverServicesResult response = await futureResponse
-          .fbpEnsureAdapterIsOn("discoverServices")
-          .fbpEnsureDeviceIsConnected(this, "discoverServices")
-          .fbpTimeout(timeout, "discoverServices");
+          .fbmEnsureAdapterIsOn("discoverServices")
+          .fbmEnsureDeviceIsConnected(this, "discoverServices")
+          .fbmTimeout(timeout, "discoverServices");
 
       // failed?
       if (!response.success) {
@@ -352,7 +352,7 @@ class BluetoothDevice {
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "readRssi", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "readRssi", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -373,9 +373,9 @@ class BluetoothDevice {
 
       // wait for response
       BmReadRssiResult response = await futureResponse
-          .fbpEnsureAdapterIsOn("readRssi")
-          .fbpEnsureDeviceIsConnected(this, "readRssi")
-          .fbpTimeout(timeout, "readRssi");
+          .fbmEnsureAdapterIsOn("readRssi")
+          .fbmEnsureDeviceIsConnected(this, "readRssi")
+          .fbmTimeout(timeout, "readRssi");
 
       // failed?
       if (!response.success) {
@@ -395,13 +395,13 @@ class BluetoothDevice {
   Future<int> requestMtu(int desiredMtu, {double predelay = 0.35, int timeout = 15}) async {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "requestMtu", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "requestMtu", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "requestMtu", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "requestMtu", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -448,9 +448,9 @@ class BluetoothDevice {
 
       // wait for response
       mtu = await futureResponse
-          .fbpEnsureAdapterIsOn("requestMtu")
-          .fbpEnsureDeviceIsConnected(this, "requestMtu")
-          .fbpTimeout(timeout, "requestMtu");
+          .fbmEnsureAdapterIsOn("requestMtu")
+          .fbmEnsureDeviceIsConnected(this, "requestMtu")
+          .fbmTimeout(timeout, "requestMtu");
     } finally {
       mtx.give();
     }
@@ -463,13 +463,13 @@ class BluetoothDevice {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "requestConnectionPriority", FbpErrorCode.androidOnly.index, "android-only");
+          ErrorPlatform.fbm, "requestConnectionPriority", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // check connected
     if (isDisconnected) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "requestConnectionPriority",
-          FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "requestConnectionPriority",
+          FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     var request = BmConnectionPriorityRequest(
@@ -494,13 +494,13 @@ class BluetoothDevice {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "setPreferredPhy", FbpErrorCode.androidOnly.index, "android-only");
+          ErrorPlatform.fbm, "setPreferredPhy", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "setPreferredPhy", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "setPreferredPhy", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     var request = BmPreferredPhy(
@@ -519,13 +519,13 @@ class BluetoothDevice {
   Future<void> createBond({int timeout = 90, Uint8List? pin}) async {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "createBond", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "createBond", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "createBond", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "createBond", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -547,13 +547,13 @@ class BluetoothDevice {
       // only wait for 'bonded' if we weren't already bonded
       if (changed) {
         BmBondStateResponse bs = await futureResponse
-            .fbpEnsureAdapterIsOn("createBond")
-            .fbpEnsureDeviceIsConnected(this, "createBond")
-            .fbpTimeout(timeout, "createBond");
+            .fbmEnsureAdapterIsOn("createBond")
+            .fbmEnsureDeviceIsConnected(this, "createBond")
+            .fbmTimeout(timeout, "createBond");
 
         // success?
         if (bs.bondState != BmBondStateEnum.bonded) {
-          throw FlutterBlueMaxException(ErrorPlatform.fbp, "createBond", FbpErrorCode.createBondFailed.hashCode,
+          throw FlutterBlueMaxException(ErrorPlatform.fbm, "createBond", FbmErrorCode.createBondFailed.hashCode,
               "Failed to create bond. ${bs.bondState}");
         }
       }
@@ -566,7 +566,7 @@ class BluetoothDevice {
   Future<void> removeBond({int timeout = 30}) async {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "removeBond", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "removeBond", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -587,11 +587,11 @@ class BluetoothDevice {
 
       // only wait for 'unbonded' state if we weren't already unbonded
       if (changed) {
-        BmBondStateResponse bs = await futureResponse.fbpTimeout(timeout, "removeBond");
+        BmBondStateResponse bs = await futureResponse.fbmTimeout(timeout, "removeBond");
 
         // success?
         if (bs.bondState != BmBondStateEnum.none) {
-          throw FlutterBlueMaxException(ErrorPlatform.fbp, "createBond", FbpErrorCode.removeBondFailed.hashCode,
+          throw FlutterBlueMaxException(ErrorPlatform.fbm, "createBond", FbmErrorCode.removeBondFailed.hashCode,
               "Failed to remove bond. ${bs.bondState}");
         }
       }
@@ -605,13 +605,13 @@ class BluetoothDevice {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "clearGattCache", FbpErrorCode.androidOnly.index, "android-only");
+          ErrorPlatform.fbm, "clearGattCache", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "clearGattCache", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "clearGattCache", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // invoke
@@ -623,7 +623,7 @@ class BluetoothDevice {
   Stream<BluetoothBondState> get bondState async* {
     // check android
     if (kIsWeb || !Platform.isAndroid) {
-      throw FlutterBlueMaxException(ErrorPlatform.fbp, "bondState", FbpErrorCode.androidOnly.index, "android-only");
+      throw FlutterBlueMaxException(ErrorPlatform.fbm, "bondState", FbmErrorCode.androidOnly.index, "android-only");
     }
 
     // get current state if needed
@@ -659,7 +659,7 @@ class BluetoothDevice {
   /// Workaround race condition between connect and disconnect.
   /// The bug: If you call disconnect right as android is establishing a connection
   /// android may still connect to the device. Worse, "onConnectionStateChange" will not be called
-  /// so FBP will have no idea this connection is active. Adding a delay fixes this issue.
+  /// so FBM will have no idea this connection is active. Adding a delay fixes this issue.
   /// https://issuetracker.google.com/issues/37121040
   Future<void> _ensureAndroidDisconnectionDelay(int androidDelay) async {
     if (!kIsWeb && Platform.isAndroid) {
@@ -668,7 +668,7 @@ class BluetoothDevice {
         Duration elapsed = DateTime.now().difference(FlutterBlueMax._connectTimestamp[remoteId]!);
         if (elapsed.compareTo(minGap) < 0) {
           Duration timeLeft = minGap - elapsed;
-          FlutterBlueMaxPlatform.log("[FBP] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap, delaying "
+          FlutterBlueMaxPlatform.log("[FBM] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap, delaying "
               "${timeLeft.inMilliseconds}ms");
           await Future<void>.delayed(timeLeft);
         }
@@ -741,13 +741,13 @@ class BluetoothDevice {
     // check connected
     if (isDisconnected) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "openL2CapChannel", FbpErrorCode.deviceIsDisconnected.index, "device is not connected");
+          ErrorPlatform.fbm, "openL2CapChannel", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
     // check platform support
     if (kIsWeb) {
       throw FlutterBlueMaxException(
-          ErrorPlatform.fbp, "openL2CapChannel", FbpErrorCode.applePlatformOnly.index, "not supported on web");
+          ErrorPlatform.fbm, "openL2CapChannel", FbmErrorCode.applePlatformOnly.index, "not supported on web");
     }
 
     // Only allow a single ble operation to be underway at a time
@@ -765,7 +765,7 @@ class BluetoothDevice {
               secure: secure,
             ),
           )
-          .fbpTimeout(timeout, "openL2CapChannel"));
+          .fbmTimeout(timeout, "openL2CapChannel"));
 
       return BluetoothL2capChannel(deviceId: remoteId, psm: psm);
     } finally {

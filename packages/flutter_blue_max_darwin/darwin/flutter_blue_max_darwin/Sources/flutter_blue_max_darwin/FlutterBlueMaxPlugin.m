@@ -9,7 +9,7 @@
 #import <IOBluetooth/IOBluetooth.h>
 #endif
 
-#define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBP-iOS] " FORMAT, ##__VA_ARGS__]
+#define Log(LEVEL, FORMAT, ...) [self log:LEVEL format:@"[FBM-iOS] " FORMAT, ##__VA_ARGS__]
 
 NSString * const CCCD = @"2902";
 // file-scope on purpose: these must not get external linkage,
@@ -401,7 +401,7 @@ static const NSTimeInterval kHotRestartDisconnectTimeout = 5.0;
                 [scanOpts setObject:[NSNumber numberWithBool:YES] forKey:CBCentralManagerScanOptionAllowDuplicatesKey];
             }
 
-            // filters implemented by FBP, not the OS
+            // filters implemented by FBM, not the OS
             BOOL hasCustomFilters =
                 [self hasFilter:@"with_remote_ids"] ||
                 [self hasFilter:@"with_names"] ||
