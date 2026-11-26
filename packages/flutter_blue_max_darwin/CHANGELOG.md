@@ -8,7 +8,7 @@
 * Add L2CAP CoC support (client & server)
   * writes are queued per channel and drained on `HasSpaceAvailable`; partial `NSOutputStream` writes no longer drop bytes
   * L2CAP connected/closed events are surfaced to Dart
-  * works around several CoreBluetooth L2CAP defects (channel-close cascade, stale channel state) — see L2CAP_README.md
+  * works around several CoreBluetooth L2CAP defects (channel-close cascade, stale channel state) — see the L2CAP section of the README
 
 ## 4.0.1
 * fix unrecognized selector sent to instance (regression from 4.0.0)

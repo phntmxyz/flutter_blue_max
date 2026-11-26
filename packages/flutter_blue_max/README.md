@@ -9,7 +9,7 @@
 > FlutterBlueMax is maintained independently and is not affiliated with or endorsed by the FlutterBluePlus maintainers.
 >
 > Key additions over FlutterBluePlus:
-> - **L2CAP support** on iOS and Android (client & server)
+> - **L2CAP support** on iOS, macOS and Android (client & server)
 
 ## Contents
 
@@ -91,7 +91,7 @@ flutter run
 
 FlutterBlueMax adds full L2CAP (Logical Link Control and Adaptation Protocol) support on top of FlutterBluePlus. L2CAP provides a raw, high-throughput channel between two Bluetooth devices — useful when GATT characteristics are too small or too slow.
 
-For the full L2CAP API reference see [L2CAP_README.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/L2CAP_README.md).
+A device can open channels to a remote PSM as a client, or publish its own PSM as a server. The OS assigns the PSM of a server.
 
 ### Platform support
 
@@ -109,13 +109,20 @@ For the full L2CAP API reference see [L2CAP_README.md](https://github.com/phntmx
 // connecting right away cannot be missed.
 
 // A client connected: build a channel handle from the event to talk to it
+BluetoothL2capChannel? clientChannel;
 FlutterBlueMax.onL2capConnected.listen((L2CapChannelConnected evt) {
-    var channel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+    clientChannel = BluetoothL2capChannel(deviceId: evt.remoteId, psm: evt.psm);
+    clientChannel!.write([0x01, 0x02, 0x03]); // send data back to the client
 });
 
 // Receive data from any connected client
 FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
     print('Received ${data.value.length} bytes from ${data.remoteId}');
+});
+
+// Notice dead channels (client closed, stream error, disconnect)
+FlutterBlueMax.onL2capClosed.listen((L2CapChannelClosed evt) {
+    print('Channel closed: ${evt.remoteId} / PSM ${evt.psm}');
 });
 
 // Start an L2CAP server — PSM is assigned automatically
@@ -157,8 +164,117 @@ await channel.close();
 
 Pass `secure: false` to both `listenL2capChannel` / `openL2CapChannel` if you need an unencrypted channel. Both sides must agree on the security mode.
 
-On **Android** this maps to `listenUsingL2capChannel()` vs `listenUsingInsecureL2capChannel()`.  
+On **Android** this maps to `listenUsingL2capChannel()` vs `listenUsingInsecureL2capChannel()` for a server and to `createL2capChannel()` vs `createInsecureL2capChannel()` for a client.  
 On **iOS** the security is controlled by the server's `publishL2CAPChannelWithEncryption` flag.
+
+### L2CAP API
+
+#### `FlutterBlueMax.listenL2capChannel({bool secure = true, int timeout = 15})`
+
+Starts an L2CAP server listening for incoming connections.
+
+- `secure`: whether to use a secure L2CAP channel
+- `timeout`: seconds to wait for the server to start
+- Returns `Future<int>`, the assigned PSM
+
+#### `FlutterBlueMax.stopL2capServer(int psm)`
+
+Stops the L2CAP server with this PSM and closes its accepted channels.
+
+#### `BluetoothDevice.openL2CapChannel(int psm, {bool secure = true, int timeout = 35})`
+
+Opens an L2CAP channel to the connected device.
+
+- `psm`: Protocol Service Multiplexer to connect to
+- `secure`: whether to use a secure L2CAP channel, see [Secure vs insecure channels](#secure-vs-insecure-channels)
+- `timeout`: seconds to wait for the channel to open
+- Returns `Future<BluetoothL2capChannel>`
+- Throws `FlutterBlueMaxException` if the device is not connected, the open fails, or the timeout elapses
+
+#### `BluetoothL2capChannel`
+
+Encapsulates one L2CAP channel. Returned by `openL2CapChannel()`, or constructed from an `onL2capConnected` event for server-accepted channels.
+
+| Member | Description |
+|--------|-------------|
+| `deviceId` | The device this channel connects to |
+| `psm` | The Protocol Service Multiplexer of this channel |
+| `write(List<int> data)` | Writes data. Completes once the platform has accepted all bytes, throws `FlutterBlueMaxException` on a write failure or if the channel is closed |
+| `read()` | Returns the data currently buffered for this channel, an empty list when none is buffered. It does not wait for data to arrive |
+| `close()` | Closes the channel and releases resources. Does not emit an `onClosed` event |
+| `onL2CapChannelReceived` | `Stream<List<int>>` of incoming data for this channel only |
+| `onClosed` | `Stream<void>` that emits when this channel dies: remote close, stream error, or device disconnect. Not emitted for a local `close()` call |
+
+A single close may be reported more than once on `onClosed` in rare races, so cancel the subscription on the first event if you only care about the transition.
+
+### L2CAP events
+
+Global streams on `FlutterBlueMax` for all devices and all PSMs. Match events to your channels by **device + PSM**, not PSM alone — multiple devices commonly share the same PSM.
+
+#### `FlutterBlueMax.onL2capConnected`
+
+A remote device connected to a server started with `listenL2capChannel`. Build a `BluetoothL2capChannel` from the event to talk to the client.
+
+The event's `remoteId` is the client's MAC address on Android. On iOS and macOS CoreBluetooth does not expose the connecting central, so the placeholder id `server` is reported instead. Both platforms accept either id for operations on server-accepted channels, but data and close events always carry the same id as this event — so always key channels by the id reported here.
+
+#### `FlutterBlueMax.onL2capReceived`
+
+Incoming L2CAP data, for client and server-accepted channels.
+
+```dart
+FlutterBlueMax.onL2capReceived.listen((L2CapChannelData data) {
+    print('Device: ${data.remoteId}');
+    print('PSM: ${data.psm}');
+    print('Data: ${data.value}');
+});
+```
+
+#### `FlutterBlueMax.onL2capClosed`
+
+A channel died: the remote closed it, a stream error occurred, or the device disconnected. Not emitted for a local `close()` call.
+
+### L2CAP error handling
+
+L2CAP methods follow the same error handling patterns as other FlutterBlueMax operations. `openL2CapChannel` and `listenL2capChannel` also throw when their timeout elapses, so a hung platform call cannot block the package-wide operation mutexes forever.
+
+```dart
+try {
+    BluetoothL2capChannel channel = await device.openL2CapChannel(1234);
+} on FlutterBlueMaxException catch (e) {
+    if (e.code == FbmErrorCode.deviceIsDisconnected.index) {
+        print('Device not connected');
+    } else if (e.code == FbmErrorCode.applePlatformOnly.index) {
+        print('L2CAP not supported on this platform');
+    } else {
+        print('L2CAP error: ${e.description}');
+    }
+}
+```
+
+### L2CAP best practices
+
+1. **Always check the device connection** before opening L2CAP channels
+2. **Listen to `onClosed` / `onL2capClosed`** — otherwise the only sign of a dead channel is a failing write
+3. **Match events by device + PSM**, not PSM alone; key server channels by the id from `onL2capConnected`
+4. **Close channels explicitly** to free resources
+5. **Stop servers when done** to prevent resource leaks
+6. **Prefer the event streams over `read()`** — `read()` only returns already-buffered data
+7. **Use secure channels** unless specifically needing insecure connections
+8. **Subscribe to the global event streams before `listenL2capChannel`** — they are broadcast streams, so events fired before you subscribe are lost
+
+### Known CoreBluetooth L2CAP issues
+
+The iOS and macOS implementation works around several CoreBluetooth defects that Apple has not fixed. Reported to Apple:
+
+- **Closing one L2CAP channel closes a different one.** With two channels open on the same peripheral, closing the second channel tears down the first instead. Reported via Feedback Assistant; Apple DTS confirmed it is "under investigation" (Sep 2025) with no resolution. See [BLE l2cap close not correct](https://developer.apple.com/forums/thread/798454). This is why closed channels are kept alive as *zombies* instead of being released while the connection is up — releasing a `CBL2CAPChannel` triggers the same cascade.
+- **Multiple L2CAP channels are unreliable** (`rdar://46227689`, since iOS 12.1): `didOpenL2CAPChannel` can report the wrong PSM for the second channel, and data written to one channel can end up on the other. Never answered by Apple. See [Multiple L2CAP channels on iOS](https://developer.apple.com/forums/thread/111099).
+
+Observed behavior without a public Apple report, worked around in this plugin:
+
+- **No client-side close API.** `CBL2CAPChannel` has no `close`; the only teardown is releasing the object (which triggers the cascade above) or a GATT disconnect.
+- **"L2CAP PSM already connected" is a dead end.** Re-opening a PSM that iOS still considers connected fails unrecoverably until a GATT disconnect. The plugin therefore recycles or adopts existing channels instead of re-opening.
+- **`openL2CAPChannel:` has no timeout and can fail silently.** If stale channel state exists for the PSM, `didOpenL2CAPChannel` is simply never called — neither success nor error. The plugin tears down all channel state on adapter power-off to avoid leaving such stale state behind.
+- **No `didDisconnectPeripheral` on adapter power-off.** Connected peripherals silently vanish, so all per-peripheral cleanup must be triggered from the adapter state change instead.
 
 
 ## Usage
