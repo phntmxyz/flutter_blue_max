@@ -1,5 +1,11 @@
+/// Identifier of a remote device, compared case-insensitively.
+///
+/// This is the MAC address on Android and the UUID on iOS and macOS.
 class DeviceIdentifier {
+  /// Creates a [DeviceIdentifier] from its string representation.
   const DeviceIdentifier(this.str);
+
+  /// The string representation of the identifier.
   final String str;
 
   @override

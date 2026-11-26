@@ -2,16 +2,24 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
+/// A 16, 32 or 128 bit Bluetooth UUID.
 class Guid {
+  /// Creates a [Guid] from a hex string, with or without dashes. An empty string results in the all-zero 128 bit UUID.
   Guid(String input) : bytes = _toBytes(input);
 
+  /// Creates the all-zero 128 bit [Guid].
   Guid.empty() : bytes = List.filled(16, 0);
 
+  /// Creates a [Guid] from 2, 4 or 16 bytes.
   Guid.fromBytes(this.bytes) : assert(_checkLen(bytes.length), "GUID must be 16, 32, or 128 bit.");
 
+  /// Creates a [Guid] from a hex string, same as the default constructor.
   Guid.fromString(String input) : bytes = _toBytes(input);
+
+  /// The raw bytes of the UUID, 2, 4 or 16 of them.
   final List<int> bytes;
 
+  /// Parses [input], returns null if it is null or empty.
   static Guid? parse(String? input) {
     if (input == null || input.isEmpty) {
       return null;
@@ -44,7 +52,7 @@ class Guid {
     return true;
   }
 
-  // 128-bit representation
+  /// The 128 bit representation, the Bluetooth base UUID is used to expand 16 and 32 bit UUIDs.
   String get str128 {
     if (bytes.length == 2) {
       // 16-bit uuid
@@ -63,7 +71,7 @@ class Guid {
     return "$one-$two-$three-$four-$five".toLowerCase();
   }
 
-  // shortest representation
+  /// The shortest representation, 16 or 32 bit for UUIDs based on the Bluetooth base UUID.
   String get str {
     final bool starts = str128.startsWith("0000");
     final bool ends = str128.contains("-0000-1000-8000-00805f9b34fb");

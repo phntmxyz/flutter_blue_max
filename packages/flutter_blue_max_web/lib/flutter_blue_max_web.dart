@@ -8,6 +8,7 @@ import "package:flutter_blue_max_web/src/web_bluetooth.dart";
 import "package:flutter_web_plugins/flutter_web_plugins.dart";
 import "package:web/web.dart" show Event;
 
+/// Web implementation of [FlutterBlueMaxPlatform], built on the Web Bluetooth API.
 final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
   late final _characteristicValueChangedEventListener = _handleCharacteristicValueChanged.toJS;
 
@@ -22,47 +23,56 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
   final _onDiscoveredServicesController = StreamController<BmDiscoverServicesResult>.broadcast();
   final _onScanResponseController = StreamController<BmScanResponse>.broadcast();
 
+  /// Emits values received from a characteristic, from a read or a notification.
   @override
   Stream<BmCharacteristicData> get onCharacteristicReceived {
     return _onCharacteristicReceivedController.stream;
   }
 
+  /// Emits the result of a characteristic write.
   @override
   Stream<BmCharacteristicData> get onCharacteristicWritten {
     return _onCharacteristicWrittenController.stream;
   }
 
+  /// Emits whenever the connection state of a device changes.
   @override
   Stream<BmConnectionStateResponse> get onConnectionStateChanged {
     return _onConnectionStateChangedController.stream;
   }
 
+  /// Emits the result of a descriptor read.
   @override
   Stream<BmDescriptorData> get onDescriptorRead {
     return _onDescriptorReadController.stream;
   }
 
+  /// Emits the result of a descriptor write.
   @override
   Stream<BmDescriptorData> get onDescriptorWritten {
     return _onDescriptorWrittenController.stream;
   }
 
+  /// Emits the services found by a service discovery.
   @override
   Stream<BmDiscoverServicesResult> get onDiscoveredServices {
     return _onDiscoveredServicesController.stream;
   }
 
+  /// Emits the advertisements found while scanning.
   @override
   Stream<BmScanResponse> get onScanResponse {
     return _onScanResponseController.stream;
   }
 
+  /// Registers this implementation as the [FlutterBlueMaxPlatform] instance.
   static void registerWith(
     Registrar registrar,
   ) {
     FlutterBlueMaxPlatform.instance = FlutterBlueMaxWeb();
   }
 
+  /// Connects to the device in [request].
   @override
   Future<bool> connect(
     BmConnectRequest request,
@@ -97,6 +107,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Disconnects from the device in [request].
   @override
   Future<bool> disconnect(
     BmDisconnectRequest request,
@@ -131,6 +142,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     return true;
   }
 
+  /// Discovers the services of the connected device.
   @override
   Future<bool> discoverServices(
     BmDiscoverServicesRequest request,
@@ -247,6 +259,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Returns whether the platform supports Bluetooth Low Energy.
   @override
   Future<bool> isSupported(
     BmIsSupportedRequest request,
@@ -258,6 +271,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Returns the current state of the Bluetooth adapter.
   @override
   Future<BmBluetoothAdapterState> getAdapterState(
     BmBluetoothAdapterStateRequest request,
@@ -269,6 +283,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     );
   }
 
+  /// Reads the value of a characteristic.
   @override
   Future<bool> readCharacteristic(
     BmReadCharacteristicRequest request,
@@ -334,6 +349,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Reads the value of a descriptor.
   @override
   Future<bool> readDescriptor(
     BmReadDescriptorRequest request,
@@ -403,6 +419,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Enables or disables notifications of a characteristic.
   @override
   Future<bool> setNotifyValue(
     BmSetNotifyValueRequest request,
@@ -449,6 +466,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     return false;
   }
 
+  /// Starts scanning for advertising devices.
   @override
   Future<bool> startScan(
     BmScanSettings request,
@@ -555,6 +573,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Writes a value to a characteristic.
   @override
   Future<bool> writeCharacteristic(
     BmWriteCharacteristicRequest request,
@@ -624,6 +643,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
+  /// Writes a value to a descriptor.
   @override
   Future<bool> writeDescriptor(
     BmWriteDescriptorRequest request,
