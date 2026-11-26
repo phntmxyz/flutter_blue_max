@@ -56,3 +56,9 @@ jobs:
 
       - name: Analyze with package:lint
         run: flutter analyze --no-pub
+
+      - name: Run tests
+        run: |
+          if [ -d test ]; then
+            flutter test --no-pub
+          fi
