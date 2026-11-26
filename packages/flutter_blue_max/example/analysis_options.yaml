@@ -1,12 +1,8 @@
-include: package:lint/strict.yaml
+include: package:lint/casual.yaml
 
 formatter:
   page_width: 120
 
-linter:
-  rules:
-    prefer_single_quotes: true
-    directives_ordering: true
 analyzer:
   exclude:
     - build/**
@@ -15,3 +11,17 @@ analyzer:
     - macos/**
     - linux/**
     - web/**
+
+linter:
+  rules:
+    # Util classes are awesome! ArriRoutes.home and Devices.iPhone15Pro read
+    # better than loose top-level names.
+    avoid_classes_with_only_static_members: false
+
+    # Make constructors the first thing in every class
+    sort_constructors_first: true
+
+    # Choose wisely, but you don't have to
+    # prefer_double_quotes: true
+    prefer_single_quotes: true
+    directives_ordering: true
