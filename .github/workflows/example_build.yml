@@ -1,6 +1,9 @@
 name: Build example downloads
 
 on:
+  push:
+    tags:
+      - 'flutter_blue_max-[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       platform:
@@ -35,8 +38,9 @@ defaults:
 jobs:
   build:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
-      github.ref == format('refs/heads/{0}', github.event.repository.default_branch)
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
+      github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
     name: Build ${{ matrix.platform }}
     runs-on: ${{ (matrix.platform == 'ios' || matrix.platform == 'macos') && 'macos-15' || 'ubuntu-24.04' }}
     timeout-minutes: 45
@@ -146,9 +150,10 @@ jobs:
 
   darwin-compatibility:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      (inputs.platform || 'all') == 'all'
+      (inputs.platform || 'all') == 'all')
     name: Darwin ${{ matrix.integration }} on Flutter ${{ matrix.flutter }} (${{ matrix.platform }})
     runs-on: macos-15
     timeout-minutes: 30
