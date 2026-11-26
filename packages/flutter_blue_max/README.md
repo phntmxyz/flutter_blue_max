@@ -52,7 +52,7 @@ The core of Bluetooth Low Energy works on iOS, macOS, Android and Web: connectin
 Linux is not tested yet, treat it as experimental.
 What a platform does not offer, such as scanning in the browser or bonding outside Android, is not available there.
 
-See [PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) for every feature and whether it works on each platform.
+See [PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/main/PLATFORM_SUPPORT.md) for every feature and whether it works on each platform.
 
 ## No Dependencies
 
@@ -674,7 +674,7 @@ FlutterBlueMax.events.onConnectionStateChanged.listen((event)) {
 
 ## Mocking
 
-To mock `FlutterBlueMax` for development, refer to the [Mocking Guide](https://github.com/phntmxyz/flutter_blue_max/blob/master/packages/flutter_blue_max/MOCKING.md).
+To mock `FlutterBlueMax` for development, refer to the [Mocking Guide](https://github.com/phntmxyz/flutter_blue_max/blob/main/packages/flutter_blue_max/MOCKING.md).
 
 ## Getting Started
 
@@ -823,10 +823,10 @@ You can try using https://pub.dev/packages/flutter_foreground_task or possibly h
 ## API Reference
 
 The tables below list the API.
-[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) has the details per feature, with the restrictions of each platform.
+[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/main/PLATFORM_SUPPORT.md) has the details per feature, with the restrictions of each platform.
 
 Note: When functionality is unsupported on a platform, the call either returns a default value or throws a `FlutterBlueMaxException` (`androidOnly`, `applePlatformOnly`).
-[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/master/PLATFORM_SUPPORT.md) says which for every feature.
+[PLATFORM_SUPPORT.md](https://github.com/phntmxyz/flutter_blue_max/blob/main/PLATFORM_SUPPORT.md) says which for every feature.
 
 * ✔️ = Supported
 * ⚠️ = Works with a restriction
