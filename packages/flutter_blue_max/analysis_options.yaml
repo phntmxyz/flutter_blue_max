@@ -17,7 +17,6 @@ analyzer:
   exclude:
     - build/**
     - example/**
-
 linter:
   rules:
     # Util classes are awesome! ArriRoutes.home and Devices.iPhone15Pro read

@@ -693,9 +693,9 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
     }
   }
 
-  Future<void> _handleCharacteristicValueChanged(
+  void _handleCharacteristicValueChanged(
     Event event,
-  ) async {
+  ) {
     final characteristic = event.target! as BluetoothRemoteGATTCharacteristic;
 
     _onCharacteristicReceivedController.add(
