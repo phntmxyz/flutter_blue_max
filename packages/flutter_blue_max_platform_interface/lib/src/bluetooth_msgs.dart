@@ -19,7 +19,6 @@ enum BmAdapterStateEnum {
 }
 
 class BmBluetoothAdapterState {
-
   BmBluetoothAdapterState({required this.adapterState});
 
   factory BmBluetoothAdapterState.fromMap(Map<dynamic, dynamic> json) {
@@ -35,7 +34,6 @@ class BmBluetoothAdapterNameRequest {
 }
 
 class BmBluetoothAdapterName {
-
   BmBluetoothAdapterName({required this.adapterName});
   String adapterName;
 }
@@ -69,7 +67,6 @@ class BmServiceDataFilter {
 }
 
 class BmScanSettings {
-
   BmScanSettings({
     required this.withServices,
     required this.withRemoteIds,
@@ -123,7 +120,6 @@ class BmStopScanRequest {
 }
 
 class BmScanAdvertisement {
-
   BmScanAdvertisement({
     required this.remoteId,
     required this.platformName,
@@ -185,7 +181,6 @@ class BmScanAdvertisement {
 }
 
 class BmScanResponse {
-
   BmScanResponse({
     required this.advertisements,
     required this.success,
@@ -215,7 +210,6 @@ class BmScanResponse {
 }
 
 class BmConnectRequest {
-
   BmConnectRequest({
     required this.remoteId,
     required this.autoConnect,
@@ -232,7 +226,6 @@ class BmConnectRequest {
 }
 
 class BmDisconnectRequest {
-
   BmDisconnectRequest({
     required this.remoteId,
   });
@@ -240,7 +233,6 @@ class BmDisconnectRequest {
 }
 
 class BmBluetoothDevice {
-
   BmBluetoothDevice({
     required this.remoteId,
     required this.platformName,
@@ -257,7 +249,6 @@ class BmBluetoothDevice {
 }
 
 class BmNameChanged {
-
   BmNameChanged({
     required this.remoteId,
     required this.name,
@@ -274,7 +265,6 @@ class BmNameChanged {
 }
 
 class BmBluetoothService {
-
   BmBluetoothService({
     required this.serviceUuid,
     required this.remoteId,
@@ -303,7 +293,6 @@ class BmBluetoothService {
 }
 
 class BmBluetoothCharacteristic {
-
   BmBluetoothCharacteristic({
     required this.remoteId,
     required this.serviceUuid,
@@ -341,7 +330,6 @@ class BmBluetoothCharacteristic {
 }
 
 class BmBluetoothDescriptor {
-
   BmBluetoothDescriptor({
     required this.remoteId,
     required this.serviceUuid,
@@ -370,7 +358,6 @@ class BmBluetoothDescriptor {
 }
 
 class BmCharacteristicProperties {
-
   BmCharacteristicProperties({
     required this.broadcast,
     required this.read,
@@ -411,7 +398,6 @@ class BmCharacteristicProperties {
 }
 
 class BmDiscoverServicesRequest {
-
   BmDiscoverServicesRequest({
     required this.remoteId,
   });
@@ -419,7 +405,6 @@ class BmDiscoverServicesRequest {
 }
 
 class BmDiscoverServicesResult {
-
   BmDiscoverServicesResult({
     required this.remoteId,
     required this.services,
@@ -447,7 +432,6 @@ class BmDiscoverServicesResult {
 }
 
 class BmReadCharacteristicRequest {
-
   BmReadCharacteristicRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -474,7 +458,6 @@ class BmReadCharacteristicRequest {
 }
 
 class BmCharacteristicData {
-
   BmCharacteristicData({
     required this.remoteId,
     required this.serviceUuid,
@@ -514,7 +497,6 @@ class BmCharacteristicData {
 }
 
 class BmReadDescriptorRequest {
-
   BmReadDescriptorRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -549,7 +531,6 @@ enum BmWriteType {
 }
 
 class BmWriteCharacteristicRequest {
-
   BmWriteCharacteristicRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -585,7 +566,6 @@ class BmWriteCharacteristicRequest {
 }
 
 class BmWriteDescriptorRequest {
-
   BmWriteDescriptorRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -618,7 +598,6 @@ class BmWriteDescriptorRequest {
 }
 
 class BmDescriptorData {
-
   BmDescriptorData({
     required this.remoteId,
     required this.serviceUuid,
@@ -659,7 +638,6 @@ class BmDescriptorData {
 }
 
 class BmSetNotifyValueRequest {
-
   BmSetNotifyValueRequest({
     required this.remoteId,
     required this.serviceUuid,
@@ -697,7 +675,6 @@ enum BmConnectionStateEnum {
 }
 
 class BmConnectionStateResponse {
-
   BmConnectionStateResponse({
     required this.remoteId,
     required this.connectionState,
@@ -724,7 +701,6 @@ class BmBondedDevicesRequest {
 }
 
 class BmSystemDevicesRequest {
-
   BmSystemDevicesRequest({
     required this.withServices,
   });
@@ -738,7 +714,6 @@ class BmSystemDevicesRequest {
 }
 
 class BmDevicesList {
-
   BmDevicesList({required this.devices});
 
   factory BmDevicesList.fromMap(Map<dynamic, dynamic> json) {
@@ -753,7 +728,6 @@ class BmDevicesList {
 }
 
 class BmMtuChangeRequest {
-
   BmMtuChangeRequest({required this.remoteId, required this.mtu});
   final DeviceIdentifier remoteId;
   final int mtu;
@@ -767,7 +741,6 @@ class BmMtuChangeRequest {
 }
 
 class BmMtuChangedResponse {
-
   BmMtuChangedResponse({
     required this.remoteId,
     required this.mtu,
@@ -793,7 +766,6 @@ class BmMtuChangedResponse {
 }
 
 class BmReadRssiRequest {
-
   BmReadRssiRequest({
     required this.remoteId,
   });
@@ -801,7 +773,6 @@ class BmReadRssiRequest {
 }
 
 class BmReadRssiResult {
-
   BmReadRssiResult({
     required this.remoteId,
     required this.rssi,
@@ -833,7 +804,6 @@ enum BmConnectionPriorityEnum {
 }
 
 class BmConnectionPriorityRequest {
-
   BmConnectionPriorityRequest({
     required this.remoteId,
     required this.connectionPriority,
@@ -850,7 +820,6 @@ class BmConnectionPriorityRequest {
 }
 
 class BmPreferredPhy {
-
   BmPreferredPhy({
     required this.remoteId,
     required this.txPhy,
@@ -873,7 +842,6 @@ class BmPreferredPhy {
 }
 
 class BmBondStateRequest {
-
   BmBondStateRequest({
     required this.remoteId,
   });
@@ -887,7 +855,6 @@ enum BmBondStateEnum {
 }
 
 class BmBondStateResponse {
-
   BmBondStateResponse({
     required this.remoteId,
     required this.bondState,
@@ -907,7 +874,6 @@ class BmBondStateResponse {
 }
 
 class BmCreateBondRequest {
-
   BmCreateBondRequest({
     required this.remoteId,
     required this.pin,
@@ -924,7 +890,6 @@ class BmCreateBondRequest {
 }
 
 class BmRemoveBondRequest {
-
   BmRemoveBondRequest({
     required this.remoteId,
   });
@@ -932,7 +897,6 @@ class BmRemoveBondRequest {
 }
 
 class BmClearGattCacheRequest {
-
   BmClearGattCacheRequest({
     required this.remoteId,
   });
@@ -952,7 +916,6 @@ class BmTurnOnRequest {
 }
 
 class BmTurnOnResponse {
-
   BmTurnOnResponse({
     required this.userAccepted,
   });
@@ -966,7 +929,6 @@ class BmTurnOnResponse {
 }
 
 class BmSetLogLevelRequest {
-
   BmSetLogLevelRequest({
     this.logLevel = LogLevel.none,
     this.logColor = true,
@@ -976,7 +938,6 @@ class BmSetLogLevelRequest {
 }
 
 class BmSetOptionsRequest {
-
   BmSetOptionsRequest({
     required this.showPowerAlert,
     required this.restoreState,
@@ -1001,7 +962,6 @@ class PhySupportRequest {
 }
 
 class PhySupport {
-
   PhySupport({
     required this.le2M,
     required this.leCoded,
@@ -1013,6 +973,7 @@ class PhySupport {
       leCoded: json["le_coded"] as bool,
     );
   }
+
   /// High speed (PHY 2M)
   final bool le2M;
 
@@ -1025,9 +986,9 @@ class PhySupport {
 /// Used internally to communicate with the platform layer when
 /// [FlutterBlueMax.listenL2capChannel] is called.
 class ListenL2CapChannelRequest {
-
   /// Creates a new [ListenL2CapChannelRequest]
   ListenL2CapChannelRequest({required this.secure});
+
   /// Whether to use a secure L2CAP channel
   /// - Android: Uses listenUsingL2capChannel() vs listenUsingInsecureL2capChannel()
   /// - iOS: Uses publishL2CAPChannelWithEncryption(secure)
@@ -1046,9 +1007,9 @@ class ListenL2CapChannelRequest {
 /// Contains the PSM (Protocol Service Multiplexer) assigned by the system
 /// for the newly created L2CAP server.
 class ListenL2CapChannelResponse {
-
   /// Creates a [ListenL2CapChannelResponse] from a platform message map
   ListenL2CapChannelResponse.fromMap(Map<dynamic, dynamic> map) : psm = map["psm"] as int;
+
   /// The PSM assigned to the L2CAP server
   final int psm;
 }
@@ -1058,9 +1019,9 @@ class ListenL2CapChannelResponse {
 /// Used internally to communicate with the platform layer when
 /// [FlutterBlueMax.stopL2capServer] is called.
 class StopListenL2CapChannelRequest {
-
   /// Creates a new [StopListenL2CapChannelRequest]
   StopListenL2CapChannelRequest({required this.psm});
+
   /// The PSM of the L2CAP server to stop
   final int psm;
 
@@ -1077,19 +1038,19 @@ class StopListenL2CapChannelRequest {
 /// Used internally to communicate with the platform layer when
 /// [BluetoothDevice.openL2CapChannel] is called.
 class OpenL2CapChannelRequest {
-
   /// Creates a new [OpenL2CapChannelRequest]
   OpenL2CapChannelRequest({
     required this.remoteId,
     required this.psm,
     required this.secure,
   });
+
   /// The device identifier of the target device
   final String remoteId;
-  
+
   /// The PSM to connect to on the remote device
   final int psm;
-  
+
   /// Whether to use a secure L2CAP channel
   /// - Android: Uses createL2capChannel() vs createInsecureL2capChannel()
   /// - iOS: Security controlled by server's publishL2CAPChannelWithEncryption setting
@@ -1109,15 +1070,15 @@ class OpenL2CapChannelRequest {
 /// Used internally to communicate with the platform layer when
 /// [BluetoothL2capChannel.close] is called.
 class CloseL2CapChannelRequest {
-
   /// Creates a new [CloseL2CapChannelRequest]
   CloseL2CapChannelRequest({
     required this.remoteId,
     required this.psm,
   });
+
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to close
   final int psm;
 
@@ -1134,15 +1095,15 @@ class CloseL2CapChannelRequest {
 /// Used internally to communicate with the platform layer when
 /// [BluetoothL2capChannel.read] is called.
 class ReadL2CapChannelRequest {
-
   /// Creates a new [ReadL2CapChannelRequest]
   ReadL2CapChannelRequest({
     required this.remoteId,
     required this.psm,
   });
+
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to read from
   final int psm;
 
@@ -1159,22 +1120,22 @@ class ReadL2CapChannelRequest {
 /// Contains the data that was read from the L2CAP channel along with
 /// metadata about the read operation.
 class ReadL2CapChannelResponse {
-
   /// Creates a [ReadL2CapChannelResponse] from a platform message map
   ReadL2CapChannelResponse.fromMap(Map<dynamic, dynamic> map)
       : remoteId = map["remote_id"] as String,
         psm = map["psm"] as int,
         bytesRead = map["bytes_read"] as int,
         value = Uint8List.fromList(map["value"] as List<int>);
+
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel that was read from
   final int psm;
-  
+
   /// The number of bytes that were read
   final int bytesRead;
-  
+
   /// The actual data bytes that were read
   final List<int> value;
 }
@@ -1184,15 +1145,15 @@ class ReadL2CapChannelResponse {
 /// Used internally to communicate with the platform layer when
 /// [BluetoothL2capChannel.write] is called.
 class WriteL2CapChannelRequest {
-
   /// Creates a new [WriteL2CapChannelRequest]
   WriteL2CapChannelRequest({required this.remoteId, required this.psm, required this.value});
+
   /// The device identifier of the remote device
   final String remoteId;
-  
+
   /// The PSM of the channel to write to
   final int psm;
-  
+
   /// The data bytes to write
   final List<int> value;
 
@@ -1219,7 +1180,6 @@ class WriteL2CapChannelRequest {
 /// });
 /// ```
 class L2CapChannelData {
-
   /// Creates a new [L2CapChannelData] instance
   L2CapChannelData({required this.remoteId, required this.psm, required this.value});
 
@@ -1231,12 +1191,13 @@ class L2CapChannelData {
       value: Uint8List.fromList(map["value"] as List<int>),
     );
   }
+
   /// The device identifier of the device that sent this data
   final DeviceIdentifier remoteId;
-  
+
   /// The PSM (Protocol Service Multiplexer) of the channel this data was received on
   final int psm;
-  
+
   /// The actual data bytes that were received
   final List<int> value;
 }
@@ -1244,7 +1205,6 @@ class L2CapChannelData {
 /// Event emitted when an L2CAP channel is closed by the remote device,
 /// a stream error, or a device disconnect.
 class L2CapChannelClosed {
-
   /// Creates a new [L2CapChannelClosed] instance
   L2CapChannelClosed({required this.remoteId, required this.psm});
 
@@ -1255,6 +1215,7 @@ class L2CapChannelClosed {
       psm: map["psm"] as int,
     );
   }
+
   /// The device identifier of the remote device
   final DeviceIdentifier remoteId;
 
@@ -1265,7 +1226,6 @@ class L2CapChannelClosed {
 /// Event emitted when a remote device connects to an L2CAP server
 /// started with `listenL2capChannel`.
 class L2CapChannelConnected {
-
   /// Creates a new [L2CapChannelConnected] instance
   L2CapChannelConnected({required this.remoteId, required this.psm});
 
@@ -1276,6 +1236,7 @@ class L2CapChannelConnected {
       psm: map["psm"] as int,
     );
   }
+
   /// The identifier to address the accepted channel with.
   ///
   /// On Android this is the connecting client's MAC address. On iOS

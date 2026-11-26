@@ -1,5 +1,4 @@
 class DeviceIdentifier {
-
   const DeviceIdentifier(this.str);
   final String str;
 

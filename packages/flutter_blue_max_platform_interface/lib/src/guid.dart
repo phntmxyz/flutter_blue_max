@@ -3,7 +3,6 @@
 // BSD-style license that can be found in the LICENSE file.
 
 class Guid {
-
   Guid(String input) : bytes = _toBytes(input);
 
   Guid.empty() : bytes = List.filled(16, 0);
