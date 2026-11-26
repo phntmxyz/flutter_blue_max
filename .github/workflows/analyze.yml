@@ -1,0 +1,54 @@
+name: Analyze packages
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/analyze.yml'
+
+# A newer PR update supersedes the previous checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.7'
+
+jobs:
+  analyze:
+    name: Analyze ${{ matrix.package }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - flutter_blue_max
+          - flutter_blue_max_android
+          - flutter_blue_max_darwin
+          - flutter_blue_max_linux
+          - flutter_blue_max_platform_interface
+          - flutter_blue_max_web
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/${{ matrix.package }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve dependencies
+        run: flutter pub get
+
+      - name: Analyze with package:lint
+        run: flutter analyze --no-pub
