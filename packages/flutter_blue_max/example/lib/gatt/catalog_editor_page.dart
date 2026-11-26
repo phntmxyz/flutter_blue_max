@@ -1,14 +1,14 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/form_validation.dart';
-import 'package:flutter_blue_max_example/shared/prompts.dart';
-import 'package:reactive_forms/reactive_forms.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/gatt/gatt_catalog_library.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/form_validation.dart";
+import "package:flutter_blue_max_example/shared/prompts.dart";
+import "package:reactive_forms/reactive_forms.dart";
 
 /// Opened from `CatalogPanel` to add/edit/copy, and from `GattService` to add or edit an entry.
 /// Saves one of the user's own GATT catalog services and keeps the editor open on conflicts.
@@ -52,12 +52,12 @@ class const CatalogEditorPage({
 
 class _CatalogEditorPageState() extends State<CatalogEditorPage> {
   bool _saving = false;
-  final _name = FormControl<String>(value: '');
-  final _uuid = FormControl<String>(value: '');
+  final _name = FormControl<String>(value: "");
+  final _uuid = FormControl<String>(value: "");
   final _characteristicForms = FormArray<Map<String, dynamic>>([]);
   final _check = FormControl<bool>(value: true);
   late final _form = FormGroup(
-    {'name': _name, 'uuid': _uuid, 'check': _check, 'characteristics': _characteristicForms},
+    {"name": _name, "uuid": _uuid, "check": _check, "characteristics": _characteristicForms},
     validators: [DelegateValidator(_validate)],
   );
   StreamSubscription<Object?>? _changes;
@@ -70,9 +70,9 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
     final uuid = _parse(_uuid.text);
     String? message;
     if (uuid == null) {
-      message = 'Enter a 16, 32 or 128-bit UUID.';
+      message = "Enter a 16, 32 or 128-bit UUID.";
     } else if (widget.others.any((other) => other.uuid == uuid)) {
-      message = 'Your catalog already has this service.';
+      message = "Your catalog already has this service.";
     }
     setInputError(_uuid, message);
     for (final draft in _characteristics) {
@@ -80,14 +80,14 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
       final uuid = draft.parsedUuid;
       String? message;
       if (uuid == null) {
-        message = 'Enter a 16, 32 or 128-bit UUID.';
+        message = "Enter a 16, 32 or 128-bit UUID.";
       } else if (_characteristics.where((other) => other.parsedUuid == uuid).length > 1) {
-        message = 'This service already has this characteristic.';
+        message = "This service already has this characteristic.";
       }
       setInputError(draft.uuid, message);
       setInputError(
         draft.propertyControl,
-        _test && draft.properties.isEmpty ? 'Select the expected properties.' : null,
+        _test && draft.properties.isEmpty ? "Select the expected properties." : null,
       );
     }
     return null;
@@ -166,11 +166,11 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
     };
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.editing ? 'Edit catalog entry' : 'Add catalog entry'),
+        title: Text(widget.editing ? "Edit catalog entry" : "Add catalog entry"),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
-            child: FilledButton(onPressed: _saving ? null : _save, child: const Text('Save entry')),
+            child: FilledButton(onPressed: _saving ? null : _save, child: const Text("Save entry")),
           ),
         ],
       ),
@@ -182,7 +182,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
             ReactiveTextField<String>(
               key: ObjectKey(_name),
               formControl: _name,
-              decoration: const InputDecoration(labelText: 'Service name', hintText: 'My sensor'),
+              decoration: const InputDecoration(labelText: "Service name", hintText: "My sensor"),
               validationMessages: inputValidationMessages,
             ),
             const SizedBox(height: 16),
@@ -190,24 +190,24 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
               key: ObjectKey(_uuid),
               formControl: _uuid,
               decoration: InputDecoration(
-                labelText: 'Service UUID',
-                hintText: '180f',
-                helperText: replaced == null ? null : 'Replaces the built-in entry ${replaced.name}.',
+                labelText: "Service UUID",
+                hintText: "180f",
+                helperText: replaced == null ? null : "Replaces the built-in entry ${replaced.name}.",
               ),
               validationMessages: inputValidationMessages,
             ),
             SwitchListTile(
               contentPadding: EdgeInsets.zero,
-              title: const Text('Check characteristics'),
+              title: const Text("Check characteristics"),
               subtitle: const Text(
-                'Discovered services must contain every characteristic with exactly the selected properties. '
-                'Otherwise the entry only names them.',
+                "Discovered services must contain every characteristic with exactly the selected properties. "
+                "Otherwise the entry only names them.",
               ),
               value: _test,
               onChanged: (value) => setState(() => _test = value),
             ),
             const SizedBox(height: 12),
-            Text('Characteristics', style: Theme.of(context).textTheme.titleSmall),
+            Text("Characteristics", style: Theme.of(context).textTheme.titleSmall),
             for (final draft in _characteristics) ...[
               const SizedBox(height: 12),
               CatalogCharacteristicCard(
@@ -221,7 +221,7 @@ class _CatalogEditorPageState() extends State<CatalogEditorPage> {
             OutlinedButton.icon(
               onPressed: () => setState(() => _characteristicForms.add(CharacteristicDraft())),
               icon: const Icon(Icons.add),
-              label: const Text('Add characteristic'),
+              label: const Text("Add characteristic"),
             ),
           ],
         ),
@@ -236,9 +236,9 @@ class CharacteristicDraft._(
   final FormControl<String> uuid,
   final FormControl<Set<GattProperty>> propertyControl,
 ) extends FormGroup {
-  new() : this._(FormControl(value: ''), FormControl(value: ''), FormControl(value: {}));
+  new() : this._(FormControl(value: ""), FormControl(value: ""), FormControl(value: {}));
 
-  this : super({'name': name, 'uuid': uuid, 'properties': propertyControl});
+  this : super({"name": name, "uuid": uuid, "properties": propertyControl});
 
   Set<GattProperty> get properties => propertyControl.value!;
   set properties(Set<GattProperty> value) => propertyControl.value = value;
@@ -274,12 +274,12 @@ class const CatalogCharacteristicCard({
                   child: ReactiveTextField<String>(
                     key: ObjectKey(draft.name),
                     formControl: draft.name,
-                    decoration: const InputDecoration(labelText: 'Characteristic name', hintText: 'Temperature'),
+                    decoration: const InputDecoration(labelText: "Characteristic name", hintText: "Temperature"),
                     validationMessages: inputValidationMessages,
                   ),
                 ),
                 IconButton(
-                  tooltip: 'Remove characteristic',
+                  tooltip: "Remove characteristic",
                   onPressed: onRemove,
                   icon: const Icon(Icons.delete_outline),
                 ),
@@ -289,7 +289,7 @@ class const CatalogCharacteristicCard({
             ReactiveTextField<String>(
               key: ObjectKey(draft.uuid),
               formControl: draft.uuid,
-              decoration: const InputDecoration(labelText: 'Characteristic UUID', hintText: '2a6e'),
+              decoration: const InputDecoration(labelText: "Characteristic UUID", hintText: "2a6e"),
               validationMessages: inputValidationMessages,
             ),
             if (checkProperties) ...[
@@ -318,10 +318,10 @@ class const CatalogCharacteristicCard({
                             ),
                         ],
                       ),
-                      if (field.control.touched && field.control.hasError('input')) ...[
+                      if (field.control.touched && field.control.hasError("input")) ...[
                         const SizedBox(height: 6),
                         Text(
-                          field.control.getError('input')! as String,
+                          field.control.getError("input")! as String,
                           style: Theme.of(context).textTheme.bodySmall!
                               .copyWith(color: Theme.of(context).colorScheme.error),
                         ),
@@ -338,4 +338,4 @@ class const CatalogCharacteristicCard({
   }
 }
 
-String? _required(String? value) => (value ?? '').trim().isEmpty ? 'Enter a name.' : null;
+String? _required(String? value) => (value ?? "").trim().isEmpty ? "Enter a name." : null;

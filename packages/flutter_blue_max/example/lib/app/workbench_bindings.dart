@@ -1,9 +1,9 @@
-import 'package:collection/collection.dart';
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/widgets.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
+import "package:collection/collection.dart";
+import "package:context_plus/context_plus.dart";
+import "package:flutter/widgets.dart";
+import "package:flutter_blue_max_example/advertisements/parser_library.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/gatt/gatt_catalog_library.dart";
 
 final workbenchRef = Ref<WorkbenchController>();
 final parserLibraryRef = Ref<ParserLibrary>();

@@ -1,21 +1,21 @@
-import 'dart:developer' as developer;
+import "dart:developer" as developer;
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_editor_page.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_files.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/json_files.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
-import 'package:flutter_blue_max_example/shared/persisted_library.dart';
-import 'package:flutter_blue_max_example/shared/prompts.dart';
-import 'package:flutter_blue_max_example/shared/selection_dialog.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/gatt/catalog_editor_page.dart";
+import "package:flutter_blue_max_example/gatt/catalog_files.dart";
+import "package:flutter_blue_max_example/gatt/catalog_import_result.dart";
+import "package:flutter_blue_max_example/gatt/gatt_catalog_library.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/json_files.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
+import "package:flutter_blue_max_example/shared/persisted_library.dart";
+import "package:flutter_blue_max_example/shared/prompts.dart";
+import "package:flutter_blue_max_example/shared/selection_dialog.dart";
 
-const _characteristicNoun = Noun(singular: 'characteristic', plural: 'characteristics');
+const _characteristicNoun = Noun(singular: "characteristic", plural: "characteristics");
 
 /// GATT catalog section of `LibraryPanel`.
 /// Lists the user's own GATT catalog services and the built-in ones they can extend or replace.
@@ -27,12 +27,12 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('GATT catalog', style: Theme.of(context).textTheme.headlineMedium),
+        Text("GATT catalog", style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const Text(
-          'Names services and characteristics in the GATT explorer. Checked services must contain every '
-          'characteristic with exactly its properties. Your entries are saved on this device and replace '
-          'built-in ones with the same UUID.',
+          "Names services and characteristics in the GATT explorer. Checked services must contain every "
+          "characteristic with exactly its properties. Your entries are saved on this device and replace "
+          "built-in ones with the same UUID.",
         ),
         const SizedBox(height: 20),
         Wrap(
@@ -42,12 +42,12 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
             FilledButton.icon(
               onPressed: () => CatalogEditorPage.open(context),
               icon: const Icon(Icons.add),
-              label: const Text('Add service'),
+              label: const Text("Add service"),
             ),
             OutlinedButton.icon(
               onPressed: () => _import(context),
               icon: const Icon(Icons.file_open_outlined),
-              label: const Text('Import'),
+              label: const Text("Import"),
             ),
             Builder(
               // The share sheet on iPad anchors to this button.
@@ -55,48 +55,48 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
                 return OutlinedButton.icon(
                   onPressed: c.catalog.isEmpty ? null : () => _export(button),
                   icon: const Icon(Icons.save_alt),
-                  label: const Text('Export'),
+                  label: const Text("Export"),
                 );
               },
             ),
             TextButton.icon(
               onPressed: () => _reset(context),
               icon: const Icon(Icons.restart_alt),
-              label: const Text('Reset catalog'),
+              label: const Text("Reset catalog"),
             ),
           ],
         ),
         const SizedBox(height: 24),
-        Text('Your services', style: Theme.of(context).textTheme.titleMedium),
+        Text("Your services", style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),
         if (c.catalog.isEmpty)
           Text(
-            'None yet. Add a service here or from a discovered service in the GATT explorer.',
+            "None yet. Add a service here or from a discovered service in the GATT explorer.",
             style: Theme.of(context).textTheme.bodySmall,
           ),
         for (final service in c.catalog)
           CatalogServiceCard(
             service: service,
             note: switch (builtInService(service.uuid)) {
-              final replaced? => Text('Replaces the built-in ${replaced.name}'),
+              final replaced? => Text("Replaces the built-in ${replaced.name}"),
               null => null,
             },
             actions: [
               TextButton.icon(
                 onPressed: () => CatalogEditorPage.open(context, previous: service),
                 icon: const Icon(Icons.edit_outlined, size: 18),
-                label: const Text('Edit'),
+                label: const Text("Edit"),
               ),
               TextButton.icon(
                 onPressed: () => c.remove(service),
                 icon: const Icon(Icons.delete_outline, size: 18),
-                label: const Text('Remove'),
+                label: const Text("Remove"),
               ),
             ],
           ),
         for (final (title, services) in [
-          ('FBM test dongle', testDongleServices),
-          ('Bluetooth SIG and common vendors', standardServices),
+          ("FBM test dongle", testDongleServices),
+          ("Bluetooth SIG and common vendors", standardServices),
         ]) ...[
           const SizedBox(height: 24),
           Text(title, style: Theme.of(context).textTheme.titleMedium),
@@ -104,12 +104,12 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
           for (final service in services)
             CatalogServiceCard(
               service: service,
-              note: c.catalog.any((own) => own.uuid == service.uuid) ? const Text('Replaced by your entry') : null,
+              note: c.catalog.any((own) => own.uuid == service.uuid) ? const Text("Replaced by your entry") : null,
               actions: [
                 TextButton.icon(
                   onPressed: () => CatalogEditorPage.open(context, initial: service),
                   icon: const Icon(Icons.copy_outlined, size: 18),
-                  label: const Text('Copy to your services'),
+                  label: const Text("Copy to your services"),
                 ),
               ],
             ),
@@ -125,7 +125,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
       services = await openCatalogFile();
     } on Exception catch (exception, stackTrace) {
       if (exception is! FormatException) {
-        developer.log('Import catalog services failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+        developer.log("Import catalog services failed", name: "workbench", error: exception, stackTrace: stackTrace);
       }
       if (context.mounted) {
         tell(
@@ -139,7 +139,7 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
       return;
     }
     if (services.isEmpty) {
-      tell(context, 'The file holds no services.');
+      tell(context, "The file holds no services.");
       return;
     }
     final replacements = await controller.previewReplacements(services);
@@ -170,10 +170,10 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
       tell(
         context,
         [
-          'Imported ${counted(added + replaced, serviceNoun)}',
-          if (replaced > 0) '$replaced replaced your own',
+          "Imported ${counted(added + replaced, serviceNoun)}",
+          if (replaced > 0) "$replaced replaced your own",
           if (present > 0) '${present == 1 ? '1 was' : '$present were'} already present',
-        ].join(', '),
+        ].join(", "),
       );
     }
   }
@@ -193,17 +193,17 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
       if (button.mounted) {
         switch (outcome) {
           case ExportOutcome.saved:
-            tell(button, 'Exported ${counted(chosen.length, serviceNoun)}');
+            tell(button, "Exported ${counted(chosen.length, serviceNoun)}");
           case ExportOutcome.unconfirmed:
-            tell(button, 'The share sheet could not confirm that the file was exported.');
+            tell(button, "The share sheet could not confirm that the file was exported.");
           case ExportOutcome.cancelled:
             break;
         }
       }
     } on Exception catch (exception, stackTrace) {
-      developer.log('Export catalog services failed', name: 'workbench', error: exception, stackTrace: stackTrace);
+      developer.log("Export catalog services failed", name: "workbench", error: exception, stackTrace: stackTrace);
       if (button.mounted) {
-        tell(button, 'Export failed: $exception');
+        tell(button, "Export failed: $exception");
       }
     }
   }
@@ -212,9 +212,9 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
     final controller = catalogLibraryRef.of(context);
     final confirmed = await confirm(
       context,
-      title: 'Reset catalog?',
-      message: 'Your own services are removed; the built-in entries stay. Export your services first to keep them.',
-      action: 'Reset',
+      title: "Reset catalog?",
+      message: "Your own services are removed; the built-in entries stay. Export your services first to keep them.",
+      action: "Reset",
     );
     if (confirmed) {
       await controller.reset();
@@ -228,13 +228,13 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
     Map<Guid, KnownService>? replacements,
   }) {
     Widget summary(KnownService service) =>
-        Text('${service.uuid.str.toUpperCase()} · ${counted(service.characteristics.length, _characteristicNoun)}');
+        Text("${service.uuid.str.toUpperCase()} · ${counted(service.characteristics.length, _characteristicNoun)}");
 
     if (replacements != null) {
       return SelectionDialog.show(
         context,
-        title: const Text('Import services'),
-        action: 'Import',
+        title: const Text("Import services"),
+        action: "Import",
         noun: serviceNoun,
         items: services,
         label: (s) => Text(s.name),
@@ -244,8 +244,8 @@ class const CatalogPanel({super.key, final ShareFile? shareFile}) extends Statel
     }
     return SelectionDialog.show(
       context,
-      title: const Text('Export services'),
-      action: 'Export',
+      title: const Text("Export services"),
+      action: "Export",
       noun: serviceNoun,
       items: services,
       label: (s) => Text(s.name),
@@ -270,7 +270,7 @@ class const CatalogImportDetails({required final Widget summary, final String? p
               Icon(Icons.warning_amber_rounded, size: 16, color: color),
               const SizedBox(width: 6),
               Expanded(
-                child: Text('Replaces your $previous', style: TextStyle(color: color)),
+                child: Text("Replaces your $previous", style: TextStyle(color: color)),
               ),
             ],
           ),
@@ -287,7 +287,7 @@ class const CatalogServiceCard({
 }) extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 11);
+    const mono = TextStyle(fontFamily: "monospace", fontSize: 11);
     return Card(
       margin: const EdgeInsets.only(bottom: 10),
       child: ExpansionTile(
@@ -299,8 +299,8 @@ class const CatalogServiceCard({
             Text(
               [
                 counted(service.characteristics.length, _characteristicNoun),
-                if (service.test) 'Checked' else 'Names only',
-              ].join(' · '),
+                if (service.test) "Checked" else "Names only",
+              ].join(" · "),
             ),
             if (note case final child?)
               DefaultTextStyle.merge(style: Theme.of(context).textTheme.bodyMedium, child: child),
@@ -319,7 +319,7 @@ class const CatalogServiceCard({
                   Text(characteristic.uuid.str.toUpperCase(), style: mono),
                   if (characteristic.properties != null)
                     Text(
-                      GattProperty.values.where(characteristic.properties!.contains).map((p) => p.label).join(' · '),
+                      GattProperty.values.where(characteristic.properties!.contains).map((p) => p.label).join(" · "),
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                 ],

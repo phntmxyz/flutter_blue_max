@@ -97,7 +97,7 @@ The desktop layout with the in-memory platform fake from the widget tests.
 ## Download builds from GitHub Actions
 
 The [Build example downloads](../../../.github/workflows/example_build.yml) workflow builds five platforms with Flutter 3.47.7 and retains downloads for 14 days.
-Pull requests that change the packages or this workflow run formatting checks, analysis, and the Dart and Chrome tests in one Linux job.
+The workflow runs when a `flutter_blue_max-<version>` release tag is pushed or when started manually. Pull requests do not build downloads. The [Check example](../../../.github/workflows/example_checks.yml) workflow runs formatting checks, analysis, and the Dart and Chrome tests in one Linux job for pull requests that change the packages.
 
 Once the workflow is on the default branch, open **Actions → Build example downloads → Run workflow**, select the default branch, and choose `all` or one platform ([GitHub instructions](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/manually-run-a-workflow)).
 Choosing `all` also runs the Darwin compatibility builds.

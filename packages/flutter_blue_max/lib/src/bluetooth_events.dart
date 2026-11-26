@@ -1,4 +1,4 @@
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 class BluetoothEvents {
   Stream<OnConnectionStateChangedEvent> get onConnectionStateChanged {
@@ -51,14 +51,14 @@ class BluetoothEvents {
   }
 }
 
-@Deprecated('Use FbmError instead')
+@Deprecated("Use FbmError instead")
 typedef FbpError = FbmError;
 
 class FbmError {
+  FbmError(this.errorCode, this.errorString);
   final int errorCode;
   final String errorString;
   ErrorPlatform get platform => _nativeError;
-  FbmError(this.errorCode, this.errorString);
 }
 
 //
@@ -67,9 +67,8 @@ class FbmError {
 
 // On Connection State Changed
 class OnConnectionStateChangedEvent {
-  final BmConnectionStateResponse _response;
-
   OnConnectionStateChangedEvent(this._response);
+  final BmConnectionStateResponse _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -80,9 +79,8 @@ class OnConnectionStateChangedEvent {
 
 // On Mtu Changed
 class OnMtuChangedEvent {
-  final BmMtuChangedResponse _response;
-
   OnMtuChangedEvent(this._response);
+  final BmMtuChangedResponse _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -96,9 +94,8 @@ class OnMtuChangedEvent {
 
 // On Read Rssi
 class OnReadRssiEvent {
-  final BmReadRssiResult _response;
-
   OnReadRssiEvent(this._response);
+  final BmReadRssiResult _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -112,9 +109,8 @@ class OnReadRssiEvent {
 
 // On Services Reset
 class OnServicesResetEvent {
-  final BmBluetoothDevice _response;
-
   OnServicesResetEvent(this._response);
+  final BmBluetoothDevice _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -122,9 +118,8 @@ class OnServicesResetEvent {
 
 // On Discovered Services
 class OnDiscoveredServicesEvent {
-  final BmDiscoverServicesResult _response;
-
   OnDiscoveredServicesEvent(this._response);
+  final BmDiscoverServicesResult _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -138,9 +133,8 @@ class OnDiscoveredServicesEvent {
 
 // On Characteristic Received
 class OnCharacteristicReceivedEvent {
-  final BmCharacteristicData _response;
-
   OnCharacteristicReceivedEvent(this._response);
+  final BmCharacteristicData _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -161,9 +155,8 @@ class OnCharacteristicReceivedEvent {
 
 // On Characteristic Written
 class OnCharacteristicWrittenEvent {
-  final BmCharacteristicData _response;
-
   OnCharacteristicWrittenEvent(this._response);
+  final BmCharacteristicData _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -184,9 +177,8 @@ class OnCharacteristicWrittenEvent {
 
 // On Descriptor Received
 class OnDescriptorReadEvent {
-  final BmDescriptorData _response;
-
   OnDescriptorReadEvent(this._response);
+  final BmDescriptorData _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -207,9 +199,8 @@ class OnDescriptorReadEvent {
 
 // On Descriptor Written
 class OnDescriptorWrittenEvent {
-  final BmDescriptorData _response;
-
   OnDescriptorWrittenEvent(this._response);
+  final BmDescriptorData _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -230,9 +221,8 @@ class OnDescriptorWrittenEvent {
 
 // On Name Changed
 class OnNameChangedEvent {
-  final BmNameChanged _response;
-
   OnNameChangedEvent(this._response);
+  final BmNameChanged _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);
@@ -243,9 +233,8 @@ class OnNameChangedEvent {
 
 // On Bond State Changed
 class OnBondStateChangedEvent {
-  final BmBondStateResponse _response;
-
   OnBondStateChangedEvent(this._response);
+  final BmBondStateResponse _response;
 
   /// the relevant device
   BluetoothDevice get device => BluetoothDevice(remoteId: _response.remoteId);

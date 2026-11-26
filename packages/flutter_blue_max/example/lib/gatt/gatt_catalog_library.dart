@@ -1,12 +1,12 @@
-import 'dart:convert';
+import "dart:convert";
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_import_result.dart';
-import 'package:flutter_blue_max_example/gatt/catalog_store.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/persisted_library.dart';
-import 'package:flutter_blue_max_example/shared/stored_list.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/gatt/catalog_import_result.dart";
+import "package:flutter_blue_max_example/gatt/catalog_store.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/persisted_library.dart";
+import "package:flutter_blue_max_example/shared/stored_list.dart";
 
 /// Owns the user's saved catalog independently of Bluetooth; imports replace by UUID.
 class GattCatalogLibrary({
@@ -14,29 +14,29 @@ class GattCatalogLibrary({
   Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) write = saveStoredList,
   Future<StoredList<KnownService>?> Function() read = loadCatalog,
 }) extends ChangeNotifier {
+  this {
+    _store.addListener(notifyListeners);
+  }
+
   final _store = PersistedLibrary<KnownService>(
     key: catalogStoreKey,
-    label: 'GATT catalog',
-    resetAction: 'Reset catalog',
-    resetNoun: 'catalog',
+    label: "GATT catalog",
+    resetAction: "Reset catalog",
+    resetNoun: "catalog",
     read: read,
     write: write,
     onProblem: onProblem,
   );
-
-  this {
-    _store.addListener(notifyListeners);
-  }
 
   List<KnownService> get catalog => _store.items;
   Future<void> load() => _store.load();
   Future<void> save(KnownService service, {KnownService? previous}) => _store.change((items) {
     final index = previous == null ? -1 : items.indexOf(previous);
     if (previous != null && index < 0) {
-      throw const CatalogConflict('This catalog entry changed while you were editing it. Reopen it and try again.');
+      throw const CatalogConflict("This catalog entry changed while you were editing it. Reopen it and try again.");
     }
     if (items.any((s) => !identical(s, previous) && s.uuid == service.uuid)) {
-      throw const CatalogConflict('Your catalog already has a service with this UUID.');
+      throw const CatalogConflict("Your catalog already has a service with this UUID.");
     }
     if (index < 0) {
       items.add(service);
@@ -74,7 +74,7 @@ class GattCatalogLibrary({
       final own = existing[service.uuid];
       if (own != null && !_sameService(own, service) && !_sameService(own, confirmedReplacements[service.uuid])) {
         throw const CatalogConflict(
-          'The catalog changed after the preview. Reopen the import and check the replacements.',
+          "The catalog changed after the preview. Reopen the import and check the replacements.",
         );
       }
     }

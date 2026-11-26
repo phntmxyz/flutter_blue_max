@@ -1,4 +1,4 @@
-name: Publish Flutter Blue Plus Darwin
+name: Publish Flutter Blue Max Darwin
 on:
   push:
     tags:

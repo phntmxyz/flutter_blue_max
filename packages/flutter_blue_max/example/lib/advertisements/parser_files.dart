@@ -1,12 +1,12 @@
-import 'dart:ui';
+import "dart:ui";
 
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/shared/json_files.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/shared/json_files.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
 
-const parserFileName = 'blue_max_parsers.json';
-const Noun parserNoun = Noun(singular: 'parser', plural: 'parsers');
-const _key = 'parsers';
+const parserFileName = "blue_max_parsers.json";
+const Noun parserNoun = Noun(singular: "parser", plural: "parsers");
+const _key = "parsers";
 
 String encodeParserFile(List<AdvertisementParser> parsers) => encodeJsonList(_key, parsers);
 

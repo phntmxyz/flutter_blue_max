@@ -1,22 +1,22 @@
-import 'dart:convert';
-import 'dart:ui';
+import "dart:convert";
+import "dart:ui";
 
-import 'package:file_selector/file_selector.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_max_example/shared/json_format.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
-import 'package:share_plus/share_plus.dart';
+import "package:file_selector/file_selector.dart";
+import "package:flutter/foundation.dart";
+import "package:flutter_blue_max_example/shared/json_format.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
+import "package:share_plus/share_plus.dart";
 
 const _jsonFiles = XTypeGroup(
-  label: 'JSON',
-  extensions: ['json'],
-  mimeTypes: ['application/json'],
-  uniformTypeIdentifiers: ['public.json'],
+  label: "JSON",
+  extensions: ["json"],
+  mimeTypes: ["application/json"],
+  uniformTypeIdentifiers: ["public.json"],
 );
 
 /// Items are wrapped in an object under [key], so other JSON files are recognised as foreign.
 String encodeJsonList(String key, List<Object?> items) =>
-    const JsonEncoder.withIndent('  ').convert({'version': jsonListVersion, key: items});
+    const JsonEncoder.withIndent("  ").convert({"version": jsonListVersion, key: items});
 
 /// Reads what [encodeJsonList] wrote under [key].
 /// Throws a [FormatException], worded with [noun], for files that hold something else.
@@ -31,20 +31,20 @@ List<T> decodeJsonList<T>(
     json = jsonDecode(text);
   } on FormatException catch (exception, stackTrace) {
     Error.throwWithStackTrace(
-      FormatException('The file is not JSON: ${exception.message}', exception.source, exception.offset),
+      FormatException("The file is not JSON: ${exception.message}", exception.source, exception.offset),
       stackTrace,
     );
   }
   if (json is Map<String, dynamic>) {
-    checkJsonListVersion(json, source: 'file');
+    checkJsonListVersion(json, source: "file");
   }
   final items = json is Map<String, dynamic> ? json[key] : null;
   if (items is! List) {
-    throw FormatException('The file holds no ${noun.plural}.');
+    throw FormatException("The file holds no ${noun.plural}.");
   }
   return [
     for (final item in items)
-      if (item is Map<String, dynamic>) fromJson(item) else throw FormatException('Invalid ${noun.singular}: $item'),
+      if (item is Map<String, dynamic>) fromJson(item) else throw FormatException("Invalid ${noun.singular}: $item"),
   ];
 }
 
@@ -66,7 +66,7 @@ enum ExportOutcome() {
 /// Saves [json] as [name] through a desktop save dialog, a browser download, or a phone share sheet.
 /// [origin] anchors the share sheet on iPad.
 Future<ExportOutcome> saveJsonFile(String name, String json, {Rect? origin, ShareFile? shareFile}) async {
-  final file = XFile.fromData(utf8.encode(json), mimeType: 'application/json', name: name);
+  final file = XFile.fromData(utf8.encode(json), mimeType: "application/json", name: name);
   final phone =
       !kIsWeb &&
       switch (defaultTargetPlatform) {

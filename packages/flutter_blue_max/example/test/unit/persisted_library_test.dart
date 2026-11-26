@@ -1,14 +1,14 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_examples.dart';
-import 'package:flutter_blue_max_example/advertisements/parser_library.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_catalog_library.dart';
-import 'package:flutter_blue_max_example/gatt/known_service.dart';
-import 'package:flutter_blue_max_example/shared/persisted_library.dart';
-import 'package:flutter_blue_max_example/shared/stored_list.dart';
-import 'package:flutter_test/flutter_test.dart';
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/advertisements/parser_examples.dart";
+import "package:flutter_blue_max_example/advertisements/parser_library.dart";
+import "package:flutter_blue_max_example/gatt/gatt_catalog_library.dart";
+import "package:flutter_blue_max_example/gatt/known_service.dart";
+import "package:flutter_blue_max_example/shared/persisted_library.dart";
+import "package:flutter_blue_max_example/shared/stored_list.dart";
+import "package:flutter_test/flutter_test.dart";
 
 enum _Edit() {
   save,
@@ -18,15 +18,15 @@ enum _Edit() {
 
 void main() {
   for (final edit in _Edit.values) {
-    test('$edit waits for the stored list before changing or persisting it', () async {
+    test("$edit waits for the stored list before changing or persisting it", () async {
       final loading = Completer<StoredList<int>?>();
       final writes = <List<Object?>>[];
       final problems = <LibraryProblem>[];
       final library = PersistedLibrary<int>(
-        key: 'test',
-        label: 'test entries',
-        resetAction: 'Reset',
-        resetNoun: 'entries',
+        key: "test",
+        label: "test entries",
+        resetAction: "Reset",
+        resetNoun: "entries",
         defaults: [9],
         read: () => loading.future,
         onProblem: problems.add,
@@ -55,27 +55,27 @@ void main() {
     });
   }
 
-  test('storage read snapshots freeze decoded and unreadable entries', () {
+  test("storage read snapshots freeze decoded and unreadable entries", () {
     final items = [1];
-    final unreadable = <Object?>['legacy'];
+    final unreadable = <Object?>["legacy"];
     final result = StoredList(items, unreadable: unreadable);
     items.clear();
     unreadable.clear();
     expect(result.items, [1]);
-    expect(result.unreadable, ['legacy']);
+    expect(result.unreadable, ["legacy"]);
     expect(result.items.clear, throwsUnsupportedError);
     expect(result.unreadable.clear, throwsUnsupportedError);
   });
 
-  test('parser import distinguishes an in-memory edit from a successful write', () async {
+  test("parser import distinguishes an in-memory edit from a successful write", () async {
     final problems = <LibraryProblem>[];
     final library = ParserLibrary(
       onProblem: problems.add,
       read: () => Future<StoredList<AdvertisementParser>?>.value(),
-      write: (_, _, {unreadable = const []}) => Future<void>.error(StateError('Disk full')),
+      write: (_, _, {unreadable = const []}) => Future<void>.error(StateError("Disk full")),
     );
     addTearDown(library.dispose);
-    const parser = AdvertisementParser(name: 'Own', source: AdvertisementSource.manufacturer, fields: []);
+    const parser = AdvertisementParser(name: "Own", source: AdvertisementSource.manufacturer, fields: []);
     final result = await library.addParsers([parser]);
     expect(result.saved, isFalse);
     expect(result.value, 1);
@@ -84,26 +84,26 @@ void main() {
     expect(problems.single.stackTrace, isNotNull);
   });
 
-  test('catalog import does not save over an unreadable envelope', () async {
+  test("catalog import does not save over an unreadable envelope", () async {
     final problems = <LibraryProblem>[];
     final library = GattCatalogLibrary(
       onProblem: problems.add,
-      read: () => Future<StoredList<KnownService>?>.error(const FormatException('Newer envelope')),
-      write: (_, _, {unreadable = const []}) => fail('The protected envelope must stay unchanged'),
+      read: () => Future<StoredList<KnownService>?>.error(const FormatException("Newer envelope")),
+      write: (_, _, {unreadable = const []}) => fail("The protected envelope must stay unchanged"),
     );
     addTearDown(library.dispose);
-    final result = await library.addCatalogServices([KnownService(Guid('fff0'), 'Own', [])]);
+    final result = await library.addCatalogServices([KnownService(Guid("fff0"), "Own", [])]);
     expect(result.saved, isFalse);
     expect(result.value.added, 1);
-    expect(problems.last.message, contains('changes are not saved'));
+    expect(problems.last.message, contains("changes are not saved"));
   });
 
-  test('parser import waits for loading and preserves earlier stored parsers', () async {
+  test("parser import waits for loading and preserves earlier stored parsers", () async {
     final loading = Completer<StoredList<AdvertisementParser>?>();
     final writes = <List<Object?>>[];
     final library = ParserLibrary(
       read: () => loading.future,
-      onProblem: (_) => fail('Unexpected library problem'),
+      onProblem: (_) => fail("Unexpected library problem"),
       write: (_, items, {unreadable = const []}) async {
         writes.add(items);
       },
@@ -120,14 +120,14 @@ void main() {
     expect(writes.single, library.parsers);
   });
 
-  test('catalog save checks for duplicates after loading', () async {
+  test("catalog save checks for duplicates after loading", () async {
     final loading = Completer<StoredList<KnownService>?>();
-    final original = KnownService(Guid('fff0'), 'Original', []);
-    final duplicate = KnownService(Guid('fff0'), 'Duplicate', []);
+    final original = KnownService(Guid("fff0"), "Original", []);
+    final duplicate = KnownService(Guid("fff0"), "Duplicate", []);
     final library = GattCatalogLibrary(
       read: () => loading.future,
-      onProblem: (_) => fail('Unexpected library problem'),
-      write: (_, _, {unreadable = const []}) => fail('Do not write the duplicate'),
+      onProblem: (_) => fail("Unexpected library problem"),
+      write: (_, _, {unreadable = const []}) => fail("Do not write the duplicate"),
     );
     addTearDown(library.dispose);
     final rejected = expectLater(library.save(duplicate), throwsA(isA<CatalogConflict>()));
@@ -136,15 +136,15 @@ void main() {
     expect(library.catalog, [original]);
   });
 
-  test('catalog replaces only the entry that was confirmed in the preview', () async {
-    final original = KnownService(Guid('fff0'), 'Original', []);
-    final updated = KnownService(Guid('fff0'), 'Changed after preview', []);
-    final replacement = KnownService(Guid('fff0'), 'Replacement', []);
-    final newEntry = KnownService(Guid('fff1'), 'New entry', []);
+  test("catalog replaces only the entry that was confirmed in the preview", () async {
+    final original = KnownService(Guid("fff0"), "Original", []);
+    final updated = KnownService(Guid("fff0"), "Changed after preview", []);
+    final replacement = KnownService(Guid("fff0"), "Replacement", []);
+    final newEntry = KnownService(Guid("fff1"), "New entry", []);
     final writes = <List<Object?>>[];
     final library = GattCatalogLibrary(
       read: () => Future.value(StoredList([original])),
-      onProblem: (_) => fail('Unexpected library problem'),
+      onProblem: (_) => fail("Unexpected library problem"),
       write: (_, items, {unreadable = const []}) async {
         writes.add(items);
       },
@@ -164,15 +164,15 @@ void main() {
     ]);
   });
 
-  test('catalog import waits for loading and replaces in place by UUID', () async {
+  test("catalog import waits for loading and replaces in place by UUID", () async {
     final loading = Completer<StoredList<KnownService>?>();
-    final original = KnownService(Guid('fff0'), 'Original', []);
-    final replacement = KnownService(Guid('fff0'), 'Replacement', []);
-    final retained = KnownService(Guid('fff1'), 'Retained', []);
+    final original = KnownService(Guid("fff0"), "Original", []);
+    final replacement = KnownService(Guid("fff0"), "Replacement", []);
+    final retained = KnownService(Guid("fff1"), "Retained", []);
     final writes = <List<Object?>>[];
     final library = GattCatalogLibrary(
       read: () => loading.future,
-      onProblem: (_) => fail('Unexpected library problem'),
+      onProblem: (_) => fail("Unexpected library problem"),
       write: (_, items, {unreadable = const []}) async {
         writes.add(items);
       },

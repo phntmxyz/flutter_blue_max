@@ -1,6 +1,6 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
 
 /// Replaces only native I/O; the example and the public plugin run unchanged.
 final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
@@ -130,7 +130,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     if (override != null) {
       return await override(request);
     }
-    return BmBluetoothAdapterName(adapterName: 'Test workstation');
+    return BmBluetoothAdapterName(adapterName: "Test workstation");
   }
 
   @override
@@ -178,7 +178,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
     }
     rssiRequests.add(request);
     rssiValues.add(
-      BmReadRssiResult(remoteId: request.remoteId, rssi: -47, success: true, errorCode: 0, errorString: ''),
+      BmReadRssiResult(remoteId: request.remoteId, rssi: -47, success: true, errorCode: 0, errorString: ""),
     );
     return true;
   }
@@ -217,7 +217,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         value: descriptorValues[request.characteristicUuid] ?? [0x41],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;
@@ -243,7 +243,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         value: request.value,
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;
@@ -266,13 +266,13 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         remoteId: request.remoteId,
         serviceUuid: request.serviceUuid,
         characteristicUuid: request.characteristicUuid,
-        descriptorUuid: Guid('2902'),
+        descriptorUuid: Guid("2902"),
         primaryServiceUuid: request.primaryServiceUuid,
         instanceId: request.instanceId,
         value: [if (request.enable) 1 else 0, 0],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;
@@ -347,8 +347,8 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
   }
 
   void advertise({
-    String id = 'AA:BB:CC:DD:EE:01',
-    String name = 'Test peripheral',
+    String id = "AA:BB:CC:DD:EE:01",
+    String name = "Test peripheral",
     int rssi = -45,
     bool connectable = true,
     int? appearance,
@@ -367,13 +367,13 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
             appearance: appearance,
             manufacturerData: manufacturerData,
             serviceData: serviceData,
-            serviceUuids: [Guid('180F')],
+            serviceUuids: [Guid("180F")],
             rssi: rssi,
           ),
         ],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
   }
@@ -433,22 +433,22 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         services: [
           BmBluetoothService(
             remoteId: request.remoteId,
-            serviceUuid: Guid('180F'),
+            serviceUuid: Guid("180F"),
             primaryServiceUuid: null,
             characteristics: [
               BmBluetoothCharacteristic(
                 remoteId: request.remoteId,
-                serviceUuid: Guid('180F'),
-                characteristicUuid: Guid('2A19'),
+                serviceUuid: Guid("180F"),
+                characteristicUuid: Guid("2A19"),
                 primaryServiceUuid: null,
                 instanceId: 1,
                 descriptors: [
                   if (includeGattExtras)
-                    for (final uuid in ['2901', '2902'])
+                    for (final uuid in ["2901", "2902"])
                       BmBluetoothDescriptor(
                         remoteId: request.remoteId,
-                        serviceUuid: Guid('180F'),
-                        characteristicUuid: Guid('2A19'),
+                        serviceUuid: Guid("180F"),
+                        characteristicUuid: Guid("2A19"),
                         descriptorUuid: Guid(uuid),
                         primaryServiceUuid: null,
                         instanceId: 1,
@@ -487,7 +487,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
                         remoteId: request.remoteId,
                         serviceUuid: serviceUuid,
                         characteristicUuid: characteristicUuid,
-                        descriptorUuid: Guid('2901'),
+                        descriptorUuid: Guid("2901"),
                         primaryServiceUuid: null,
                         instanceId: 1,
                       ),
@@ -499,7 +499,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         ],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;
@@ -538,7 +538,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         value: characteristicReadValue,
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;
@@ -563,7 +563,7 @@ final class FakeBluetoothPlatform() extends FlutterBlueMaxPlatform {
         value: request.value,
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
     return true;

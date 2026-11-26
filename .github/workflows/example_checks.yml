@@ -1,0 +1,53 @@
+name: Check example
+
+on:
+  pull_request:
+    paths:
+      - 'packages/**'
+      - '.github/workflows/example_checks.yml'
+
+# A newer PR update supersedes the previous checks.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  FLUTTER_VERSION: '3.47.7'
+
+defaults:
+  run:
+    shell: bash
+    working-directory: packages/flutter_blue_max/example
+
+jobs:
+  checks:
+    name: Check example
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v7
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: stable
+          cache: true
+
+      - name: Resolve the example dependencies
+        run: flutter pub get --enforce-lockfile
+
+      - name: Check example formatting, analysis and tests
+        run: |
+          dart format --output=none --set-exit-if-changed lib test
+          flutter analyze --no-pub lib test
+          flutter test --no-pub
+          flutter test --no-pub --platform chrome \
+            test/scenarios/workbench_test.dart --plain-name 'web:'
+          flutter test --no-pub --platform chrome \
+            test/unit/web_export_test.dart test/unit/advertisement_parser_test.dart \
+            test/unit/payload_editor_test.dart test/unit/parser_editor_validation_test.dart

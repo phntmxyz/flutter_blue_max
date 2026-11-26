@@ -2,7 +2,7 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 /// Represents an L2CAP (Logical Link Control and Adaptation Protocol) channel
 /// for communication with a Bluetooth device.
@@ -28,6 +28,12 @@ part of '../flutter_blue_max.dart';
 /// await channel.close();
 /// ```
 class BluetoothL2capChannel {
+  /// Creates a new [BluetoothL2capChannel] instance.
+  ///
+  /// [deviceId] - The identifier of the Bluetooth device
+  /// [psm] - The Protocol Service Multiplexer value for this channel
+  BluetoothL2capChannel({required this.deviceId, required this.psm});
+
   /// The device identifier for the connected Bluetooth device
   final DeviceIdentifier deviceId;
 
@@ -35,12 +41,6 @@ class BluetoothL2capChannel {
   /// PSM values are used to distinguish between different services/protocols
   /// running over L2CAP on the same device.
   final int psm;
-
-  /// Creates a new [BluetoothL2capChannel] instance.
-  ///
-  /// [deviceId] - The identifier of the Bluetooth device
-  /// [psm] - The Protocol Service Multiplexer value for this channel
-  BluetoothL2capChannel({required this.deviceId, required this.psm});
 
   /// Writes data to the L2CAP channel.
   ///
@@ -160,10 +160,10 @@ class BluetoothL2capChannel {
 
   @override
   String toString() {
-    return 'BluetoothL2capChannel{'
-        'deviceId: $deviceId, '
-        'psm: $psm'
-        '}';
+    return "BluetoothL2capChannel{"
+        "deviceId: $deviceId, "
+        "psm: $psm"
+        "}";
   }
 
   @override

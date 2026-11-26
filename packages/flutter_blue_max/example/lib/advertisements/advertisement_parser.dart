@@ -1,9 +1,9 @@
-import 'dart:math';
-import 'dart:typed_data';
+import "dart:math";
+import "dart:typed_data";
 
-import 'package:deep_pick/deep_pick.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
+import "package:deep_pick/deep_pick.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/shared/payload_codec.dart";
 
 /// Reads named values from advertisements whose source and byte pattern match.
 /// Parsers are global unless bound to [device]; the pattern keeps vendors apart.
@@ -33,24 +33,24 @@ class const AdvertisementParser({
   factory fromPick(RequiredPick data) {
     final AdvertisementParser parser;
     try {
-      final serviceUuid = _nullableString(data('serviceUuid'))?.trim();
-      final records = data('records');
-      final device = _nullableString(data('device'));
+      final serviceUuid = _nullableString(data("serviceUuid"))?.trim();
+      final records = data("records");
+      final device = _nullableString(data("device"));
       parser = AdvertisementParser(
-        name: data('name').asStringOrThrow(),
-        source: AdvertisementSource.values.byName(data('source').asStringOrThrow()),
-        companyId: _nullableInt(data('companyId')),
+        name: data("name").asStringOrThrow(),
+        source: AdvertisementSource.values.byName(data("source").asStringOrThrow()),
+        companyId: _nullableInt(data("companyId")),
         serviceUuid: serviceUuid == null || serviceUuid.isEmpty ? null : Guid(serviceUuid),
-        match: List<int>.unmodifiable(_intListOrEmpty(data('match'))),
-        matchOffset: _intOrDefault(data('matchOffset'), 0),
+        match: List<int>.unmodifiable(_intListOrEmpty(data("match"))),
+        matchOffset: _intOrDefault(data("matchOffset"), 0),
         records: records.value == null ? null : RecordFormat.fromPick(records.required()),
         device: device == null ? null : DeviceIdentifier(device),
-        fields: List<AdvertisementField>.unmodifiable(data('fields').asListOrThrow(AdvertisementField.fromPick)),
+        fields: List<AdvertisementField>.unmodifiable(data("fields").asListOrThrow(AdvertisementField.fromPick)),
       );
     } on FormatException {
       rethrow;
     } on Object catch (error, stackTrace) {
-      Error.throwWithStackTrace(FormatException('Invalid parser: $error'), stackTrace);
+      Error.throwWithStackTrace(FormatException("Invalid parser: $error"), stackTrace);
     }
     // The same rules as the editor, so imported and stored parsers render like hand-made ones.
     final companyId = parser.companyId;
@@ -59,17 +59,17 @@ class const AdvertisementParser({
       AdvertisementSource.service => parser.serviceUuid != null,
     };
     if (!hasSource) {
-      throw FormatException('Invalid parser ${parser.name}: ${parser.source.label} needs a company ID or service UUID');
+      throw FormatException("Invalid parser ${parser.name}: ${parser.source.label} needs a company ID or service UUID");
     }
     if (parser.matchOffset < 0 || parser.match.any((byte) => byte < 0 || byte > 0xff)) {
-      throw FormatException('Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}');
+      throw FormatException("Invalid parser ${parser.name}: match ${parser.match} at ${parser.matchOffset}");
     }
     final recordType = parser.records?.type;
     if (recordType != null) {
       for (final field in parser.fields) {
         if (!recordType.canReadId(field.record)) {
           throw FormatException(
-            'Invalid parser ${parser.name}: ${field.name} needs a ${recordType.size * 8}-bit record ID',
+            "Invalid parser ${parser.name}: ${field.name} needs a ${recordType.size * 8}-bit record ID",
           );
         }
       }
@@ -78,28 +78,28 @@ class const AdvertisementParser({
   }
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'source': source.name,
-    'companyId': companyId,
-    'serviceUuid': serviceUuid?.str128,
-    'match': match,
-    'matchOffset': matchOffset,
-    'records': records?.toJson(),
-    'device': device?.str,
-    'fields': [for (final field in fields) field.toJson()],
+    "name": name,
+    "source": source.name,
+    "companyId": companyId,
+    "serviceUuid": serviceUuid?.str128,
+    "match": match,
+    "matchOffset": matchOffset,
+    "records": records?.toJson(),
+    "device": device?.str,
+    "fields": [for (final field in fields) field.toJson()],
   };
 
   /// Where and when the parser reads, for parser lists.
   String get summary => [
     switch (source) {
-      AdvertisementSource.manufacturer => 'Manufacturer 0x${companyId!.toRadixString(16)}',
-      AdvertisementSource.service => 'Service data $serviceUuid',
+      AdvertisementSource.manufacturer => "Manufacturer 0x${companyId!.toRadixString(16)}",
+      AdvertisementSource.service => "Service data $serviceUuid",
     },
-    if (match.isNotEmpty) 'match ${PayloadCodec.hex(match)} at $matchOffset',
+    if (match.isNotEmpty) "match ${PayloadCodec.hex(match)} at $matchOffset",
     ?records?.summary,
     '${fields.length} ${fields.length == 1 ? 'field' : 'fields'}',
-    if (device == null) 'All devices' else 'Only ${device!.str}',
-  ].join(' · ');
+    if (device == null) "All devices" else "Only ${device!.str}",
+  ].join(" · ");
 
   bool appliesTo(DeviceIdentifier remoteId) => device == null || device == remoteId;
 
@@ -120,7 +120,7 @@ class const AdvertisementParser({
     }
     final records = this.records;
     if (records == null) {
-      return [for (final field in fields) '$name · ${field.name}: ${field.format(bytes)}'];
+      return [for (final field in fields) "$name · ${field.name}: ${field.format(bytes)}"];
     }
     // A record type without a length byte is as large as its fields reach.
     final sizes = <int, int>{};
@@ -136,8 +136,8 @@ class const AdvertisementParser({
     // Fields of records absent from this frame are left out: many sensors send one value per frame.
     return [
       for (final field in fields)
-        if (values[field.record] != null) '$name · ${field.name}: ${field.format(values[field.record]!)}',
-      if (problem != null) '$name · $problem',
+        if (values[field.record] != null) "$name · ${field.name}: ${field.format(values[field.record]!)}",
+      if (problem != null) "$name · $problem",
     ];
   }
 
@@ -158,28 +158,28 @@ class const AdvertisementParser({
 }
 
 enum AdvertisementSource(final String label) {
-  manufacturer('Manufacturer data'),
-  service('Service data'),
+  manufacturer("Manufacturer data"),
+  service("Service data"),
 }
 
 /// [size] is null for variable-width types, which read [AdvertisementField.length] bytes.
 enum AdvertisementFieldType(final String label, final int? size) {
-  uint8('uint8', 1),
-  int8('int8', 1),
-  uint16le('uint16 LE', 2),
-  uint16be('uint16 BE', 2),
-  uint24le('uint24 LE', 3),
-  uint24be('uint24 BE', 3),
-  int16le('int16 LE', 2),
-  int16be('int16 BE', 2),
-  uint32le('uint32 LE', 4),
-  uint32be('uint32 BE', 4),
-  int32le('int32 LE', 4),
-  int32be('int32 BE', 4),
-  float32le('float32 LE', 4),
-  float32be('float32 BE', 4),
-  hex('Hex', null),
-  ascii('ASCII', null);
+  uint8("uint8", 1),
+  int8("int8", 1),
+  uint16le("uint16 LE", 2),
+  uint16be("uint16 BE", 2),
+  uint24le("uint24 LE", 3),
+  uint24be("uint24 BE", 3),
+  int16le("int16 LE", 2),
+  int16be("int16 BE", 2),
+  uint32le("uint32 LE", 4),
+  uint32be("uint32 BE", 4),
+  int32le("int32 LE", 4),
+  int32be("int32 BE", 4),
+  float32le("float32 LE", 4),
+  float32be("float32 BE", 4),
+  hex("Hex", null),
+  ascii("ASCII", null);
 
   /// Bit ranges are read from unsigned integers only.
   bool get unsigned => switch (this) {
@@ -190,9 +190,9 @@ enum AdvertisementFieldType(final String label, final int? size) {
 
 /// Width and byte order of a record's type.
 enum RecordTypeFormat(final String label, final int size) {
-  uint8('1 byte', 1),
-  uint16le('2 bytes LE', 2),
-  uint16be('2 bytes BE', 2);
+  uint8("1 byte", 1),
+  uint16le("2 bytes LE", 2),
+  uint16be("2 bytes BE", 2);
 
   bool canReadId(int? id) => id != null && id >= 0 && id < 1 << (size * 8);
 
@@ -209,14 +209,14 @@ enum RecordTypeFormat(final String label, final int size) {
 /// Where a record states the size of its value.
 enum RecordLength(final String label) {
   /// A length byte follows the type and counts the value.
-  afterType('Type, length, value'),
+  afterType("Type, length, value"),
 
   /// A length byte precedes the type and counts type and value, as in advertising data structures.
-  beforeType('Length, type, value'),
+  beforeType("Length, type, value"),
 
   /// No length byte: the fields of a type define its size, as in BTHome.
   /// Splitting stops at a type without fields, because its size is unknown.
-  implied('Type, value'),
+  implied("Type, value"),
 }
 
 /// A payload that continues as a sequence of typed records.
@@ -236,20 +236,20 @@ class const RecordFormat({
     final RecordFormat format;
     try {
       format = RecordFormat(
-        offset: _intOrDefault(data('offset'), 0),
-        type: _enumOrDefault(data('type'), RecordTypeFormat.values, RecordTypeFormat.uint8),
-        length: _enumOrDefault(data('length'), RecordLength.values, RecordLength.afterType),
+        offset: _intOrDefault(data("offset"), 0),
+        type: _enumOrDefault(data("type"), RecordTypeFormat.values, RecordTypeFormat.uint8),
+        length: _enumOrDefault(data("length"), RecordLength.values, RecordLength.afterType),
       );
     } on Object catch (error, stackTrace) {
-      Error.throwWithStackTrace(FormatException('Invalid record format: $error'), stackTrace);
+      Error.throwWithStackTrace(FormatException("Invalid record format: $error"), stackTrace);
     }
     if (format.offset < 0) {
-      throw FormatException('Invalid record format: offset ${format.offset}');
+      throw FormatException("Invalid record format: offset ${format.offset}");
     }
     return format;
   }
 
-  Map<String, dynamic> toJson() => {'offset': offset, 'type': type.name, 'length': length.name};
+  Map<String, dynamic> toJson() => {"offset": offset, "type": type.name, "length": length.name};
 
   /// The value of each record type in [bytes], keeping the first of repeated types.
   /// [sizes] gives the value size per type for [RecordLength.implied].
@@ -266,7 +266,7 @@ class const RecordFormat({
       switch (length) {
         case RecordLength.afterType:
           if (!_fits(position, type.size + 1, bytes.length)) {
-            return result('record header truncated at $position');
+            return result("record header truncated at $position");
           }
           recordType = type.read(bytes, position);
           start = position + type.size + 1;
@@ -277,28 +277,28 @@ class const RecordFormat({
             return result();
           }
           if (!_fits(position, type.size + 1, bytes.length)) {
-            return result('record header truncated at $position');
+            return result("record header truncated at $position");
           }
           if (bytes[position] < type.size) {
-            return result('record length ${bytes[position]} is smaller than the ${type.size}-byte type at $position');
+            return result("record length ${bytes[position]} is smaller than the ${type.size}-byte type at $position");
           }
           recordType = type.read(bytes, position + 1);
           start = position + 1 + type.size;
           size = bytes[position] - type.size;
         case RecordLength.implied:
           if (!_fits(position, type.size, bytes.length)) {
-            return result('record header truncated at $position');
+            return result("record header truncated at $position");
           }
           recordType = type.read(bytes, position);
           start = position + type.size;
           final known = sizes[recordType];
           if (known == null) {
-            return result('unknown record ${type.format(recordType)} at $position');
+            return result("unknown record ${type.format(recordType)} at $position");
           }
           size = known;
       }
       if (!_fits(start, size, bytes.length)) {
-        return result('record ${type.format(recordType)} truncated at $position');
+        return result("record ${type.format(recordType)} truncated at $position");
       }
       values.putIfAbsent(recordType, () => List.unmodifiable(bytes.getRange(start, start + size)));
       position = start + size;
@@ -306,7 +306,7 @@ class const RecordFormat({
     return result();
   }
 
-  String get summary => 'records from $offset · ${length.label} · type ${type.label}';
+  String get summary => "records from $offset · ${length.label} · type ${type.label}";
 }
 
 /// One value of a manufacturer or service data payload, shown as `raw × scale + add`.
@@ -319,7 +319,7 @@ class const AdvertisementField(
   final int length = 1,
   final double scale = 1,
   final double add = 0,
-  final String unit = '',
+  final String unit = "",
 
   /// The record type that holds this value; only used with [RecordFormat].
   final int? record,
@@ -338,66 +338,66 @@ class const AdvertisementField(
     final AdvertisementField field;
     try {
       field = AdvertisementField(
-        data('name').asStringOrThrow(),
-        data('offset').asIntOrThrow(),
-        AdvertisementFieldType.values.byName(data('type').asStringOrThrow()),
-        length: _intOrDefault(data('length'), 1),
-        scale: _doubleOrDefault(data('scale'), 1),
-        add: _doubleOrDefault(data('add'), 0),
-        unit: _stringOrDefault(data('unit'), ''),
-        record: _nullableInt(data('record')),
-        bit: _intOrDefault(data('bit'), 0),
-        bits: _nullableInt(data('bits')),
+        data("name").asStringOrThrow(),
+        data("offset").asIntOrThrow(),
+        AdvertisementFieldType.values.byName(data("type").asStringOrThrow()),
+        length: _intOrDefault(data("length"), 1),
+        scale: _doubleOrDefault(data("scale"), 1),
+        add: _doubleOrDefault(data("add"), 0),
+        unit: _stringOrDefault(data("unit"), ""),
+        record: _nullableInt(data("record")),
+        bit: _intOrDefault(data("bit"), 0),
+        bits: _nullableInt(data("bits")),
       );
     } on Object catch (error, stackTrace) {
-      Error.throwWithStackTrace(FormatException('Invalid parser field: $error'), stackTrace);
+      Error.throwWithStackTrace(FormatException("Invalid parser field: $error"), stackTrace);
     }
     if (field.scale == 0 || !field.scale.isFinite) {
-      throw FormatException('Invalid parser field ${field.name}: scale ${field.scale}');
+      throw FormatException("Invalid parser field ${field.name}: scale ${field.scale}");
     }
     if (!field.add.isFinite) {
-      throw FormatException('Invalid parser field ${field.name}: add ${field.add}');
+      throw FormatException("Invalid parser field ${field.name}: add ${field.add}");
     }
     if (field.offset < 0 || field.length < 1 || field.bit < 0) {
       throw FormatException(
-        'Invalid parser field ${field.name}: offset ${field.offset}, length ${field.length}, bit ${field.bit}',
+        "Invalid parser field ${field.name}: offset ${field.offset}, length ${field.length}, bit ${field.bit}",
       );
     }
     final bits = field.bits;
     if (bits != null && (!field.type.unsigned || bits < 1 || !_fits(field.bit, bits, field.size * 8))) {
       throw FormatException(
-        'Invalid parser field ${field.name}: $bits bits from bit ${field.bit} of ${field.type.label}',
+        "Invalid parser field ${field.name}: $bits bits from bit ${field.bit} of ${field.type.label}",
       );
     }
     return field;
   }
 
   Map<String, dynamic> toJson() => {
-    'name': name,
-    'offset': offset,
-    'type': type.name,
-    'length': length,
-    'scale': scale,
-    'add': add,
-    'unit': unit,
-    'record': record,
-    'bit': bit,
-    'bits': bits,
+    "name": name,
+    "offset": offset,
+    "type": type.name,
+    "length": length,
+    "scale": scale,
+    "add": add,
+    "unit": unit,
+    "record": record,
+    "bit": bit,
+    "bits": bits,
   };
 
   int get size => type.size ?? length;
 
   /// Type and position, for parser lists.
   String summary(RecordFormat? records) => [
-    '$name: ${type.label}',
-    if (records != null && record != null) 'record ${records.type.format(record!)}',
-    if (bits == 1) 'bit $bit' else if (bits != null) 'bits $bit–${bit + bits! - 1}',
-  ].join(' · ');
+    "$name: ${type.label}",
+    if (records != null && record != null) "record ${records.type.format(record!)}",
+    if (bits == 1) "bit $bit" else if (bits != null) "bits $bit–${bit + bits! - 1}",
+  ].join(" · ");
 
   /// Short payloads are reported per field, so one malformed frame never hides the others.
   String format(List<int> bytes) {
     if (size < 1 || !_fits(offset, size, bytes.length)) {
-      return 'too short (${bytes.length} B)';
+      return "too short (${bytes.length} B)";
     }
     final slice = bytes.sublist(offset, offset + size);
     if (type == AdvertisementFieldType.hex) {
@@ -408,7 +408,7 @@ class const AdvertisementField(
     }
     final data = ByteData.sublistView(Uint8List.fromList(slice));
     final num raw = switch (type) {
-      AdvertisementFieldType.hex || AdvertisementFieldType.ascii => throw StateError('$type is not numeric'),
+      AdvertisementFieldType.hex || AdvertisementFieldType.ascii => throw StateError("$type is not numeric"),
       AdvertisementFieldType.uint8 => data.getUint8(0),
       AdvertisementFieldType.int8 => data.getInt8(0),
       AdvertisementFieldType.uint16le => data.getUint16(0, Endian.little),
@@ -428,10 +428,10 @@ class const AdvertisementField(
     final bits = this.bits;
     if (bits != null) {
       if (!type.unsigned) {
-        return 'bits need an unsigned type';
+        return "bits need an unsigned type";
       }
       if (bits < 1 || !_fits(bit, bits, size * 8)) {
-        return 'bits beyond ${size * 8}-bit value';
+        return "bits beyond ${size * 8}-bit value";
       }
       final shifted = raw.toInt() >> bit;
       final mask = (1 << bits) - 1;
@@ -443,11 +443,11 @@ class const AdvertisementField(
     final integerType = type != AdvertisementFieldType.float32le && type != AdvertisementFieldType.float32be;
     final String text;
     if (integerType && scaled.isFinite && scale == scale.roundToDouble() && add == add.roundToDouble()) {
-      text = '${scaled.round()}';
+      text = "${scaled.round()}";
     } else {
       text = scaled.toStringAsFixed(max(_scaleDecimals, _addDecimals));
     }
-    return unit.isEmpty ? text : '$text $unit';
+    return unit.isEmpty ? text : "$text $unit";
   }
 
   /// Enough decimals to show one step of the scale: 0.1 → 1, 0.005 and 1/256 → 3.
@@ -476,19 +476,19 @@ bool _fits(int offset, int size, int limit) => offset >= 0 && offset <= limit &&
 /// Human-readable advertisement fields; without parsers also the identity used to detect payload changes.
 /// Parsed values follow the payload they were read from.
 List<String> describeAdvertisement(AdvertisementData data, {List<AdvertisementParser> parsers = const []}) => [
-  'Name: ${data.advName}',
-  if (data.txPowerLevel != null) 'TX power: ${data.txPowerLevel} dBm',
-  if (data.appearance != null) 'Appearance: 0x${data.appearance!.toRadixString(16)}',
-  for (final uuid in data.serviceUuids) 'Service: $uuid',
+  "Name: ${data.advName}",
+  if (data.txPowerLevel != null) "TX power: ${data.txPowerLevel} dBm",
+  if (data.appearance != null) "Appearance: 0x${data.appearance!.toRadixString(16)}",
+  for (final uuid in data.serviceUuids) "Service: $uuid",
   for (final entry in data.manufacturerData.entries) ...[
-    'Manufacturer 0x${entry.key.toRadixString(16)}: ${PayloadCodec.hex(entry.value)}',
+    "Manufacturer 0x${entry.key.toRadixString(16)}: ${PayloadCodec.hex(entry.value)}",
     for (final parser in parsers)
-      for (final line in parser.read(companyId: entry.key, bytes: entry.value)) '  ↳ $line',
+      for (final line in parser.read(companyId: entry.key, bytes: entry.value)) "  ↳ $line",
   ],
   for (final entry in data.serviceData.entries) ...[
-    'Service data ${entry.key}: ${PayloadCodec.hex(entry.value)}',
+    "Service data ${entry.key}: ${PayloadCodec.hex(entry.value)}",
     for (final parser in parsers)
-      for (final line in parser.read(serviceUuid: entry.key, bytes: entry.value)) '  ↳ $line',
+      for (final line in parser.read(serviceUuid: entry.key, bytes: entry.value)) "  ↳ $line",
   ],
 ];
 

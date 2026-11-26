@@ -1,16 +1,16 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/activity/activity_panel.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/devices/devices_panel.dart';
-import 'package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart';
-import 'package:flutter_blue_max_example/library/library_panel.dart';
-import 'package:flutter_blue_max_example/shared/json_files.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/foundation.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/activity/activity_panel.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/devices/devices_panel.dart";
+import "package:flutter_blue_max_example/l2cap/l2cap_server_panel.dart";
+import "package:flutter_blue_max_example/library/library_panel.dart";
+import "package:flutter_blue_max_example/shared/json_files.dart";
 
 /// A responsive diagnostic app for the plugin's native and web backends.
 class const WorkbenchApp({
@@ -80,7 +80,7 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
     return WorkbenchScope(
       controller: _controller,
       child: MaterialApp(
-        title: 'Blue Max',
+        title: "Blue Max",
         debugShowCheckedModeBanner: false,
         theme: _theme(Brightness.light),
         darkTheme: _theme(Brightness.dark),
@@ -114,8 +114,8 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                     const Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Blue Max', style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5)),
-                        Text('Bluetooth workbench', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
+                        Text("Blue Max", style: TextStyle(fontWeight: FontWeight.w700, letterSpacing: -0.5)),
+                        Text("Bluetooth workbench", style: TextStyle(fontSize: 11, fontWeight: FontWeight.w400)),
                       ],
                     ),
                   ],
@@ -129,10 +129,10 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                         }
                         return const Icon(Icons.circle_outlined, size: 10);
                       }(),
-                      label: Text('Bluetooth ${c.adapter.name}'),
+                      label: Text("Bluetooth ${c.adapter.name}"),
                     ),
                   IconButton(
-                    tooltip: 'Toggle light / dark theme',
+                    tooltip: "Toggle light / dark theme",
                     onPressed: () {
                       setState(() => _themeMode = _themeMode == ThemeMode.dark ? ThemeMode.light : ThemeMode.dark);
                     },
@@ -159,20 +159,20 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                               destinations: [
                                 const NavigationRailDestination(
                                   icon: Icon(Icons.radar_rounded),
-                                  label: Text('Devices'),
+                                  label: Text("Devices"),
                                 ),
                                 if (c.supportsL2cap)
                                   const NavigationRailDestination(
                                     icon: Icon(Icons.dns_outlined),
-                                    label: Text('Local server'),
+                                    label: Text("Local server"),
                                   ),
                                 const NavigationRailDestination(
                                   icon: Icon(Icons.local_library_outlined),
-                                  label: Text('Library'),
+                                  label: Text("Library"),
                                 ),
                                 const NavigationRailDestination(
                                   icon: Icon(Icons.terminal_rounded),
-                                  label: Text('Activity'),
+                                  label: Text("Activity"),
                                 ),
                               ],
                             ),
@@ -193,11 +193,11 @@ class _WorkbenchAppState() extends State<WorkbenchApp> {
                   selectedIndex: _destination,
                   onDestinationSelected: (index) => setState(() => _destination = index),
                   destinations: [
-                    const NavigationDestination(icon: Icon(Icons.radar_rounded), label: 'Devices'),
+                    const NavigationDestination(icon: Icon(Icons.radar_rounded), label: "Devices"),
                     if (c.supportsL2cap)
-                      const NavigationDestination(icon: Icon(Icons.dns_outlined), label: 'Local server'),
-                    const NavigationDestination(icon: Icon(Icons.local_library_outlined), label: 'Library'),
-                    const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: 'Activity'),
+                      const NavigationDestination(icon: Icon(Icons.dns_outlined), label: "Local server"),
+                    const NavigationDestination(icon: Icon(Icons.local_library_outlined), label: "Library"),
+                    const NavigationDestination(icon: Icon(Icons.terminal_rounded), label: "Activity"),
                   ],
                 );
               })(),
@@ -216,12 +216,12 @@ class const AdapterBanner() extends StatelessWidget {
     workbenchRef.watchOnly(context, (c) => (c.adapter, c.busy(Operation.adapter)));
     final message = switch (workbenchRef.of(context).adapter) {
       BluetoothAdapterState.unknown when kIsWeb =>
-        'Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.',
+        "Web Bluetooth is unavailable. Use a compatible browser over HTTPS or localhost and enable Bluetooth.",
       BluetoothAdapterState.unauthorized =>
-        'Bluetooth permission is denied. Allow access in system settings, then reopen the app.',
-      BluetoothAdapterState.unavailable => 'Bluetooth is not available on this device.',
-      BluetoothAdapterState.off => 'Bluetooth is off. Enable it in system settings to scan or connect.',
-      _ => 'Waiting for Bluetooth…',
+        "Bluetooth permission is denied. Allow access in system settings, then reopen the app.",
+      BluetoothAdapterState.unavailable => "Bluetooth is not available on this device.",
+      BluetoothAdapterState.off => "Bluetooth is off. Enable it in system settings to scan or connect.",
+      _ => "Waiting for Bluetooth…",
     };
     return Container(
       width: double.infinity,
@@ -243,7 +243,7 @@ class const AdapterBanner() extends StatelessWidget {
                   }
                   return controller.turnOn;
                 })(),
-                child: const Text('Turn on Bluetooth'),
+                child: const Text("Turn on Bluetooth"),
               ),
           ],
         ],
@@ -313,7 +313,7 @@ class const ErrorBanner({super.key, required final Widget message, required fina
               child: message,
             ),
           ),
-          IconButton(tooltip: 'Dismiss error', onPressed: onDismiss, icon: const Icon(Icons.close)),
+          IconButton(tooltip: "Dismiss error", onPressed: onDismiss, icon: const Icon(Icons.close)),
         ],
       ),
     );

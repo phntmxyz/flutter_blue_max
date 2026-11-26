@@ -1,14 +1,14 @@
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_card.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/gatt/gatt_service.dart';
-import 'package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart';
-import 'package:flutter_blue_max_example/shared/workbench_card.dart';
-import 'package:reactive_forms/reactive_forms.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/foundation.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_card.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/gatt/gatt_service.dart";
+import "package:flutter_blue_max_example/l2cap/device_l2cap_panel.dart";
+import "package:flutter_blue_max_example/shared/workbench_card.dart";
+import "package:reactive_forms/reactive_forms.dart";
 
 /// Devices destination of `WorkbenchApp`: discovery and details share two panes on desktop, one on phones.
 /// [active] is false on hidden destinations so this panel does not intercept their system back gesture.
@@ -98,13 +98,13 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
               Icon(Icons.developer_board_rounded, size: 56, color: Theme.of(context).colorScheme.primary),
               const SizedBox(height: 24),
               Text(
-                'A closer look at Bluetooth.',
+                "A closer look at Bluetooth.",
                 style: Theme.of(context).textTheme.headlineSmall,
                 textAlign: TextAlign.center,
               ),
               const SizedBox(height: 10),
               const Text(
-                'Select a device to inspect its services, read values and subscribe to notifications.',
+                "Select a device to inspect its services, read values and subscribe to notifications.",
                 textAlign: TextAlign.center,
               ),
             ],
@@ -143,7 +143,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                   child: TextButton.icon(
                     onPressed: onBack,
                     icon: const Icon(Icons.arrow_back),
-                    label: const Text('Devices'),
+                    label: const Text("Devices"),
                   ),
                 ),
               Text(header.name, style: Theme.of(context).textTheme.headlineMedium),
@@ -152,7 +152,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 children: [
                   Expanded(child: SelectableText(device.remoteId.str, style: Theme.of(context).textTheme.bodySmall)),
                   IconButton(
-                    tooltip: 'Copy device ID',
+                    tooltip: "Copy device ID",
                     onPressed: () => c.copyToClipboard(device.remoteId.str),
                     icon: const Icon(Icons.copy_rounded, size: 18),
                   ),
@@ -165,12 +165,12 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 children: [
                   () {
                     if (header.connected) {
-                      return const Chip(avatar: Icon(Icons.link, size: 16), label: Text('Connected'));
+                      return const Chip(avatar: Icon(Icons.link, size: 16), label: Text("Connected"));
                     }
-                    return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text('Disconnected'));
+                    return const Chip(avatar: Icon(Icons.link_off, size: 16), label: Text("Disconnected"));
                   }(),
-                  if (c.supportsMtu && header.connected && header.mtu != null) Chip(label: Text('MTU ${header.mtu} B')),
-                  if (header.rssi != null && header.connected) Chip(label: Text('${header.rssi} dBm')),
+                  if (c.supportsMtu && header.connected && header.mtu != null) Chip(label: Text("MTU ${header.mtu} B")),
+                  if (header.rssi != null && header.connected) Chip(label: Text("${header.rssi} dBm")),
                 ],
               ),
               const SizedBox(height: 16),
@@ -186,39 +186,39 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                       return FilledButton.icon(
                         onPressed: header.cancelling ? null : c.cancelConnect,
                         icon: Icon(header.connected ? Icons.link_off : Icons.link),
-                        label: const Text('Cancel connection'),
+                        label: const Text("Cancel connection"),
                       );
                     }
                     if (!connectionIdle) {
                       return FilledButton.icon(
                         onPressed: null,
                         icon: Icon(header.connected ? Icons.link_off : Icons.link),
-                        label: const Text('Working…'),
+                        label: const Text("Working…"),
                       );
                     }
                     if (header.connected) {
                       return FilledButton.icon(
                         onPressed: canConnect ? c.disconnect : null,
                         icon: const Icon(Icons.link_off),
-                        label: const Text('Disconnect'),
+                        label: const Text("Disconnect"),
                       );
                     }
                     return FilledButton.icon(
                       onPressed: canConnect ? c.connect : null,
                       icon: const Icon(Icons.link),
-                      label: const Text('Connect'),
+                      label: const Text("Connect"),
                     );
                   }(),
                   if (!kIsWeb)
                     OutlinedButton.icon(
                       onPressed: available && !header.readingRssi ? c.readRssi : null,
                       icon: const Icon(Icons.signal_cellular_alt),
-                      label: const Text('Read RSSI'),
+                      label: const Text("Read RSSI"),
                     ),
                   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) ...[
                     OutlinedButton(
                       onPressed: available ? () => _mtuDialog(context, c, device) : null,
-                      child: const Text('Request MTU'),
+                      child: const Text("Request MTU"),
                     ),
                     OutlinedButton(
                       onPressed: (() {
@@ -227,7 +227,7 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                         }
                         return () => c.run(Operation.bond, device.createBond);
                       })(),
-                      child: const Text('Create bond'),
+                      child: const Text("Create bond"),
                     ),
                   ],
                 ],
@@ -245,8 +245,8 @@ class _DeviceDetailsState() extends State<DeviceDetails> {
                 padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
                 child: SegmentedButton<bool>(
                   segments: const [
-                    ButtonSegment(value: false, icon: Icon(Icons.account_tree_outlined), label: Text('GATT')),
-                    ButtonSegment(value: true, icon: Icon(Icons.cable_rounded), label: Text('L2CAP')),
+                    ButtonSegment(value: false, icon: Icon(Icons.account_tree_outlined), label: Text("GATT")),
+                    ButtonSegment(value: true, icon: Icon(Icons.cable_rounded), label: Text("L2CAP")),
                   ],
                   selected: {_l2cap},
                   onSelectionChanged: (value) => setState(() => _l2cap = value.single),
@@ -298,11 +298,11 @@ class const GattExplorer() extends StatelessWidget {
     );
     final available = c.connected && c.ready && !c.busy(Operation.connection);
     return WorkbenchCard(
-      title: const Text('GATT explorer'),
+      title: const Text("GATT explorer"),
       icon: Icons.account_tree_outlined,
       subtitle: const Text(
-        'Discover services after connecting. '
-        'Only operations supported by each characteristic are shown.',
+        "Discover services after connecting. "
+        "Only operations supported by each characteristic are shown.",
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -311,22 +311,22 @@ class const GattExplorer() extends StatelessWidget {
             OutlinedButton.icon(
               onPressed: null,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Discovering…'),
+              label: const Text("Discovering…"),
             )
           else
             OutlinedButton.icon(
               onPressed: available ? c.discover : null,
               icon: const Icon(Icons.refresh_rounded),
-              label: const Text('Discover services'),
+              label: const Text("Discover services"),
             ),
           if (c.services.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text('No services discovered in this connection.'),
+              child: Text("No services discovered in this connection."),
             ),
           for (final service in c.services)
             GattService(
-              key: ValueKey('${service.remoteId}:${service.primaryServiceUuid}:${service.uuid}'),
+              key: ValueKey("${service.remoteId}:${service.primaryServiceUuid}:${service.uuid}"),
               service: service,
             ),
         ],
@@ -357,20 +357,20 @@ class const DeviceDiscoveryList({
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Nearby devices', style: Theme.of(context).textTheme.headlineSmall),
+                  Text("Nearby devices", style: Theme.of(context).textTheme.headlineSmall),
                   const SizedBox(height: 6),
                   Text(
                     (() {
                       if (kIsWeb) {
-                        return 'Choose a device in the browser to explore GATT services.';
+                        return "Choose a device in the browser to explore GATT services.";
                       }
-                      return 'Explore advertisements and GATT services.';
+                      return "Explore advertisements and GATT services.";
                     })(),
                     style: Theme.of(context).textTheme.bodySmall,
                   ),
                   if (c.localName?.isNotEmpty ?? false) ...[
                     const SizedBox(height: 6),
-                    Text('This device: ${c.localName}', style: Theme.of(context).textTheme.bodySmall),
+                    Text("This device: ${c.localName}", style: Theme.of(context).textTheme.bodySmall),
                   ],
                   const SizedBox(height: 20),
                   TextField(
@@ -378,7 +378,7 @@ class const DeviceDiscoveryList({
                     onChanged: c.setQuery,
                     decoration: const InputDecoration(
                       prefixIcon: Icon(Icons.search),
-                      hintText: 'Name, ID or service UUID',
+                      hintText: "Name, ID or service UUID",
                     ),
                   ),
                   const SizedBox(height: 14),
@@ -390,13 +390,13 @@ class const DeviceDiscoveryList({
                         return FilledButton.icon(
                           onPressed: canScan ? c.scan : null,
                           icon: const Icon(Icons.stop_rounded),
-                          label: const Text('Stop scan'),
+                          label: const Text("Stop scan"),
                         );
                       }
                       return FilledButton.icon(
                         onPressed: canScan ? c.scan : null,
                         icon: const Icon(Icons.radar_rounded),
-                        label: const Text('Start scan'),
+                        label: const Text("Start scan"),
                       );
                     }(),
                   ),
@@ -404,8 +404,8 @@ class const DeviceDiscoveryList({
                   if (c.systemDevices.isNotEmpty) ...[
                     ExpansionTile(
                       expandedCrossAxisAlignment: CrossAxisAlignment.start,
-                      title: const Text('Connected to the system'),
-                      subtitle: const Text('These peers may be connected through another app.'),
+                      title: const Text("Connected to the system"),
+                      subtitle: const Text("These peers may be connected through another app."),
                       children: [
                         for (final device in c.systemDevices)
                           ListTile(
@@ -441,16 +441,16 @@ class const DeviceDiscoveryList({
                     spacing: 12,
                     runSpacing: 4,
                     children: [
-                      Text('${results.length} devices', style: Theme.of(context).textTheme.labelMedium),
+                      Text("${results.length} devices", style: Theme.of(context).textTheme.labelMedium),
                       Text(
                         (() {
                           if (c.scanning) {
-                            return 'Scanning…';
+                            return "Scanning…";
                           }
                           if (kIsWeb) {
-                            return 'Selected devices';
+                            return "Selected devices";
                           }
-                          return 'In order of discovery';
+                          return "In order of discovery";
                         })(),
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
@@ -479,11 +479,11 @@ class const DeviceDiscoveryList({
                       Icon(Icons.bluetooth_searching_rounded, size: 42, color: Theme.of(context).colorScheme.primary),
                       const SizedBox(height: 16),
                       Text(
-                        c.query.isNotEmpty ? 'No matching devices' : 'Your next connection starts here',
+                        c.query.isNotEmpty ? "No matching devices" : "Your next connection starts here",
                         textAlign: TextAlign.center,
                       ),
                       const SizedBox(height: 8),
-                      const Text('Keep your peripheral nearby and start a scan.', textAlign: TextAlign.center),
+                      const Text("Keep your peripheral nearby and start a scan.", textAlign: TextAlign.center),
                     ],
                   ),
                 ),
@@ -500,7 +500,7 @@ class const DeviceDiscoveryList({
                   final selected = c.selected == result.device;
                   final String signal;
                   if (kIsWeb) {
-                    signal = 'Selected in browser';
+                    signal = "Selected in browser";
                   } else {
                     signal =
                         '${result.rssi} dBm · ${result.advertisementData.connectable ? 'Connectable' : 'Broadcast only'}';
@@ -542,7 +542,7 @@ class const ScanResultTile({
           children: [
             const SizedBox(height: 5),
             DefaultTextStyle.merge(
-              style: const TextStyle(fontFamily: 'monospace', fontSize: 11),
+              style: const TextStyle(fontFamily: "monospace", fontSize: 11),
               child: identifier,
             ),
             const SizedBox(height: 5),
@@ -564,7 +564,7 @@ class const MtuRequestDialog({super.key, required final int initialMtu}) extends
 
 class _MtuRequestDialogState() extends State<MtuRequestDialog> {
   late final form = FormGroup({
-    'mtu': FormControl<int>(
+    "mtu": FormControl<int>(
       value: widget.initialMtu,
       validators: [Validators.required, Validators.min(23), Validators.max(517)],
     ),
@@ -579,30 +579,30 @@ class _MtuRequestDialogState() extends State<MtuRequestDialog> {
   @override
   Widget build(BuildContext context) {
     return AlertDialog(
-      title: const Text('Request MTU'),
+      title: const Text("Request MTU"),
       content: ReactiveForm(
         formGroup: form,
         child: ReactiveTextField<int>(
-          formControlName: 'mtu',
+          formControlName: "mtu",
           keyboardType: TextInputType.number,
-          decoration: const InputDecoration(labelText: 'Bytes (23–517)'),
+          decoration: const InputDecoration(labelText: "Bytes (23–517)"),
           validationMessages: {
             for (final error in [ValidationMessage.required, ValidationMessage.min, ValidationMessage.max])
-              error: (_) => 'Enter a value from 23 to 517.',
+              error: (_) => "Enter a value from 23 to 517.",
           },
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
         FilledButton(
           onPressed: () {
             if (!form.valid) {
               form.markAllAsTouched();
               return;
             }
-            Navigator.pop(context, form.value['mtu']);
+            Navigator.pop(context, form.value["mtu"]);
           },
-          child: const Text('Request'),
+          child: const Text("Request"),
         ),
       ],
     );

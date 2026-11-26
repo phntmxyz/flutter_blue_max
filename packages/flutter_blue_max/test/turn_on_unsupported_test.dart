@@ -1,23 +1,23 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_darwin/flutter_blue_max_darwin.dart';
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_test/flutter_test.dart';
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_darwin/flutter_blue_max_darwin.dart";
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_test/flutter_test.dart";
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('turnOn passes on the unsupported error of the Darwin implementation', () async {
+  test("turnOn passes on the unsupported error of the Darwin implementation", () async {
     final plugin = FlutterBlueMaxDarwin();
     FlutterBlueMaxPlatform.instance = plugin;
     final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     messenger.setMockMethodCallHandler(plugin.methodChannel, (call) async {
       switch (call.method) {
-        case 'flutterRestart':
+        case "flutterRestart":
           return 0;
-        case 'turnOn':
-          fail('turnOn must not reach the native plugin');
+        case "turnOn":
+          fail("turnOn must not reach the native plugin");
         default:
           return true;
       }

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import "package:flutter/material.dart";
 
 /// Replaces a shown message, so quick successive actions each report at once.
 void tell(BuildContext context, String message) {
@@ -21,7 +21,7 @@ Future<bool> confirm(
         title: Text(title),
         content: Text(message),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
           FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(action)),
         ],
       );

@@ -1,27 +1,27 @@
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 /// State of the bluetooth adapter.
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
 class DisconnectReason {
+  DisconnectReason(this.platform, this.code, this.description);
   final ErrorPlatform platform;
   final int? code; // specific to platform
   final String? description;
-  DisconnectReason(this.platform, this.code, this.description);
   @override
   String toString() {
-    return 'DisconnectReason{'
-        'platform: $platform, '
-        'code: $code, '
-        '$description'
-        '}';
+    return "DisconnectReason{"
+        "platform: $platform, "
+        "code: $code, "
+        "$description"
+        "}";
   }
 }
 
 class BluetoothConnectionEvent {
+  BluetoothConnectionEvent(this.device, this.connectionState);
   BluetoothDevice device;
   BluetoothConnectionState connectionState;
-  BluetoothConnectionEvent(this.device, this.connectionState);
 }
 
 enum BluetoothConnectionState {
@@ -29,11 +29,11 @@ enum BluetoothConnectionState {
   connected,
   // Deprecated: To be more precise, 'connecting' is only returned by getConnectionState (android)
   // or CBPeripheral.state (iOS), which FlutterBlueMax does not use. FBM only uses the OS callbacks.
-  @Deprecated('Android & iOS dont stream this state. You can delete')
+  @Deprecated("Android & iOS dont stream this state. You can delete")
   connecting,
   // Deprecated: To be more precise, 'disconnecting' is only returned by getConnectionState (android)
   // or CBPeripheral.state (iOS), which FlutterBlueMax does not use. FBM only uses the OS callbacks.
-  @Deprecated('Android & iOS dont stream this state. You can delete')
+  @Deprecated("Android & iOS dont stream this state. You can delete")
   disconnecting
 }
 
@@ -111,14 +111,14 @@ extension PhyExt on Phy {
   }
 }
 
-@Deprecated('Use PhyCoding instead')
+@Deprecated("Use PhyCoding instead")
 enum PhyOption { noPreferred, s2, s8 }
 
-@Deprecated('Use Phy instead')
+@Deprecated("Use Phy instead")
 enum PhyType { le1m, le2m, leCoded }
 
-@Deprecated('Use BluetoothConnectionState instead')
+@Deprecated("Use BluetoothConnectionState instead")
 enum BluetoothDeviceState { disconnected, connecting, connected, disconnecting }
 
-@Deprecated('Use BluetoothAdapterState instead')
+@Deprecated("Use BluetoothAdapterState instead")
 enum BluetoothState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }

@@ -1,7 +1,7 @@
-import 'dart:math';
+import "dart:math";
 
-import 'package:flutter/foundation.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
+import "package:flutter/foundation.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
 
 /// Follows every advertisement of one peer, including duplicates the device list collapses.
 class AdvertisementTracker(final DeviceIdentifier remoteId) {

@@ -1,9 +1,9 @@
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/app/workbench_controller.dart';
-import 'package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart';
-import 'package:flutter_blue_max_example/shared/workbench_card.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/app/workbench_controller.dart";
+import "package:flutter_blue_max_example/l2cap/l2cap_channel_card.dart";
+import "package:flutter_blue_max_example/shared/workbench_card.dart";
 
 /// Local server destination in `WorkbenchApp`, available only on L2CAP platforms.
 /// The receiving role waits for peers; it does not open a channel to a selected device.
@@ -33,26 +33,26 @@ class _L2capServerPanelState() extends State<L2capServerPanel> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
-        Text('Accept incoming L2CAP connections', style: Theme.of(context).textTheme.headlineMedium),
+        Text("Accept incoming L2CAP connections", style: Theme.of(context).textTheme.headlineMedium),
         const SizedBox(height: 8),
         const Text(
-          'This device is the server. Another device opens the channel to it. '
-          'To open a channel yourself, select a device in Devices and use its L2CAP tab.',
+          "This device is the server. Another device opens the channel to it. "
+          "To open a channel yourself, select a device in Devices and use its L2CAP tab.",
         ),
         const SizedBox(height: 24),
         ServerStatusCard(psm: c.serverPsm, connectedCount: connectedCount, child: listenerControls),
         const WorkbenchCard(
-          title: Text('Connect from the other device'),
+          title: Text("Connect from the other device"),
           icon: Icons.info_outline,
           child: Text(
-            'The client needs to know this device and the assigned PSM. Starting this server does not advertise '
-            'a discoverable GATT peripheral or exchange the PSM. Two copies of this example therefore cannot '
-            'find and connect to each other automatically. Use a compatible peer that provides this setup. '
-            'Android requires version 10 or newer.',
+            "The client needs to know this device and the assigned PSM. Starting this server does not advertise "
+            "a discoverable GATT peripheral or exchange the PSM. Two copies of this example therefore cannot "
+            "find and connect to each other automatically. Use a compatible peer that provides this setup. "
+            "Android requires version 10 or newer.",
           ),
         ),
         if (incoming.isNotEmpty) ...[
-          Text('Incoming channels', style: Theme.of(context).textTheme.titleLarge),
+          Text("Incoming channels", style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: 16),
           for (final session in incoming) L2capChannelCard(key: ValueKey(session.key), session: session),
         ],
@@ -80,7 +80,7 @@ class const ServerListenerControls({
       children: [
         SwitchListTile.adaptive(
           contentPadding: EdgeInsets.zero,
-          title: const Text('Require encryption'),
+          title: const Text("Require encryption"),
           value: secure,
           onChanged: psm == null && !busy ? onSecureChanged : null,
         ),
@@ -88,10 +88,10 @@ class const ServerListenerControls({
           const SizedBox(height: 8),
           Row(
             children: [
-              Expanded(child: SelectableText('PSM $psm', style: Theme.of(context).textTheme.headlineSmall)),
+              Expanded(child: SelectableText("PSM $psm", style: Theme.of(context).textTheme.headlineSmall)),
               IconButton(
-                tooltip: 'Copy server PSM',
-                onPressed: () => workbenchRef.of(context).copyToClipboard('$psm'),
+                tooltip: "Copy server PSM",
+                onPressed: () => workbenchRef.of(context).copyToClipboard("$psm"),
                 icon: const Icon(Icons.copy),
               ),
             ],
@@ -104,13 +104,13 @@ class const ServerListenerControls({
               return FilledButton.icon(
                 onPressed: canChangeServer ? onStart : null,
                 icon: const Icon(Icons.play_arrow_rounded),
-                label: Text(busy ? 'Working…' : 'Start server'),
+                label: Text(busy ? "Working…" : "Start server"),
               );
             }
             return FilledButton.icon(
               onPressed: canChangeServer ? onStop : null,
               icon: const Icon(Icons.stop_rounded),
-              label: Text(busy ? 'Working…' : 'Stop server'),
+              label: Text(busy ? "Working…" : "Stop server"),
             );
           },
         ),
@@ -130,20 +130,20 @@ class const ServerStatusCard({
   Widget build(BuildContext context) {
     if (psm == null) {
       return WorkbenchCard(
-        title: const Text('Prepare this device'),
+        title: const Text("Prepare this device"),
         icon: Icons.dns_outlined,
-        subtitle: const Text('Start listening before the other device connects.'),
+        subtitle: const Text("Start listening before the other device connects."),
         child: child,
       );
     }
     final String status;
     if (connectedCount == 0) {
-      status = 'Waiting for a peer — no channel connected yet.';
+      status = "Waiting for a peer — no channel connected yet.";
     } else {
       status = '$connectedCount incoming ${connectedCount == 1 ? 'channel' : 'channels'} connected.';
     }
     return WorkbenchCard(
-      title: Text('Listening on PSM $psm'),
+      title: Text("Listening on PSM $psm"),
       icon: Icons.dns_outlined,
       subtitle: Text(status),
       child: child,

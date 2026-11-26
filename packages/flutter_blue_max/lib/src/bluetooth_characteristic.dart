@@ -2,20 +2,11 @@
 // All rights reserved. Use of this source code is governed by a
 // BSD-style license that can be found in the LICENSE file.
 
-part of '../flutter_blue_max.dart';
+part of "../flutter_blue_max.dart";
 
 final Guid cccdUuid = Guid("00002902-0000-1000-8000-00805f9b34fb");
 
 class BluetoothCharacteristic {
-  final DeviceIdentifier remoteId;
-  final Guid serviceUuid;
-  final Guid characteristicUuid;
-  final Guid? primaryServiceUuid;
-
-  /// uniquely identifies this characteristic
-  /// on the platform native side
-  final int? instanceId;
-
   BluetoothCharacteristic({
     required this.remoteId,
     required this.serviceUuid,
@@ -30,6 +21,14 @@ class BluetoothCharacteristic {
         characteristicUuid = p.characteristicUuid,
         primaryServiceUuid = p.primaryServiceUuid,
         instanceId = p.instanceId;
+  final DeviceIdentifier remoteId;
+  final Guid serviceUuid;
+  final Guid characteristicUuid;
+  final Guid? primaryServiceUuid;
+
+  /// uniquely identifies this characteristic
+  /// on the platform native side
+  final int? instanceId;
 
   /// convenience accessor
   Guid get uuid => characteristicUuid;
@@ -39,7 +38,7 @@ class BluetoothCharacteristic {
 
   /// Get Properties from known services
   CharacteristicProperties get properties {
-    return _bmchr != null ? CharacteristicProperties.fromProto(_bmchr!.properties) : CharacteristicProperties();
+    return _bmchr != null ? CharacteristicProperties.fromProto(_bmchr!.properties) : const CharacteristicProperties();
   }
 
   /// Get Descriptors from known services
@@ -53,7 +52,7 @@ class BluetoothCharacteristic {
   ///   - anytime a notification arrives (if subscribed)
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key = FlutterBlueMax._chrCacheKey(serviceUuid, characteristicUuid, instanceId, primaryServiceUuid);
+    final String key = FlutterBlueMax._chrCacheKey(serviceUuid, characteristicUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastChrs[remoteId]?[key] ?? [];
   }
 
@@ -92,7 +91,7 @@ class BluetoothCharacteristic {
   /// return true if we're subscribed to this characteristic
   ///   -  you can subscribe using setNotifyValue(true)
   bool get isNotifying {
-    var cccd = descriptors._firstWhereOrNull(
+    final cccd = descriptors._firstWhereOrNull(
       (d) => d.descriptorUuid == cccdUuid && d.instanceId == instanceId,
     );
 
@@ -100,8 +99,8 @@ class BluetoothCharacteristic {
       return false;
     }
 
-    var hasNotify = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x01) > 0;
-    var hasIndicate = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x02) > 0;
+    final hasNotify = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x01) > 0;
+    final hasIndicate = cccd.lastValue.isNotEmpty && (cccd.lastValue[0] & 0x02) > 0;
 
     return hasNotify || hasIndicate;
   }
@@ -115,14 +114,14 @@ class BluetoothCharacteristic {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     // return value
     List<int> responseValue = [];
 
     try {
-      var request = BmReadCharacteristicRequest(
+      final request = BmReadCharacteristicRequest(
         remoteId: remoteId,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
@@ -130,7 +129,7 @@ class BluetoothCharacteristic {
         instanceId: instanceId,
       );
 
-      var responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicReceived
+      final responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicReceived
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -138,13 +137,13 @@ class BluetoothCharacteristic {
           .where((p) => p.instanceId == null || p.instanceId == request.instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmCharacteristicData> futureResponse = responseStream.first;
+      final Future<BmCharacteristicData> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.readCharacteristic(request));
 
       // wait for response
-      BmCharacteristicData response = await futureResponse
+      final BmCharacteristicData response = await futureResponse
           .fbmEnsureAdapterIsOn("readCharacteristic")
           .fbmEnsureDeviceIsConnected(device, "readCharacteristic")
           .fbmTimeout(timeout, "readCharacteristic");
@@ -187,13 +186,13 @@ class BluetoothCharacteristic {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
       final writeType = withoutResponse ? BmWriteType.withoutResponse : BmWriteType.withResponse;
 
-      var request = BmWriteCharacteristicRequest(
+      final request = BmWriteCharacteristicRequest(
         remoteId: remoteId,
         characteristicUuid: characteristicUuid,
         serviceUuid: serviceUuid,
@@ -204,7 +203,7 @@ class BluetoothCharacteristic {
         value: value,
       );
 
-      var responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicWritten
+      final responseStream = FlutterBlueMaxPlatform.instance.onCharacteristicWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -212,7 +211,7 @@ class BluetoothCharacteristic {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmCharacteristicData> futureResponse = responseStream.first;
+      final Future<BmCharacteristicData> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.writeCharacteristic(request));
@@ -220,7 +219,7 @@ class BluetoothCharacteristic {
       // wait for response so that we can:
       //  1. check for success (writeWithResponse)
       //  2. wait until the packet has been sent, to prevent iOS & Android dropping packets (writeWithoutResponse)
-      BmCharacteristicData response = await futureResponse
+      final BmCharacteristicData response = await futureResponse
           .fbmEnsureAdapterIsOn("writeCharacteristic")
           .fbmEnsureDeviceIsConnected(device, "writeCharacteristic")
           .fbmTimeout(timeout, "writeCharacteristic");
@@ -253,11 +252,11 @@ class BluetoothCharacteristic {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
-      var request = BmSetNotifyValueRequest(
+      final request = BmSetNotifyValueRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -269,7 +268,7 @@ class BluetoothCharacteristic {
 
       // Notifications & Indications are configured by writing to the
       // Client Characteristic Configuration Descriptor (CCCD)
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -278,14 +277,15 @@ class BluetoothCharacteristic {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
-      bool hasCCCD = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
+      final bool hasCCCD =
+          await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.setNotifyValue(request));
 
       // wait for CCCD descriptor to be written?
       if (hasCCCD) {
-        BmDescriptorData response = await futureResponse
+        final BmDescriptorData response = await futureResponse
             .fbmEnsureAdapterIsOn("setNotifyValue")
             .fbmEnsureDeviceIsConnected(device, "setNotifyValue")
             .fbmTimeout(timeout, "setNotifyValue");
@@ -305,7 +305,7 @@ class BluetoothCharacteristic {
   // get known service
   BmBluetoothService? get _bmsvc {
     if (FlutterBlueMax._knownServices[remoteId] != null) {
-      for (var s in FlutterBlueMax._knownServices[remoteId]!.services) {
+      for (final s in FlutterBlueMax._knownServices[remoteId]!.services) {
         if (s.serviceUuid == serviceUuid) {
           if (s.primaryServiceUuid == primaryServiceUuid) {
             return s;
@@ -319,7 +319,7 @@ class BluetoothCharacteristic {
   /// get known characteristic
   BmBluetoothCharacteristic? get _bmchr {
     if (_bmsvc != null) {
-      for (var c in _bmsvc!.characteristics) {
+      for (final c in _bmsvc!.characteristics) {
         if (c.characteristicUuid == uuid) {
           if (c.instanceId == null || c.instanceId == instanceId) {
             return c;
@@ -332,40 +332,29 @@ class BluetoothCharacteristic {
 
   @override
   String toString() {
-    return 'BluetoothCharacteristic{'
-        'remoteId: $remoteId, '
-        'serviceUuid: $serviceUuid, '
-        'characteristicUuid: $characteristicUuid, '
-        'primaryServiceUuid: $primaryServiceUuid, '
-        'instanceId: $instanceId, '
-        'descriptors: $descriptors, '
-        'properties: $properties, '
-        'value: $lastValue'
-        '}';
+    return "BluetoothCharacteristic{"
+        "remoteId: $remoteId, "
+        "serviceUuid: $serviceUuid, "
+        "characteristicUuid: $characteristicUuid, "
+        "primaryServiceUuid: $primaryServiceUuid, "
+        "instanceId: $instanceId, "
+        "descriptors: $descriptors, "
+        "properties: $properties, "
+        "value: $lastValue"
+        "}";
   }
 
-  @Deprecated('Use remoteId instead')
+  @Deprecated("Use remoteId instead")
   DeviceIdentifier get deviceId => remoteId;
 
-  @Deprecated('Use lastValueStream instead')
+  @Deprecated("Use lastValueStream instead")
   Stream<List<int>> get value => lastValueStream;
 
-  @Deprecated('Use onValueReceived instead')
+  @Deprecated("Use onValueReceived instead")
   Stream<List<int>> get onValueChangedStream => onValueReceived;
 }
 
 class CharacteristicProperties {
-  final bool broadcast;
-  final bool read;
-  final bool writeWithoutResponse;
-  final bool write;
-  final bool notify;
-  final bool indicate;
-  final bool authenticatedSignedWrites;
-  final bool extendedProperties;
-  final bool notifyEncryptionRequired;
-  final bool indicateEncryptionRequired;
-
   const CharacteristicProperties(
       {this.broadcast = false,
       this.read = false,
@@ -389,20 +378,30 @@ class CharacteristicProperties {
         extendedProperties = p.extendedProperties,
         notifyEncryptionRequired = p.notifyEncryptionRequired,
         indicateEncryptionRequired = p.indicateEncryptionRequired;
+  final bool broadcast;
+  final bool read;
+  final bool writeWithoutResponse;
+  final bool write;
+  final bool notify;
+  final bool indicate;
+  final bool authenticatedSignedWrites;
+  final bool extendedProperties;
+  final bool notifyEncryptionRequired;
+  final bool indicateEncryptionRequired;
 
   @override
   String toString() {
-    return 'CharacteristicProperties{'
-        'broadcast: $broadcast, '
-        'read: $read, '
-        'writeWithoutResponse: $writeWithoutResponse, '
-        'write: $write, '
-        'notify: $notify, '
-        'indicate: $indicate, '
-        'authenticatedSignedWrites: $authenticatedSignedWrites, '
-        'extendedProperties: $extendedProperties, '
-        'notifyEncryptionRequired: $notifyEncryptionRequired, '
-        'indicateEncryptionRequired: $indicateEncryptionRequired'
-        '}';
+    return "CharacteristicProperties{"
+        "broadcast: $broadcast, "
+        "read: $read, "
+        "writeWithoutResponse: $writeWithoutResponse, "
+        "write: $write, "
+        "notify: $notify, "
+        "indicate: $indicate, "
+        "authenticatedSignedWrites: $authenticatedSignedWrites, "
+        "extendedProperties: $extendedProperties, "
+        "notifyEncryptionRequired: $notifyEncryptionRequired, "
+        "indicateEncryptionRequired: $indicateEncryptionRequired"
+        "}";
   }
 }

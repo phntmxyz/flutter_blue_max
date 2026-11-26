@@ -1,11 +1,11 @@
-import 'dart:async';
+import "dart:async";
 
-import 'src/bluetooth_msgs.dart';
+import "package:flutter_blue_max_platform_interface/src/bluetooth_msgs.dart";
 
-export 'src/bluetooth_msgs.dart';
-export 'src/device_identifier.dart';
-export 'src/guid.dart';
-export 'src/log_level.dart';
+export "src/bluetooth_msgs.dart";
+export "src/device_identifier.dart";
+export "src/guid.dart";
+export "src/log_level.dart";
 
 /// The interface that implementations of flutter_blue_max must implement.
 abstract base class FlutterBlueMaxPlatform {
@@ -19,7 +19,7 @@ abstract base class FlutterBlueMaxPlatform {
       return instance;
     } else {
       throw UnsupportedError(
-        'flutter_blue_max is unsupported on this platform',
+        "flutter_blue_max is unsupported on this platform",
       );
     }
   }
@@ -32,75 +32,75 @@ abstract base class FlutterBlueMaxPlatform {
   }
 
   Stream<BmBluetoothAdapterState> get onAdapterStateChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmBondStateResponse> get onBondStateChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmCharacteristicData> get onCharacteristicReceived {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmCharacteristicData> get onCharacteristicWritten {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmConnectionStateResponse> get onConnectionStateChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmDescriptorData> get onDescriptorRead {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmDescriptorData> get onDescriptorWritten {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmDetachedFromEngineResponse> get onDetachedFromEngine {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmDiscoverServicesResult> get onDiscoveredServices {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmMtuChangedResponse> get onMtuChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmNameChanged> get onNameChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmReadRssiResult> get onReadRssi {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmScanResponse> get onScanResponse {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<L2CapChannelData> get onL2CapChannelReceived {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<L2CapChannelClosed> get onL2CapChannelClosed {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<L2CapChannelConnected> get onL2CapChannelConnected {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmBluetoothDevice> get onServicesReset {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   Stream<BmTurnOnResponse> get onTurnOnResponse {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   static final _logsController = StreamController<String>.broadcast();
@@ -153,7 +153,7 @@ abstract base class FlutterBlueMaxPlatform {
   ) {
     return Future.value(
       BmBluetoothAdapterName(
-        adapterName: '',
+        adapterName: "",
       ),
     );
   }

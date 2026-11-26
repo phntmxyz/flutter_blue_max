@@ -1,13 +1,12 @@
-import 'dart:async';
-import 'dart:js_interop';
-import 'dart:typed_data';
+import "dart:async";
+import "dart:js_interop";
+import "dart:typed_data";
 
-import 'package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart';
-import 'package:flutter_web_plugins/flutter_web_plugins.dart';
-import 'package:web/web.dart' show Event;
-
-import 'src/html.dart';
-import 'src/web_bluetooth.dart';
+import "package:flutter_blue_max_platform_interface/flutter_blue_max_platform_interface.dart";
+import "package:flutter_blue_max_web/src/html.dart";
+import "package:flutter_blue_max_web/src/web_bluetooth.dart";
+import "package:flutter_web_plugins/flutter_web_plugins.dart";
+import "package:web/web.dart" show Event;
 
 final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
   late final _characteristicValueChangedEventListener = _handleCharacteristicValueChanged.toJS;
@@ -155,23 +154,23 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
 
       final services = <BmBluetoothService>[];
 
-      List<BluetoothRemoteGATTService> primaryServices = (await gatt.getPrimaryServices().toDart).toDart;
+      final List<BluetoothRemoteGATTService> primaryServices = (await gatt.getPrimaryServices().toDart).toDart;
       for (final s in primaryServices) {
         final characteristics = <BmBluetoothCharacteristic>[];
 
-        List<BluetoothRemoteGATTCharacteristic> chars = (await s.getCharacteristics().toDart).toDart;
+        final List<BluetoothRemoteGATTCharacteristic> chars = (await s.getCharacteristics().toDart).toDart;
 
         resetInstanceIds(request.remoteId);
         for (final c in chars) {
           final descriptors = <BmBluetoothDescriptor>[];
 
-          int instanceId = _UniqueCharacteristicInstanceId.next();
+          final int instanceId = _UniqueCharacteristicInstanceId.next();
           instanceIdToCharMap[instanceId] = c;
           charToInstanceIdMap[c] = instanceId;
           instanceIdToDeviceMap[instanceId] = device.remoteId.str;
 
           try {
-            List<BluetoothRemoteGATTDescriptor> descs = (await c.getDescriptors().toDart).toDart;
+            final List<BluetoothRemoteGATTDescriptor> descs = (await c.getDescriptors().toDart).toDart;
             for (final d in descs) {
               descriptors.add(
                 BmBluetoothDescriptor(
@@ -228,7 +227,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           services: services,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -311,7 +310,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: value.buffer.asUint8List(),
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -379,7 +378,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: value.buffer.asUint8List(),
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -433,7 +432,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
 
     if (request.enable) {
       characteristic.addEventListener(
-        'characteristicvaluechanged',
+        "characteristicvaluechanged",
         _characteristicValueChangedEventListener,
       );
 
@@ -442,7 +441,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
       await characteristic.stopNotifications().toDart;
 
       characteristic.removeEventListener(
-        'characteristicvaluechanged',
+        "characteristicvaluechanged",
         _characteristicValueChangedEventListener,
       );
     }
@@ -537,7 +536,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           ],
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -600,7 +599,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
           instanceId: request.instanceId,
         ),
       );
@@ -669,7 +668,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
           value: request.value,
           success: true,
           errorCode: 0,
-          errorString: '',
+          errorString: "",
         ),
       );
 
@@ -696,8 +695,8 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
 
   void _handleCharacteristicValueChanged(
     Event event,
-  ) async {
-    final characteristic = event.target as BluetoothRemoteGATTCharacteristic;
+  ) {
+    final characteristic = event.target! as BluetoothRemoteGATTCharacteristic;
 
     _onCharacteristicReceivedController.add(
       BmCharacteristicData(
@@ -709,7 +708,7 @@ final class FlutterBlueMaxWeb extends FlutterBlueMaxPlatform {
         value: characteristic.value?.toDart.buffer.asUint8List() ?? [],
         success: true,
         errorCode: 0,
-        errorString: '',
+        errorString: "",
       ),
     );
   }
@@ -759,17 +758,14 @@ extension on BluetoothRemoteGATTCharacteristic {
 class _UniqueCharacteristicInstanceId {
   static int _counter = 0;
 
-  static int next() {
-    _counter++;
-    return _counter;
-  }
+  static int next() => ++_counter;
 }
 
 /// Resets the instance IDs for all characteristics for a specific device,
 /// so we do not keep incrementing the map for multiple
 /// calls to discoverServices.
 void resetInstanceIds(DeviceIdentifier discoveredDevice) {
-  List<int> instanceIdsToRemove = [];
+  final List<int> instanceIdsToRemove = [];
 
   for (final entry in instanceIdToDeviceMap.entries) {
     if (entry.value == discoveredDevice.str) {

@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max_example/shared/noun.dart';
+import "package:flutter/material.dart";
+import "package:flutter_blue_max_example/shared/noun.dart";
 
 /// Import/export chooser used by `ParsersPanel` and `CatalogPanel`.
 /// Lets the user choose all or some [items], all selected at first.
@@ -72,7 +72,7 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
             CheckboxListTile(
               tristate: true,
               value: _allValue,
-              title: Text('All ${widget.noun.plural}'),
+              title: Text("All ${widget.noun.plural}"),
               onChanged: (_) {
                 return setState(() {
                   if (all) {
@@ -95,10 +95,10 @@ class _SelectionDialogState<T>() extends State<SelectionDialog<T>> {
         ),
       ),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel")),
         FilledButton(
           onPressed: _chosen.isEmpty ? null : _confirmSelection,
-          child: Text('${widget.action} ${counted(_chosen.length, widget.noun)}'),
+          child: Text("${widget.action} ${counted(_chosen.length, widget.noun)}"),
         ),
       ],
     );

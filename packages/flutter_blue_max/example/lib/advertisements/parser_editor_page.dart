@@ -1,13 +1,13 @@
-import 'dart:async';
+import "dart:async";
 
-import 'package:context_plus/context_plus.dart';
-import 'package:flutter/material.dart';
-import 'package:flutter_blue_max/flutter_blue_max.dart';
-import 'package:flutter_blue_max_example/advertisements/advertisement_parser.dart';
-import 'package:flutter_blue_max_example/app/workbench_bindings.dart';
-import 'package:flutter_blue_max_example/shared/form_validation.dart';
-import 'package:flutter_blue_max_example/shared/payload_codec.dart';
-import 'package:reactive_forms/reactive_forms.dart';
+import "package:context_plus/context_plus.dart";
+import "package:flutter/material.dart";
+import "package:flutter_blue_max/flutter_blue_max.dart";
+import "package:flutter_blue_max_example/advertisements/advertisement_parser.dart";
+import "package:flutter_blue_max_example/app/workbench_bindings.dart";
+import "package:flutter_blue_max_example/shared/form_validation.dart";
+import "package:flutter_blue_max_example/shared/payload_codec.dart";
+import "package:reactive_forms/reactive_forms.dart";
 
 /// Opened from `AdvertisementCard` or `ParsersPanel`.
 /// Builds a parser against the device's latest advertisement, previewing every change.
@@ -43,11 +43,11 @@ class const ParserEditorPage({
 }
 
 class _ParserEditorPageState() extends State<ParserEditorPage> {
-  final _name = FormControl<String>(value: '');
-  final _key = FormControl<String>(value: '');
-  final _match = FormControl<String>(value: '');
-  final _matchOffset = FormControl<String>(value: '0');
-  final _recordOffset = FormControl<String>(value: '0');
+  final _name = FormControl<String>(value: "");
+  final _key = FormControl<String>(value: "");
+  final _match = FormControl<String>(value: "");
+  final _matchOffset = FormControl<String>(value: "0");
+  final _recordOffset = FormControl<String>(value: "0");
   final _fieldForms = FormArray<Map<String, dynamic>>([]);
   List<ParserFieldDraft> get _fields => _fieldForms.controls.cast<ParserFieldDraft>();
   final _sourceControl = FormControl<AdvertisementSource>(value: AdvertisementSource.manufacturer);
@@ -67,17 +67,17 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
   set _deviceOnly(bool value) => _deviceOnlyControl.value = value;
   late final _form = FormGroup(
     {
-      'name': _name,
-      'key': _key,
-      'match': _match,
-      'matchOffset': _matchOffset,
-      'recordOffset': _recordOffset,
-      'source': _sourceControl,
-      'records': _recordsControl,
-      'recordType': _recordTypeControl,
-      'recordLength': _recordLengthControl,
-      'deviceOnly': _deviceOnlyControl,
-      'fields': _fieldForms,
+      "name": _name,
+      "key": _key,
+      "match": _match,
+      "matchOffset": _matchOffset,
+      "recordOffset": _recordOffset,
+      "source": _sourceControl,
+      "records": _recordsControl,
+      "recordType": _recordTypeControl,
+      "recordLength": _recordLengthControl,
+      "deviceOnly": _deviceOnlyControl,
+      "fields": _fieldForms,
     },
     validators: [DelegateValidator(_validate)],
   );
@@ -98,11 +98,11 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         AdvertisementSource.service => initial.serviceUuid!.str,
       };
       _match.text = PayloadCodec.hex(initial.match);
-      _matchOffset.text = '${initial.matchOffset}';
+      _matchOffset.text = "${initial.matchOffset}";
       final records = initial.records;
       if (records != null) {
         _records = true;
-        _recordOffset.text = '${records.offset}';
+        _recordOffset.text = "${records.offset}";
         _recordType = records.type;
         _recordLength = records.length;
       }
@@ -111,14 +111,14 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
         _fieldForms.add(
           ParserFieldDraft()
             ..name.text = field.name
-            ..offset.text = '${field.offset}'
-            ..length.text = '${field.length}'
+            ..offset.text = "${field.offset}"
+            ..length.text = "${field.length}"
             ..scale.text = _number(field.scale)
             ..add.text = _number(field.add)
             ..unit.text = field.unit
-            ..record.text = field.record == null ? '' : field.record!.toRadixString(16).toUpperCase()
-            ..bit.text = '${field.bit}'
-            ..bits.text = field.bits == null ? '' : '${field.bits}'
+            ..record.text = field.record == null ? "" : field.record!.toRadixString(16).toUpperCase()
+            ..bit.text = "${field.bit}"
+            ..bits.text = field.bits == null ? "" : "${field.bits}"
             ..type = field.type,
         );
       }
@@ -171,10 +171,10 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
     if (_source == AdvertisementSource.manufacturer) {
       final id = _companyId;
       if (id == null || id < 0 || id > 0xffff) {
-        keyError = 'Enter a 16-bit hex company ID.';
+        keyError = "Enter a 16-bit hex company ID.";
       }
     } else if (_serviceUuid == null) {
-      keyError = 'Enter a 16, 32 or 128-bit UUID.';
+      keyError = "Enter a 16, 32 or 128-bit UUID.";
     }
     setInputError(_key, keyError);
     setInputError(_matchOffset, _offsetError(_matchOffset.text));
@@ -193,26 +193,26 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
       final recordBits = _recordType.size * 8;
       String? recordError;
       if (_records && !_recordType.canReadId(record)) {
-        recordError = 'Enter a $recordBits-bit hex type.';
+        recordError = "Enter a $recordBits-bit hex type.";
       }
       setInputError(draft.record, recordError);
       final variable = draft.type.size == null;
       final length = int.tryParse(draft.length.text.trim());
-      setInputError(draft.length, variable && (length == null || length < 1) ? 'Enter 1 or more.' : null);
+      setInputError(draft.length, variable && (length == null || length < 1) ? "Enter 1 or more." : null);
       final scale = double.tryParse(draft.scale.text.trim());
       setInputError(
         draft.scale,
-        !variable && (scale == null || !scale.isFinite || scale == 0) ? 'Enter a non-zero number.' : null,
+        !variable && (scale == null || !scale.isFinite || scale == 0) ? "Enter a non-zero number." : null,
       );
       final add = double.tryParse(draft.add.text.trim());
-      setInputError(draft.add, !variable && (add == null || !add.isFinite) ? 'Enter a number.' : null);
+      setInputError(draft.add, !variable && (add == null || !add.isFinite) ? "Enter a number." : null);
       setInputError(draft.bit, draft.type.unsigned ? _offsetError(draft.bit.text) : null);
       String? bitsError;
       if (draft.type.unsigned && draft.bits.text.trim().isNotEmpty) {
         final available = draft.type.size! * 8 - (int.tryParse(draft.bit.text.trim()) ?? 0);
         final bits = int.tryParse(draft.bits.text.trim());
         if (bits == null || bits < 1 || bits > available) {
-          bitsError = 'Enter 1 to $available.';
+          bitsError = "Enter 1 to $available.";
         }
       }
       setInputError(draft.bits, bitsError);
@@ -279,10 +279,10 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
   Widget build(BuildContext context) {
     final sample = _sample;
     final parser = _build();
-    const mono = TextStyle(fontFamily: 'monospace', fontSize: 12);
+    const mono = TextStyle(fontFamily: "monospace", fontSize: 12);
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.initial == null ? 'Add parser' : 'Edit parser'),
+        title: Text(widget.initial == null ? "Add parser" : "Edit parser"),
         actions: [
           Padding(
             padding: const EdgeInsets.only(right: 12),
@@ -294,7 +294,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                 }
                 _form.markAllAsTouched();
               },
-              child: const Text('Save parser'),
+              child: const Text("Save parser"),
             ),
           ),
         ],
@@ -307,7 +307,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             ReactiveTextField<String>(
               key: ObjectKey(_name),
               formControl: _name,
-              decoration: const InputDecoration(labelText: 'Parser name', hintText: 'My sensor'),
+              decoration: const InputDecoration(labelText: "Parser name", hintText: "My sensor"),
               validationMessages: inputValidationMessages,
             ),
             const SizedBox(height: 16),
@@ -331,26 +331,26 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                   return ReactiveTextField<String>(
                     key: ObjectKey(_key),
                     formControl: _key,
-                    decoration: const InputDecoration(labelText: 'Company ID (hex)', hintText: '0xFFFF'),
+                    decoration: const InputDecoration(labelText: "Company ID (hex)", hintText: "0xFFFF"),
                     validationMessages: inputValidationMessages,
                   );
                 }
                 return ReactiveTextField<String>(
                   key: ObjectKey(_key),
                   formControl: _key,
-                  decoration: const InputDecoration(labelText: 'Service UUID', hintText: '180f'),
+                  decoration: const InputDecoration(labelText: "Service UUID", hintText: "180f"),
                   validationMessages: inputValidationMessages,
                 );
               },
             ),
             const SizedBox(height: 16),
-            Text('Sample from this device', style: Theme.of(context).textTheme.titleSmall),
+            Text("Sample from this device", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 8),
             Builder(
               builder: (context) {
                 if (sample == null) {
                   return Text(
-                    'The latest advertisement has no payload for this source. '
+                    "The latest advertisement has no payload for this source. "
                     '${switch (_source) {
                       AdvertisementSource.manufacturer => 'Offsets count from the first byte after the company ID.',
                       AdvertisementSource.service => 'Offsets count from the first byte of the service data.',
@@ -371,7 +371,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                         ),
                         child: Column(
                           children: [
-                            Text('$offset', style: Theme.of(context).textTheme.labelSmall),
+                            Text("$offset", style: Theme.of(context).textTheme.labelSmall),
                             Text(PayloadCodec.hex([byte]), style: mono),
                           ],
                         ),
@@ -381,10 +381,10 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
               },
             ),
             const SizedBox(height: 20),
-            Text('Match', style: Theme.of(context).textTheme.titleSmall),
+            Text("Match", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Optional bytes the payload must contain, e.g. a frame type. Leave empty to parse every payload.',
+              "Optional bytes the payload must contain, e.g. a frame type. Leave empty to parse every payload.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
@@ -396,7 +396,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                     key: ObjectKey(_matchOffset),
                     formControl: _matchOffset,
                     keyboardType: TextInputType.number,
-                    decoration: const InputDecoration(labelText: 'At offset'),
+                    decoration: const InputDecoration(labelText: "At offset"),
                     validationMessages: inputValidationMessages,
                   ),
                 ),
@@ -405,26 +405,26 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                   child: ReactiveTextField<String>(
                     key: ObjectKey(_match),
                     formControl: _match,
-                    decoration: const InputDecoration(labelText: 'Bytes (hex)', hintText: '01'),
+                    decoration: const InputDecoration(labelText: "Bytes (hex)", hintText: "01"),
                     validationMessages: inputValidationMessages,
                   ),
                 ),
               ],
             ),
             const SizedBox(height: 20),
-            Text('Layout', style: Theme.of(context).textTheme.titleSmall),
+            Text("Layout", style: Theme.of(context).textTheme.titleSmall),
             const SizedBox(height: 4),
             Text(
-              'Fixed offsets read fields at fixed positions. In Records mode, each field names a record type. '
-              'For BTHome choose Type, value. Its record size comes from the configured fields, and parsing stops '
-              'when it reaches a type whose size is unknown.',
+              "Fixed offsets read fields at fixed positions. In Records mode, each field names a record type. "
+              "For BTHome choose Type, value. Its record size comes from the configured fields, and parsing stops "
+              "when it reaches a type whose size is unknown.",
               style: Theme.of(context).textTheme.bodySmall,
             ),
             const SizedBox(height: 8),
             SegmentedButton<bool>(
               segments: const [
-                ButtonSegment(value: false, label: Text('Fixed offsets')),
-                ButtonSegment(value: true, label: Text('Records')),
+                ButtonSegment(value: false, label: Text("Fixed offsets")),
+                ButtonSegment(value: true, label: Text("Records")),
               ],
               selected: {_records},
               onSelectionChanged: (value) => setState(() => _records = value.single),
@@ -441,7 +441,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       key: ObjectKey(_recordOffset),
                       formControl: _recordOffset,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Records start at'),
+                      decoration: const InputDecoration(labelText: "Records start at"),
                       validationMessages: inputValidationMessages,
                     ),
                   ),
@@ -451,7 +451,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       key: ObjectKey(_recordTypeControl),
                       formControl: _recordTypeControl,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Record type'),
+                      decoration: const InputDecoration(labelText: "Record type"),
                       items: [
                         for (final type in RecordTypeFormat.values)
                           DropdownMenuItem(value: type, child: Text(type.label)),
@@ -464,7 +464,7 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
                       key: ObjectKey(_recordLengthControl),
                       formControl: _recordLengthControl,
                       isExpanded: true,
-                      decoration: const InputDecoration(labelText: 'Record layout'),
+                      decoration: const InputDecoration(labelText: "Record layout"),
                       items: [
                         for (final length in RecordLength.values)
                           DropdownMenuItem(value: length, child: Text(length.label)),
@@ -477,13 +477,13 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             if (_device != null)
               SwitchListTile(
                 contentPadding: EdgeInsets.zero,
-                title: const Text('Only this device'),
-                subtitle: Text('${_device!.str}. Otherwise every device with a matching payload is parsed.'),
+                title: const Text("Only this device"),
+                subtitle: Text("${_device!.str}. Otherwise every device with a matching payload is parsed."),
                 value: _deviceOnly,
                 onChanged: (value) => setState(() => _deviceOnly = value),
               ),
             const SizedBox(height: 12),
-            Text('Fields', style: Theme.of(context).textTheme.titleSmall),
+            Text("Fields", style: Theme.of(context).textTheme.titleSmall),
             for (final draft in _fields) ...[
               const SizedBox(height: 12),
               ParserFieldCard(
@@ -498,18 +498,18 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
             OutlinedButton.icon(
               onPressed: () => setState(() => _fieldForms.add(ParserFieldDraft())),
               icon: const Icon(Icons.add),
-              label: const Text('Add field'),
+              label: const Text("Add field"),
             ),
             if (sample != null) ...[
               const SizedBox(height: 20),
-              Text('Preview', style: Theme.of(context).textTheme.titleSmall),
+              Text("Preview", style: Theme.of(context).textTheme.titleSmall),
               const SizedBox(height: 8),
               SelectableText(() {
                 if (parser == null) {
-                  return 'Complete the form to preview.';
+                  return "Complete the form to preview.";
                 }
                 final lines = parser.read(companyId: parser.companyId, serviceUuid: parser.serviceUuid, bytes: sample);
-                return lines.isEmpty ? 'The sample does not match.' : lines.join('\n');
+                return lines.isEmpty ? "The sample does not match." : lines.join("\n");
               }(), style: mono),
             ],
           ],
@@ -523,42 +523,42 @@ class _ParserEditorPageState() extends State<ParserEditorPage> {
 class ParserFieldDraft() extends FormGroup {
   this
     : super({
-        'name': FormControl<String>(value: ''),
-        'offset': FormControl<String>(value: '0'),
-        'length': FormControl<String>(value: '1'),
-        'scale': FormControl<String>(value: '1'),
-        'add': FormControl<String>(value: '0'),
-        'unit': FormControl<String>(value: ''),
-        'record': FormControl<String>(value: ''),
-        'bit': FormControl<String>(value: '0'),
-        'bits': FormControl<String>(value: ''),
-        'type': FormControl<AdvertisementFieldType>(value: AdvertisementFieldType.uint8),
+        "name": FormControl<String>(value: ""),
+        "offset": FormControl<String>(value: "0"),
+        "length": FormControl<String>(value: "1"),
+        "scale": FormControl<String>(value: "1"),
+        "add": FormControl<String>(value: "0"),
+        "unit": FormControl<String>(value: ""),
+        "record": FormControl<String>(value: ""),
+        "bit": FormControl<String>(value: "0"),
+        "bits": FormControl<String>(value: ""),
+        "type": FormControl<AdvertisementFieldType>(value: AdvertisementFieldType.uint8),
       });
-  FormControl<String> get name => control('name') as FormControl<String>;
-  FormControl<String> get offset => control('offset') as FormControl<String>;
-  FormControl<String> get length => control('length') as FormControl<String>;
-  FormControl<String> get scale => control('scale') as FormControl<String>;
-  FormControl<String> get add => control('add') as FormControl<String>;
-  FormControl<String> get unit => control('unit') as FormControl<String>;
-  FormControl<String> get record => control('record') as FormControl<String>;
-  FormControl<String> get bit => control('bit') as FormControl<String>;
-  FormControl<String> get bits => control('bits') as FormControl<String>;
-  FormControl<AdvertisementFieldType> get typeControl => control('type') as FormControl<AdvertisementFieldType>;
+  FormControl<String> get name => control("name") as FormControl<String>;
+  FormControl<String> get offset => control("offset") as FormControl<String>;
+  FormControl<String> get length => control("length") as FormControl<String>;
+  FormControl<String> get scale => control("scale") as FormControl<String>;
+  FormControl<String> get add => control("add") as FormControl<String>;
+  FormControl<String> get unit => control("unit") as FormControl<String>;
+  FormControl<String> get record => control("record") as FormControl<String>;
+  FormControl<String> get bit => control("bit") as FormControl<String>;
+  FormControl<String> get bits => control("bits") as FormControl<String>;
+  FormControl<AdvertisementFieldType> get typeControl => control("type") as FormControl<AdvertisementFieldType>;
   AdvertisementFieldType get type => typeControl.value!;
   set type(AdvertisementFieldType value) => typeControl.value = value;
 }
 
-String? _required(String value) => value.trim().isEmpty ? 'Enter a name.' : null;
+String? _required(String value) => value.trim().isEmpty ? "Enter a name." : null;
 
 String _companyText(int id) => '0x${id.toRadixString(16).padLeft(4, '0').toUpperCase()}';
 
-String _number(double value) => value == value.roundToDouble() ? '${value.toInt()}' : '$value';
+String _number(double value) => value == value.roundToDouble() ? "${value.toInt()}" : "$value";
 
-int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp('^0[xX]'), ''), radix: 16);
+int? _hexNumber(String text) => int.tryParse(text.trim().replaceFirst(RegExp("^0[xX]"), ""), radix: 16);
 
 String? _offsetError(String? value) {
-  final offset = int.tryParse(value?.trim() ?? '');
-  return offset == null || offset < 0 ? 'Enter 0 or more.' : null;
+  final offset = int.tryParse(value?.trim() ?? "");
+  return offset == null || offset < 0 ? "Enter 0 or more." : null;
 }
 
 /// One keyed field card within ParserEditorPage; its page owns the draft controllers.
@@ -583,11 +583,11 @@ class const ParserFieldCard({
                   child: ReactiveTextField<String>(
                     key: ObjectKey(draft.name),
                     formControl: draft.name,
-                    decoration: const InputDecoration(labelText: 'Field name', hintText: 'Temperature'),
+                    decoration: const InputDecoration(labelText: "Field name", hintText: "Temperature"),
                     validationMessages: inputValidationMessages,
                   ),
                 ),
-                IconButton(tooltip: 'Remove field', onPressed: onRemove, icon: const Icon(Icons.delete_outline)),
+                IconButton(tooltip: "Remove field", onPressed: onRemove, icon: const Icon(Icons.delete_outline)),
               ],
             ),
             const SizedBox(height: 12),
@@ -601,7 +601,7 @@ class const ParserFieldCard({
                     child: ReactiveTextField<String>(
                       key: ObjectKey(draft.record),
                       formControl: draft.record,
-                      decoration: const InputDecoration(labelText: 'Record type (hex)', hintText: '02'),
+                      decoration: const InputDecoration(labelText: "Record type (hex)", hintText: "02"),
                       validationMessages: inputValidationMessages,
                     ),
                   ),
@@ -611,7 +611,7 @@ class const ParserFieldCard({
                     key: ObjectKey(draft.offset),
                     formControl: draft.offset,
                     keyboardType: TextInputType.number,
-                    decoration: InputDecoration(labelText: records ? 'Offset in value' : 'Offset'),
+                    decoration: InputDecoration(labelText: records ? "Offset in value" : "Offset"),
                     validationMessages: inputValidationMessages,
                   ),
                 ),
@@ -621,7 +621,7 @@ class const ParserFieldCard({
                     key: ObjectKey(draft.typeControl),
                     formControl: draft.typeControl,
                     isExpanded: true,
-                    decoration: const InputDecoration(labelText: 'Type'),
+                    decoration: const InputDecoration(labelText: "Type"),
                     items: [
                       for (final type in AdvertisementFieldType.values)
                         DropdownMenuItem(value: type, child: Text(type.label)),
@@ -635,7 +635,7 @@ class const ParserFieldCard({
                       key: ObjectKey(draft.bit),
                       formControl: draft.bit,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Bit offset'),
+                      decoration: const InputDecoration(labelText: "Bit offset"),
                       validationMessages: inputValidationMessages,
                     ),
                   ),
@@ -645,7 +645,7 @@ class const ParserFieldCard({
                       key: ObjectKey(draft.bits),
                       formControl: draft.bits,
                       keyboardType: TextInputType.number,
-                      decoration: const InputDecoration(labelText: 'Bit count', hintText: 'All'),
+                      decoration: const InputDecoration(labelText: "Bit count", hintText: "All"),
                       validationMessages: inputValidationMessages,
                     ),
                   ),
@@ -659,7 +659,7 @@ class const ParserFieldCard({
                           key: ObjectKey(draft.length),
                           formControl: draft.length,
                           keyboardType: TextInputType.number,
-                          decoration: const InputDecoration(labelText: 'Bytes'),
+                          decoration: const InputDecoration(labelText: "Bytes"),
                           validationMessages: inputValidationMessages,
                         ),
                       );
@@ -674,7 +674,7 @@ class const ParserFieldCard({
                             key: ObjectKey(draft.scale),
                             formControl: draft.scale,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            decoration: const InputDecoration(labelText: 'Scale'),
+                            decoration: const InputDecoration(labelText: "Scale"),
                             validationMessages: inputValidationMessages,
                           ),
                         ),
@@ -684,7 +684,7 @@ class const ParserFieldCard({
                             key: ObjectKey(draft.add),
                             formControl: draft.add,
                             keyboardType: const TextInputType.numberWithOptions(decimal: true, signed: true),
-                            decoration: const InputDecoration(labelText: 'Add'),
+                            decoration: const InputDecoration(labelText: "Add"),
                             validationMessages: inputValidationMessages,
                           ),
                         ),
@@ -693,7 +693,7 @@ class const ParserFieldCard({
                           child: ReactiveTextField<String>(
                             key: ObjectKey(draft.unit),
                             formControl: draft.unit,
-                            decoration: const InputDecoration(labelText: 'Unit', hintText: '°C'),
+                            decoration: const InputDecoration(labelText: "Unit", hintText: "°C"),
                           ),
                         ),
                       ],

@@ -1,10 +1,9 @@
 name: Build example downloads
 
 on:
-  pull_request:
-    paths:
-      - 'packages/**'
-      - '.github/workflows/example_build.yml'
+  push:
+    tags:
+      - 'flutter_blue_max-[0-9]+.[0-9]+.[0-9]+'
   workflow_dispatch:
     inputs:
       platform:
@@ -20,10 +19,10 @@ on:
           - linux
           - web
 
-# A newer PR update supersedes the previous checks. Explicit builds each get their own run.
+# Explicit builds each get their own run.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.event.pull_request.number || github.run_id }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -39,18 +38,17 @@ defaults:
 jobs:
   build:
     if: >-
-      github.event_name == 'pull_request' ||
+      github.event_name == 'push' ||
       (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch))
-    name: ${{ matrix.platform == 'checks' && 'Check example' || format('Build {0}', matrix.platform) }}
+    name: Build ${{ matrix.platform }}
     runs-on: ${{ (matrix.platform == 'ios' || matrix.platform == 'macos') && 'macos-15' || 'ubuntu-24.04' }}
     timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
         platform: >-
-          ${{ fromJSON(github.event_name == 'pull_request' && '["checks"]' ||
-          (inputs.platform || 'all') == 'all' && '["android","ios","macos","linux","web"]' ||
+          ${{ fromJSON((inputs.platform || 'all') == 'all' && '["android","ios","macos","linux","web"]' ||
           format('["{0}"]', inputs.platform)) }}
     steps:
       - name: Check out source
@@ -86,7 +84,7 @@ jobs:
         run: flutter pub get --enforce-lockfile
 
       - name: Check example formatting, analysis and tests
-        if: matrix.platform == 'checks' || matrix.platform == 'linux'
+        if: matrix.platform == 'linux'
         run: |
           dart format --output=none --set-exit-if-changed lib test
           flutter analyze --no-pub lib test
@@ -98,7 +96,6 @@ jobs:
             test/unit/payload_editor_test.dart test/unit/parser_editor_validation_test.dart
 
       - name: Create the download directory
-        if: matrix.platform != 'checks'
         run: mkdir -p dist
 
       - name: Build Android APK
@@ -135,7 +132,6 @@ jobs:
           tar -czf dist/blue-max-web-release.tar.gz -C build web
 
       - name: Upload download
-        if: matrix.platform != 'checks'
         id: upload
         uses: actions/upload-artifact@v7
         with:
@@ -145,7 +141,6 @@ jobs:
           retention-days: 14
 
       - name: Link download in summary
-        if: matrix.platform != 'checks'
         env:
           BUILD_PLATFORM: ${{ matrix.platform }}
           DOWNLOAD_URL: ${{ steps.upload.outputs.artifact-url }}
@@ -155,9 +150,10 @@ jobs:
 
   darwin-compatibility:
     if: >-
-      github.event_name == 'workflow_dispatch' &&
+      github.event_name == 'push' ||
+      (github.event_name == 'workflow_dispatch' &&
       github.ref == format('refs/heads/{0}', github.event.repository.default_branch) &&
-      (inputs.platform || 'all') == 'all'
+      (inputs.platform || 'all') == 'all')
     name: Darwin ${{ matrix.integration }} on Flutter ${{ matrix.flutter }} (${{ matrix.platform }})
     runs-on: macos-15
     timeout-minutes: 30
