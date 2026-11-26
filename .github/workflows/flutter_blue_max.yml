@@ -1,4 +1,4 @@
-name: Publish Flutter Blue Plus
+name: Publish Flutter Blue Max
 on:
   push:
     tags:

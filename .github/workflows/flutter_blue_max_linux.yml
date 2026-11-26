@@ -1,4 +1,4 @@
-name: Publish Flutter Blue Plus Linux
+name: Publish Flutter Blue Max Linux
 on:
   push:
     tags:

@@ -1,4 +1,4 @@
-name: Publish Flutter Blue Plus Platform Interface
+name: Publish Flutter Blue Max Platform Interface
 on:
   push:
     tags:
