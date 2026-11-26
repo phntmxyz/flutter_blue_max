@@ -163,7 +163,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
 
   @override
   Stream<BmMtuChangedResponse> get onMtuChanged {
-    return Stream.empty();
+    return const Stream.empty();
   }
 
   @override
@@ -344,7 +344,7 @@ final class FlutterBlueMaxLinux extends FlutterBlueMaxPlatform {
                 remoteId: device.remoteId,
                 characteristics: service.characteristics.map(
                   (characteristic) {
-                    int instanceId = _UniqueCharacteristicInstanceId.next();
+                    final int instanceId = _UniqueCharacteristicInstanceId.next();
                     instanceIdToCharMap[instanceId] = characteristic;
                     charToInstanceIdMap[characteristic] = instanceId;
 
@@ -1130,17 +1130,14 @@ extension on BlueZGattCharacteristic {
 class _UniqueCharacteristicInstanceId {
   static int _counter = 0;
 
-  static int next() {
-    _counter++;
-    return _counter;
-  }
+  static int next() => ++_counter;
 }
 
 /// Resets the instance IDs for all characteristics for a specific device,
 /// so we do not keep incrementing the map for multiple
 /// calls to discoverServices.
 void resetInstanceIds(DeviceIdentifier discoveredDevice) {
-  List<int> instanceIdsToRemove = [];
+  final List<int> instanceIdsToRemove = [];
 
   for (final entry in instanceIdToDeviceMap.entries) {
     if (entry.value == discoveredDevice.str) {

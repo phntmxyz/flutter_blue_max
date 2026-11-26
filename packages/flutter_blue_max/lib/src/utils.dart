@@ -22,10 +22,10 @@ extension FutureTimeout<T> on Future<T> {
 
   Future<T> fbmEnsureDeviceIsConnected(BluetoothDevice device, String function) {
     // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
+    final completer = Completer<T>();
 
     // disconnection listener.
-    var subscription = device.connectionState.listen((event) {
+    final subscription = device.connectionState.listen((event) {
       if (event == BluetoothConnectionState.disconnected) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
@@ -44,7 +44,7 @@ extension FutureTimeout<T> on Future<T> {
     }).catchError((error) {
       if (!completer.isCompleted) {
         subscription.cancel();
-        completer.completeError(error);
+        completer.completeError(error as Object);
       }
     });
 
@@ -53,10 +53,10 @@ extension FutureTimeout<T> on Future<T> {
 
   Future<T> fbmEnsureAdapterIsOn(String function) {
     // Create a completer to represent the result of this extended Future.
-    var completer = Completer<T>();
+    final completer = Completer<T>();
 
     // disconnection listener.
-    var subscription = FlutterBlueMax.adapterState.listen((event) {
+    final subscription = FlutterBlueMax.adapterState.listen((event) {
       if (event == BluetoothAdapterState.off || event == BluetoothAdapterState.turningOff) {
         if (!completer.isCompleted) {
           completer.completeError(FlutterBlueMaxException(
@@ -75,7 +75,7 @@ extension FutureTimeout<T> on Future<T> {
     }).catchError((error) {
       if (!completer.isCompleted) {
         subscription.cancel();
-        completer.completeError(error);
+        completer.completeError(error as Object);
       }
     });
 
@@ -99,11 +99,11 @@ extension FutureTimeout<T> on Future<T> {
 //  1. we cache the latestValue of the stream
 //  2. the "latestValue" is re-emitted whenever the stream is listened to
 class _StreamControllerReEmit<T> {
+
+  _StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
   T latestValue;
 
   final StreamController<T> _controller = StreamController<T>.broadcast();
-
-  _StreamControllerReEmit({required T initialValue}) : latestValue = initialValue;
 
   Stream<T> get stream {
     if (latestValue != null) {
@@ -137,10 +137,6 @@ class _StreamControllerReEmit<T> {
 // immediately starts listening to a broadcast stream and
 // buffering it in a new single-subscription stream
 class _BufferStream<T> {
-  final Stream<T> _inputStream;
-  late final StreamSubscription? _subscription;
-  late final StreamController<T> _controller;
-  late bool hasReceivedValue = false;
 
   _BufferStream.listen(this._inputStream) {
     _controller = StreamController<T>(
@@ -163,7 +159,7 @@ class _BufferStream<T> {
         _controller.add(data);
       },
       onError: (e) {
-        _controller.addError(e);
+        _controller.addError(e as Object);
       },
       onDone: () {
         _controller.close();
@@ -171,6 +167,10 @@ class _BufferStream<T> {
       cancelOnError: false,
     );
   }
+  final Stream<T> _inputStream;
+  late final StreamSubscription? _subscription;
+  late final StreamController<T> _controller;
+  late bool hasReceivedValue = false;
 
   void close() {
     _subscription?.cancel();
@@ -184,6 +184,8 @@ class _BufferStream<T> {
 
 // Helper for 'newStreamWithInitialValue' method for streams.
 class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, T> {
+
+  _NewStreamWithInitialValueTransformer(this.initialValue);
   /// the initial value to push to the new stream
   final T initialValue;
 
@@ -194,9 +196,7 @@ class _NewStreamWithInitialValueTransformer<T> extends StreamTransformerBase<T, 
   late StreamSubscription<T> subscription;
 
   /// new stream listener count
-  var listenerCount = 0;
-
-  _NewStreamWithInitialValueTransformer(this.initialValue);
+  int listenerCount = 0;
 
   @override
   Stream<T> bind(Stream<T> stream) {
@@ -308,8 +308,8 @@ extension _StreamNewStreamWithInitialValue<T> on Stream<T> {
 
 // ignore: unused_element
 Stream<T> _mergeStreams<T>(List<Stream<T>> streams) {
-  StreamController<T> controller = StreamController<T>();
-  List<StreamSubscription<T>> subscriptions = [];
+  final StreamController<T> controller = StreamController<T>();
+  final List<StreamSubscription<T>> subscriptions = [];
 
   void handleData(T data) {
     if (!controller.isClosed) {
@@ -324,7 +324,7 @@ Stream<T> _mergeStreams<T>(List<Stream<T>> streams) {
   }
 
   void handleDone() {
-    for (var s in subscriptions) {
+    for (final s in subscriptions) {
       s.cancel();
     }
     controller.close();
@@ -352,7 +352,7 @@ class _Mutex {
   int issued = 0;
 
   Future<bool> take() async {
-    int mine = issued;
+    final int mine = issued;
     issued++;
     // tasks are executed in the same order they call take()
     while (mine != execute) {
@@ -380,7 +380,7 @@ class _MutexFactory {
 extension FirstWhereOrNullExtension<T> on Iterable<T> {
   /// returns first item to satisfy `test`, else null
   T? _firstWhereOrNull(bool Function(T) test) {
-    for (var element in this) {
+    for (final element in this) {
       if (test(element)) {
         return element;
       }
@@ -392,7 +392,7 @@ extension FirstWhereOrNullExtension<T> on Iterable<T> {
 extension RemoveWhere<T> on List<T> {
   /// returns true if some items where removed
   bool _removeWhere(bool Function(T) test) {
-    int initialLength = length;
+    final int initialLength = length;
     removeWhere(test);
     return length != initialLength;
   }

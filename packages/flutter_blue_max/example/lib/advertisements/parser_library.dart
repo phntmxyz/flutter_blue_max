@@ -13,6 +13,10 @@ class ParserLibrary({
   Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) write = saveStoredList,
   Future<StoredList<AdvertisementParser>?> Function() read = loadParsers,
 }) extends ChangeNotifier {
+  this {
+    _store.addListener(notifyListeners);
+  }
+
   final _store = PersistedLibrary<AdvertisementParser>(
     key: parserStoreKey,
     label: 'parsers',
@@ -23,10 +27,6 @@ class ParserLibrary({
     write: write,
     onProblem: onProblem,
   );
-
-  this {
-    _store.addListener(notifyListeners);
-  }
 
   List<AdvertisementParser> get parsers => _store.items;
   Future<void> load() => _store.load();

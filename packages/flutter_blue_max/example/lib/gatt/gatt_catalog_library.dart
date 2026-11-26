@@ -14,6 +14,10 @@ class GattCatalogLibrary({
   Future<void> Function(String key, List<Object?> items, {List<Object?> unreadable}) write = saveStoredList,
   Future<StoredList<KnownService>?> Function() read = loadCatalog,
 }) extends ChangeNotifier {
+  this {
+    _store.addListener(notifyListeners);
+  }
+
   final _store = PersistedLibrary<KnownService>(
     key: catalogStoreKey,
     label: 'GATT catalog',
@@ -23,10 +27,6 @@ class GattCatalogLibrary({
     write: write,
     onProblem: onProblem,
   );
-
-  this {
-    _store.addListener(notifyListeners);
-  }
 
   List<KnownService> get catalog => _store.items;
   Future<void> load() => _store.load();

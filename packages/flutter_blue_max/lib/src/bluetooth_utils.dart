@@ -4,10 +4,10 @@ part of '../flutter_blue_max.dart';
 enum BluetoothAdapterState { unknown, unavailable, unauthorized, turningOn, on, turningOff, off }
 
 class DisconnectReason {
+  DisconnectReason(this.platform, this.code, this.description);
   final ErrorPlatform platform;
   final int? code; // specific to platform
   final String? description;
-  DisconnectReason(this.platform, this.code, this.description);
   @override
   String toString() {
     return 'DisconnectReason{'
@@ -19,9 +19,9 @@ class DisconnectReason {
 }
 
 class BluetoothConnectionEvent {
+  BluetoothConnectionEvent(this.device, this.connectionState);
   BluetoothDevice device;
   BluetoothConnectionState connectionState;
-  BluetoothConnectionEvent(this.device, this.connectionState);
 }
 
 enum BluetoothConnectionState {

@@ -5,6 +5,13 @@
 part of '../flutter_blue_max.dart';
 
 class BluetoothService {
+
+  /// for internal use
+  BluetoothService.fromProto(BmBluetoothService p)
+      : remoteId = p.remoteId,
+        serviceUuid = p.serviceUuid,
+        primaryServiceUuid = p.primaryServiceUuid,
+        characteristics = p.characteristics.map((c) => BluetoothCharacteristic.fromProto(c)).toList();
   final DeviceIdentifier remoteId;
   final Guid serviceUuid;
   final Guid? primaryServiceUuid;
@@ -22,9 +29,9 @@ class BluetoothService {
   /// (for primary services)
   ///  get it's secondary services (i.e. includedServices)
   List<BluetoothService> get includedServices {
-    List<BluetoothService> out = [];
+    final List<BluetoothService> out = [];
     if (FlutterBlueMax._knownServices[remoteId] != null) {
-      for (var s in FlutterBlueMax._knownServices[remoteId]!.services) {
+      for (final s in FlutterBlueMax._knownServices[remoteId]!.services) {
         if (s.primaryServiceUuid == serviceUuid) {
           out.add(BluetoothService.fromProto(s));
         }
@@ -38,7 +45,7 @@ class BluetoothService {
   BluetoothService? get primaryService {
     if (primaryServiceUuid != null) {
       if (FlutterBlueMax._knownServices[remoteId] != null) {
-        for (var s in FlutterBlueMax._knownServices[remoteId]!.services) {
+        for (final s in FlutterBlueMax._knownServices[remoteId]!.services) {
           if (s.serviceUuid == primaryServiceUuid) {
             return BluetoothService.fromProto(s);
           }
@@ -47,13 +54,6 @@ class BluetoothService {
     }
     return null;
   }
-
-  /// for internal use
-  BluetoothService.fromProto(BmBluetoothService p)
-      : remoteId = p.remoteId,
-        serviceUuid = p.serviceUuid,
-        primaryServiceUuid = p.primaryServiceUuid,
-        characteristics = p.characteristics.map((c) => BluetoothCharacteristic.fromProto(c)).toList();
 
   @override
   String toString() {

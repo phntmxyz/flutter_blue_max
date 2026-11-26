@@ -4,6 +4,9 @@
 
 part of '../flutter_blue_max.dart';
 
+// Platforms without an implementation throw UnimplementedError for optional calls, which is expected here.
+// ignore_for_file: avoid_catching_errors
+
 class FlutterBlueMax {
   ///////////////////
   //  Internal
@@ -177,22 +180,22 @@ class FlutterBlueMax {
   /// Turn on Bluetooth (Android & Linux only).
   ///  - iOS & macOS do not let apps turn Bluetooth on, their platform implementation throws [UnsupportedError].
   static Future<void> turnOn({int timeout = 60}) async {
-    var responseStream = FlutterBlueMaxPlatform.instance.onTurnOnResponse;
+    final responseStream = FlutterBlueMaxPlatform.instance.onTurnOnResponse;
 
     // Start listening now, before invokeMethod, to ensure we don't miss the response
-    Future<BmTurnOnResponse> futureResponse = responseStream.first;
+    final Future<BmTurnOnResponse> futureResponse = responseStream.first;
 
     // the response is only awaited when the platform reports a change,
     // a platform without turn on responses must not raise an unhandled error
     futureResponse.ignore();
 
     // invoke
-    bool changed = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.turnOn(BmTurnOnRequest()));
+    final bool changed = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.turnOn(BmTurnOnRequest()));
 
     // only wait if bluetooth was off
     if (changed) {
       // wait for response
-      BmTurnOnResponse response = await futureResponse.fbmTimeout(timeout, "turnOn");
+      final BmTurnOnResponse response = await futureResponse.fbmTimeout(timeout, "turnOn");
 
       // check response
       if (response.userAccepted == false) {
@@ -208,7 +211,7 @@ class FlutterBlueMax {
   static Stream<BluetoothAdapterState> get adapterState async* {
     // get current state if needed
     if (_adapterStateNow == null) {
-      var result =
+      final result =
           await _invokeMethod(() => FlutterBlueMaxPlatform.instance.getAdapterState(BmBluetoothAdapterStateRequest()));
       // update _adapterStateNow if it is still null after the await
       _adapterStateNow ??= result.adapterState;
@@ -221,7 +224,7 @@ class FlutterBlueMax {
 
   /// Retrieve a list of devices currently connected to your app
   static List<BluetoothDevice> get connectedDevices {
-    var copy = Map.from(_connectionStates);
+    final copy = Map<DeviceIdentifier, BmConnectionStateResponse>.from(_connectionStates);
     copy.removeWhere((key, value) => value.connectionState == BmConnectionStateEnum.disconnected);
     return copy.values.map((v) => BluetoothDevice(remoteId: v.remoteId)).toList();
   }
@@ -231,9 +234,9 @@ class FlutterBlueMax {
   /// - You must still call device.connect() to connect them to *your app*
   /// - [withServices] required on iOS (for privacy purposes). ignored on android.
   static Future<List<BluetoothDevice>> systemDevices(List<Guid> withServices) async {
-    var r = await _invokeMethod(
+    final r = await _invokeMethod(
         () => FlutterBlueMaxPlatform.instance.getSystemDevices(BmSystemDevicesRequest(withServices: withServices)));
-    for (BmBluetoothDevice device in r.devices) {
+    for (final BmBluetoothDevice device in r.devices) {
       if (device.platformName != null) {
         _platformNames[device.remoteId] = device.platformName!;
       }
@@ -243,8 +246,8 @@ class FlutterBlueMax {
 
   /// Retrieve a list of bonded devices (Android only)
   static Future<List<BluetoothDevice>> get bondedDevices async {
-    var r = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.getBondedDevices(BmBondedDevicesRequest()));
-    for (BmBluetoothDevice device in r.devices) {
+    final r = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.getBondedDevices(BmBondedDevicesRequest()));
+    for (final BmBluetoothDevice device in r.devices) {
       if (device.platformName != null) {
         _platformNames[device.remoteId] = device.platformName!;
       }
@@ -303,7 +306,7 @@ class FlutterBlueMax {
     assert(continuousDivisor >= 1, "divisor must be >= 1");
 
     // check filters
-    bool hasOtherFilter = withServices.isNotEmpty ||
+    final bool hasOtherFilter = withServices.isNotEmpty ||
         withRemoteIds.isNotEmpty ||
         withNames.isNotEmpty ||
         withMsd.isNotEmpty ||
@@ -317,7 +320,7 @@ class FlutterBlueMax {
 
     // only allow a single task to call
     // startScan or stopScan at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("scan");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("scan");
     await mtx.take();
     try {
       // already scanning?
@@ -329,7 +332,7 @@ class FlutterBlueMax {
       // push to stream
       _isScanning.add(true);
 
-      var settings = BmScanSettings(
+      final settings = BmScanSettings(
           withServices: withServices,
           withRemoteIds: withRemoteIds,
           withNames: withNames,
@@ -344,7 +347,7 @@ class FlutterBlueMax {
           androidCheckLocationServices: androidCheckLocationServices,
           webOptionalServices: webOptionalServices);
 
-      Stream<BmScanResponse> responseStream = FlutterBlueMaxPlatform.instance.onScanResponse;
+      final Stream<BmScanResponse> responseStream = FlutterBlueMaxPlatform.instance.onScanResponse;
 
       // Start listening now, before invokeMethod, so we do not miss any results
       _scanBuffer = _BufferStream.listen(responseStream);
@@ -356,14 +359,14 @@ class FlutterBlueMax {
       });
 
       // check every 250ms for gone devices?
-      late Stream<BmScanResponse?> outputStream = removeIfGone != null
-          ? _mergeStreams([_scanBuffer!.stream, Stream.periodic(Duration(milliseconds: 250))])
+      late final Stream<BmScanResponse?> outputStream = removeIfGone != null
+          ? _mergeStreams([_scanBuffer!.stream, Stream.periodic(const Duration(milliseconds: 250))])
           : _scanBuffer!.stream;
 
       // start by pushing an empty array
       _scanResults.add([]);
 
-      List<ScanResult> output = [];
+      final List<ScanResult> output = [];
 
       // listen & push to `scanResults` stream
       _scanSubscription = outputStream.listen((BmScanResponse? response) {
@@ -375,13 +378,13 @@ class FlutterBlueMax {
         } else {
           // failure?
           if (response.success == false) {
-            var e = FlutterBlueMaxException(_nativeError, "scan", response.errorCode, response.errorString);
+            final e = FlutterBlueMaxException(_nativeError, "scan", response.errorCode, response.errorString);
             _scanResults.addError(e);
             _stopScan(invokePlatform: false);
           }
 
           // iterate through advertisements
-          for (BmScanAdvertisement bm in response.advertisements) {
+          for (final BmScanAdvertisement bm in response.advertisements) {
             // cache platform name
             if (bm.platformName != null) {
               _platformNames[bm.remoteId] = bm.platformName!;
@@ -393,7 +396,7 @@ class FlutterBlueMax {
             }
 
             // convert
-            ScanResult sr = ScanResult.fromProto(bm);
+            final ScanResult sr = ScanResult.fromProto(bm);
 
             if (oneByOne) {
               // push single item
@@ -423,7 +426,7 @@ class FlutterBlueMax {
 
   /// Stops a scan for Bluetooth Low Energy devices
   static Future<void> stopScan() async {
-    _Mutex mtx = _MutexFactory.getMutexForKey("scan");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("scan");
     await mtx.take();
     try {
       if (isScanningNow) {
@@ -442,7 +445,7 @@ class FlutterBlueMax {
     _scanSubscription?.cancel();
     _scanTimeout?.cancel();
     _isScanning.add(false);
-    for (var subscription in _scanSubscriptions) {
+    for (final subscription in _scanSubscriptions) {
       subscription.cancel();
     }
     if (invokePlatform) {
@@ -459,7 +462,7 @@ class FlutterBlueMax {
   }
 
   /// Sets the internal FlutterBlue log level
-  static Future<void> setLogLevel(LogLevel level, {color = true}) async {
+  static Future<void> setLogLevel(LogLevel level, {bool color = true}) async {
     _logLevel = level;
     await _invokeMethod(
         () => FlutterBlueMaxPlatform.instance.setLogLevel(BmSetLogLevelRequest(logLevel: level, logColor: color)));
@@ -600,7 +603,7 @@ class FlutterBlueMax {
           _stopScan(invokePlatform: false);
         }
         if (r.adapterState == BmAdapterStateEnum.on) {
-          for (DeviceIdentifier d in _autoConnect) {
+          for (final DeviceIdentifier d in _autoConnect) {
             BluetoothDevice(remoteId: d).connect(autoConnect: true, mtu: null).onError((e, s) {
               if (logLevel != LogLevel.none) {
                 FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
@@ -639,7 +642,7 @@ class FlutterBlueMax {
           if (!kIsWeb && Platform.isAndroid == false) {
             if (_autoConnect.contains(r.remoteId)) {
               if (_adapterStateNow == BmAdapterStateEnum.on) {
-                var d = BluetoothDevice(remoteId: r.remoteId);
+                final d = BluetoothDevice(remoteId: r.remoteId);
                 d.connect(autoConnect: true, mtu: null).onError((e, s) {
                   if (logLevel != LogLevel.none) {
                     FlutterBlueMaxPlatform.log("[FBM] [AutoConnect] connection failed: $e");
@@ -740,7 +743,7 @@ class FlutterBlueMax {
       FlutterBlueMaxPlatform.instance.onConnectionStateChanged.listen((r) {
         if (_delayedSubscriptions.isNotEmpty) {
           if (r.connectionState == BmConnectionStateEnum.disconnected) {
-            var remoteId = r.remoteId;
+            final remoteId = r.remoteId;
             // use delayed to update the stream before we cancel it
             Future.delayed(Duration.zero).then((_) {
               _delayedSubscriptions[remoteId]?.forEach((s) => s.cancel()); // cancel
@@ -757,7 +760,7 @@ class FlutterBlueMax {
   /// invoke a platform method
   static Future<T> _invokeMethod<T>(Future<T> Function() invoke) async {
     // only allow 1 invocation at a time (guarantees that hot restart finishes)
-    _Mutex mtx = _MutexFactory.getMutexForKey("invokeMethod");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("invokeMethod");
     await mtx.take();
 
     try {
@@ -774,14 +777,14 @@ class FlutterBlueMax {
   /// Turn off Bluetooth (Android only),
   @Deprecated('Deprecated in Android SDK 33 with no replacement')
   static Future<void> turnOff({int timeout = 10}) async {
-    var responseStream =
+    final responseStream =
         FlutterBlueMaxPlatform.instance.onAdapterStateChanged.where((p) => p.adapterState == BmAdapterStateEnum.off);
 
     // Start listening now, before invokeMethod, to ensure we don't miss the response
-    Future<BmBluetoothAdapterState> futureResponse = responseStream.first;
+    final Future<BmBluetoothAdapterState> futureResponse = responseStream.first;
 
     // invoke
-    bool changed = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.turnOff(BmTurnOffRequest()));
+    final bool changed = await _invokeMethod(() => FlutterBlueMaxPlatform.instance.turnOff(BmTurnOffRequest()));
 
     // only wait if bluetooth was on
     if (changed) {
@@ -823,6 +826,8 @@ class AndroidScanMode {
 }
 
 class MsdFilter {
+
+  MsdFilter(this.manufacturerId, {this.data = const [], this.mask = const []});
   int manufacturerId;
 
   /// filter for this data
@@ -833,8 +838,6 @@ class MsdFilter {
   /// The 'mask' must have the same length as 'data'.
   List<int> mask;
 
-  MsdFilter(this.manufacturerId, {this.data = const [], this.mask = const []});
-
   // convert to bmMsg
   BmMsdFilter get _bm {
     assert(mask.isEmpty || (data.length == mask.length), "mask & data must be same length");
@@ -843,6 +846,8 @@ class MsdFilter {
 }
 
 class ServiceDataFilter {
+
+  ServiceDataFilter(this.service, {this.data = const [], this.mask = const []});
   Guid service;
 
   // filter for this data
@@ -853,8 +858,6 @@ class ServiceDataFilter {
   // The 'mask' must have the same length as 'data'.
   List<int> mask;
 
-  ServiceDataFilter(this.service, {this.data = const [], this.mask = const []});
-
   // convert to bmMsg
   BmServiceDataFilter get _bm {
     assert(mask.isEmpty || (data.length == mask.length), "mask & data must be same length");
@@ -863,10 +866,6 @@ class ServiceDataFilter {
 }
 
 class ScanResult {
-  final BluetoothDevice device;
-  final AdvertisementData advertisementData;
-  final int rssi;
-  final DateTime timeStamp;
 
   ScanResult({
     required this.device,
@@ -880,6 +879,10 @@ class ScanResult {
         advertisementData = AdvertisementData.fromProto(p),
         rssi = p.rssi,
         timeStamp = DateTime.now();
+  final BluetoothDevice device;
+  final AdvertisementData advertisementData;
+  final int rssi;
+  final DateTime timeStamp;
 
   @override
   bool operator ==(Object other) =>
@@ -900,26 +903,6 @@ class ScanResult {
 }
 
 class AdvertisementData {
-  final String advName;
-  final int? txPowerLevel;
-  final int? appearance; // not supported on iOS / macOS
-  final bool connectable;
-  final Map<int, List<int>> manufacturerData; // key: manufacturerId
-  final Map<Guid, List<int>> serviceData; // key: service guid
-  final List<Guid> serviceUuids;
-
-  /// for convenience, raw msd data
-  ///   * interprets the first two byte as raw data,
-  ///     as opposed to a `manufacturerId`
-  List<List<int>> get msd {
-    List<List<int>> output = [];
-    manufacturerData.forEach((manufacturerId, bytes) {
-      int low = manufacturerId & 0xFF;
-      int high = (manufacturerId >> 8) & 0xFF;
-      output.add([low, high] + bytes);
-    });
-    return output;
-  }
 
   AdvertisementData({
     required this.advName,
@@ -939,6 +922,26 @@ class AdvertisementData {
         manufacturerData = p.manufacturerData,
         serviceData = p.serviceData,
         serviceUuids = p.serviceUuids;
+  final String advName;
+  final int? txPowerLevel;
+  final int? appearance; // not supported on iOS / macOS
+  final bool connectable;
+  final Map<int, List<int>> manufacturerData; // key: manufacturerId
+  final Map<Guid, List<int>> serviceData; // key: service guid
+  final List<Guid> serviceUuids;
+
+  /// for convenience, raw msd data
+  ///   * interprets the first two byte as raw data,
+  ///     as opposed to a `manufacturerId`
+  List<List<int>> get msd {
+    final List<List<int>> output = [];
+    manufacturerData.forEach((manufacturerId, bytes) {
+      final int low = manufacturerId & 0xFF;
+      final int high = (manufacturerId >> 8) & 0xFF;
+      output.add([low, high] + bytes);
+    });
+    return output;
+  }
 
   @override
   String toString() {
@@ -1001,6 +1004,8 @@ enum FbmErrorCode {
 }
 
 class FlutterBlueMaxException implements Exception {
+
+  FlutterBlueMaxException(this.platform, this.function, this.code, this.description);
   /// Which platform did the error occur on?
   final ErrorPlatform platform;
 
@@ -1013,11 +1018,9 @@ class FlutterBlueMaxException implements Exception {
   /// note: depends on platform
   final String? description;
 
-  FlutterBlueMaxException(this.platform, this.function, this.code, this.description);
-
   @override
   String toString() {
-    String sPlatform = platform.toString().split('.').last;
+    final String sPlatform = platform.toString().split('.').last;
     return 'FlutterBlueMaxException | $function | $sPlatform-code: $code | $description';
   }
 

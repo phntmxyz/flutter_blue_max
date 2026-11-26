@@ -5,16 +5,6 @@
 part of '../flutter_blue_max.dart';
 
 class BluetoothDescriptor {
-  final DeviceIdentifier remoteId;
-  final Guid serviceUuid;
-  final Guid characteristicUuid;
-  final Guid descriptorUuid;
-  final Guid? primaryServiceUuid;
-
-  /// uniquely identifies the characteristic
-  /// this descriptor is associated with
-  /// on the platform native side
-  final int? instanceId;
 
   BluetoothDescriptor({
     required this.remoteId,
@@ -32,6 +22,16 @@ class BluetoothDescriptor {
         descriptorUuid = p.descriptorUuid,
         primaryServiceUuid = p.primaryServiceUuid,
         instanceId = p.instanceId;
+  final DeviceIdentifier remoteId;
+  final Guid serviceUuid;
+  final Guid characteristicUuid;
+  final Guid descriptorUuid;
+  final Guid? primaryServiceUuid;
+
+  /// uniquely identifies the characteristic
+  /// this descriptor is associated with
+  /// on the platform native side
+  final int? instanceId;
 
   /// convenience accessor
   Guid get uuid => descriptorUuid;
@@ -44,7 +44,7 @@ class BluetoothDescriptor {
   ///   - anytime `write()` is called
   ///   - when the device is disconnected it is cleared
   List<int> get lastValue {
-    String key =
+    final String key =
         FlutterBlueMax._descCacheKey(serviceUuid, characteristicUuid, descriptorUuid, instanceId, primaryServiceUuid);
     return FlutterBlueMax._lastDescs[remoteId]?[key] ?? [];
   }
@@ -86,14 +86,14 @@ class BluetoothDescriptor {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     // return value
     List<int> readValue = [];
 
     try {
-      var request = BmReadDescriptorRequest(
+      final request = BmReadDescriptorRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -102,7 +102,7 @@ class BluetoothDescriptor {
         instanceId: instanceId,
       );
 
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorRead
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorRead
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -111,13 +111,13 @@ class BluetoothDescriptor {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.readDescriptor(request));
 
       // wait for response
-      BmDescriptorData response = await futureResponse
+      final BmDescriptorData response = await futureResponse
           .fbmEnsureAdapterIsOn("readDescriptor")
           .fbmEnsureDeviceIsConnected(device, "readDescriptor")
           .fbmTimeout(timeout, "readDescriptor");
@@ -144,11 +144,11 @@ class BluetoothDescriptor {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
-      var request = BmWriteDescriptorRequest(
+      final request = BmWriteDescriptorRequest(
         remoteId: remoteId,
         serviceUuid: serviceUuid,
         characteristicUuid: characteristicUuid,
@@ -158,7 +158,7 @@ class BluetoothDescriptor {
         instanceId: instanceId,
       );
 
-      Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
+      final Stream<BmDescriptorData> responseStream = FlutterBlueMaxPlatform.instance.onDescriptorWritten
           .where((p) => p.remoteId == request.remoteId)
           .where((p) => p.serviceUuid == request.serviceUuid)
           .where((p) => p.characteristicUuid == request.characteristicUuid)
@@ -167,13 +167,13 @@ class BluetoothDescriptor {
           .where((p) => p.instanceId == null || p.instanceId == instanceId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDescriptorData> futureResponse = responseStream.first;
+      final Future<BmDescriptorData> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.writeDescriptor(request));
 
       // wait for response
-      BmDescriptorData response = await futureResponse
+      final BmDescriptorData response = await futureResponse
           .fbmEnsureAdapterIsOn("writeDescriptor")
           .fbmEnsureDeviceIsConnected(device, "writeDescriptor")
           .fbmTimeout(timeout, "writeDescriptor");

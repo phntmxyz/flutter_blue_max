@@ -6,8 +6,6 @@ import 'package:flutter_blue_max/flutter_blue_max.dart';
 /// A service name and its known characteristics.
 /// A [test] service must contain every listed characteristic with exactly its properties.
 class KnownService(Guid uuid, final String name, List<KnownCharacteristic> characteristics, {final bool test = false}) {
-  final Guid uuid = _immutableUuid(uuid);
-  final List<KnownCharacteristic> characteristics = List.unmodifiable(characteristics);
 
   /// Throws a [FormatException] for stored data that no longer describes a service.
   factory fromJson(Map<String, dynamic> json) => KnownService.fromPick(pick(json).required());
@@ -44,6 +42,8 @@ class KnownService(Guid uuid, final String name, List<KnownCharacteristic> chara
         properties: GattProperty.of(characteristic.properties),
       ),
   ]);
+  final Guid uuid = _immutableUuid(uuid);
+  final List<KnownCharacteristic> characteristics = List.unmodifiable(characteristics);
 
   Map<String, dynamic> toJson() => {
     'uuid': uuid.str128,
@@ -104,8 +104,6 @@ enum GattProperty(final String label) {
 
 /// A characteristic name and, for test services, the exact properties it must report.
 class KnownCharacteristic(Guid uuid, final String name, {Set<GattProperty>? properties}) {
-  final Guid uuid = _immutableUuid(uuid);
-  final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
 
   /// Throws a [FormatException] for stored data that no longer describes a characteristic.
   factory fromJson(Map<String, dynamic> json) => KnownCharacteristic.fromPick(pick(json).required());
@@ -124,6 +122,8 @@ class KnownCharacteristic(Guid uuid, final String name, {Set<GattProperty>? prop
       Error.throwWithStackTrace(FormatException('Invalid catalog characteristic: $error'), stackTrace);
     }
   }
+  final Guid uuid = _immutableUuid(uuid);
+  final Set<GattProperty>? properties = properties == null ? null : Set.unmodifiable(properties);
 
   Map<String, dynamic> toJson() {
     List<String>? propertyNames;

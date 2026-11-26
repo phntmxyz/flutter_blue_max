@@ -1006,18 +1006,6 @@ class _CharacteristicValue(BluetoothCharacteristic characteristic, void Function
 /// Identifies an operation for [WorkbenchController.run] and [WorkbenchController.busy].
 /// Operations with a [scope], such as one channel, run independently of each other.
 class const Operation._(final _OperationKind _kind, [final Object? scope, final String? _detail]) {
-  static const initialize = Operation._(_OperationKind.initialize);
-  static const clipboard = Operation._(_OperationKind.clipboard);
-  static const scan = Operation._(_OperationKind.scan);
-  static const systemDevices = Operation._(_OperationKind.systemDevices);
-  static const connection = Operation._(_OperationKind.connection);
-  static const cancelConnection = Operation._(_OperationKind.cancelConnection);
-  static const adapter = Operation._(_OperationKind.adapter);
-  static const discover = Operation._(_OperationKind.discover);
-  static const bond = Operation._(_OperationKind.bond);
-  static const mtu = Operation._(_OperationKind.mtu);
-  static const server = Operation._(_OperationKind.server);
-  static const open = Operation._(_OperationKind.open);
 
   new rssi(BluetoothDevice device) : this._(_OperationKind.rssi, device.remoteId);
   new channel(ChannelSession session) : this._(_OperationKind.channel, session.key);
@@ -1037,6 +1025,18 @@ class const Operation._(final _OperationKind _kind, [final Object? scope, final 
         d.uuid,
         d.instanceId,
       ), d.uuid.toString());
+  static const initialize = Operation._(_OperationKind.initialize);
+  static const clipboard = Operation._(_OperationKind.clipboard);
+  static const scan = Operation._(_OperationKind.scan);
+  static const systemDevices = Operation._(_OperationKind.systemDevices);
+  static const connection = Operation._(_OperationKind.connection);
+  static const cancelConnection = Operation._(_OperationKind.cancelConnection);
+  static const adapter = Operation._(_OperationKind.adapter);
+  static const discover = Operation._(_OperationKind.discover);
+  static const bond = Operation._(_OperationKind.bond);
+  static const mtu = Operation._(_OperationKind.mtu);
+  static const server = Operation._(_OperationKind.server);
+  static const open = Operation._(_OperationKind.open);
 
   /// Prefixes the error the operation reports.
   String get label => _detail == null ? _kind.label : '${_kind.label} $_detail';

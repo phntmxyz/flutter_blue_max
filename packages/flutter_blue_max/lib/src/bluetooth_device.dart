@@ -5,7 +5,6 @@
 part of '../flutter_blue_max.dart';
 
 class BluetoothDevice {
-  final DeviceIdentifier remoteId;
 
   BluetoothDevice({
     required this.remoteId,
@@ -16,6 +15,10 @@ class BluetoothDevice {
   ///   - iOS uses 128-bit uuids the remoteId, e.g. e006b3a7-ef7b-4980-a668-1f8005f84383
   ///   - Android uses 48-bit mac addresses as the remoteId, e.g. 06:E5:28:3B:FD:E0
   BluetoothDevice.fromId(String remoteId) : remoteId = DeviceIdentifier(remoteId);
+
+  @Deprecated('Use fromId instead')
+  BluetoothDevice.fromProto(BmBluetoothDevice p) : remoteId = p.remoteId;
+  final DeviceIdentifier remoteId;
 
   /// platform name
   /// - this name is kept track of by the platform
@@ -36,7 +39,7 @@ class BluetoothDevice {
   ///  - returns empty if discoverServices() has not been called
   ///    or if your device does not have any services (rare)
   List<BluetoothService> get servicesList {
-    BmDiscoverServicesResult? result = FlutterBlueMax._knownServices[remoteId];
+    final BmDiscoverServicesResult? result = FlutterBlueMax._knownServices[remoteId];
     if (result == null) {
       return [];
     } else {
@@ -75,7 +78,7 @@ class BluetoothDevice {
     if (FlutterBlueMax._connectionStates[remoteId] == null) {
       return false;
     } else {
-      var state = FlutterBlueMax._connectionStates[remoteId]!.connectionState;
+      final state = FlutterBlueMax._connectionStates[remoteId]!.connectionState;
       return state == BmConnectionStateEnum.connected;
     }
   }
@@ -102,11 +105,11 @@ class BluetoothDevice {
     assert((mtu == null) || !autoConnect, "mtu and auto connect are incompatible");
 
     // make sure no one else is calling disconnect
-    _Mutex dmtx = _MutexFactory.getMutexForKey("disconnect");
+    final _Mutex dmtx = _MutexFactory.getMutexForKey("disconnect");
     bool dtook = await dmtx.take();
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
@@ -115,16 +118,16 @@ class BluetoothDevice {
         FlutterBlueMax._autoConnect.add(remoteId);
       }
 
-      var request = BmConnectRequest(
+      final request = BmConnectRequest(
         remoteId: remoteId,
         autoConnect: autoConnect,
       );
 
-      var responseStream =
+      final responseStream =
           FlutterBlueMaxPlatform.instance.onConnectionStateChanged.where((p) => p.remoteId == remoteId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmConnectionStateResponse> futureState = responseStream.first;
+      final Future<BmConnectionStateResponse> futureState = responseStream.first;
 
       // record connection time
       if (!kIsWeb && Platform.isAndroid) {
@@ -132,7 +135,7 @@ class BluetoothDevice {
       }
 
       // invoke
-      bool changed = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.connect(request));
+      final bool changed = await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.connect(request));
 
       // we return the disconnect mutex now so that this
       // connection attempt can be canceled by calling disconnect
@@ -140,10 +143,10 @@ class BluetoothDevice {
 
       // only wait for connection if we weren't already connected
       if (changed && !autoConnect) {
-        BmConnectionStateResponse response = await futureState
+        final BmConnectionStateResponse response = await futureState
             .fbmEnsureAdapterIsOn("connect")
             .fbmTimeout(timeout.inSeconds, "connect")
-            .catchError((e) async {
+            .catchError((Object e) async {
           if (e is FlutterBlueMaxException && e.code == FbmErrorCode.timeout.index) {
             FlutterBlueMaxPlatform.log("[FBM] connection timeout");
             await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance
@@ -192,11 +195,11 @@ class BluetoothDevice {
     int androidDelay = 2000,
   }) async {
     // Only allow a single disconnect operation at a time
-    _Mutex dtx = _MutexFactory.getMutexForKey("disconnect");
+    final _Mutex dtx = _MutexFactory.getMutexForKey("disconnect");
     await dtx.take();
 
     // Only allow a single ble operation to be underway at a time?
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     if (queue) {
       await mtx.take();
     }
@@ -205,18 +208,18 @@ class BluetoothDevice {
       // remove from auto connect list if there
       FlutterBlueMax._autoConnect.remove(remoteId);
 
-      var responseStream = FlutterBlueMaxPlatform.instance.onConnectionStateChanged
+      final responseStream = FlutterBlueMaxPlatform.instance.onConnectionStateChanged
           .where((p) => p.remoteId == remoteId)
           .where((p) => p.connectionState == BmConnectionStateEnum.disconnected);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmConnectionStateResponse> futureState = responseStream.first;
+      final Future<BmConnectionStateResponse> futureState = responseStream.first;
 
       // Workaround Android race condition
       await _ensureAndroidDisconnectionDelay(androidDelay);
 
       // invoke
-      bool changed = await FlutterBlueMax._invokeMethod(
+      final bool changed = await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.disconnect(BmDisconnectRequest(remoteId: remoteId)));
 
       // only wait for disconnection if weren't already disconnected
@@ -248,23 +251,23 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     List<BluetoothService> result = [];
 
     try {
-      var responseStream = FlutterBlueMaxPlatform.instance.onDiscoveredServices.where((p) => p.remoteId == remoteId);
+      final responseStream = FlutterBlueMaxPlatform.instance.onDiscoveredServices.where((p) => p.remoteId == remoteId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmDiscoverServicesResult> futureResponse = responseStream.first;
+      final Future<BmDiscoverServicesResult> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.discoverServices(BmDiscoverServicesRequest(remoteId: remoteId)));
 
       // wait for response
-      BmDiscoverServicesResult response = await futureResponse
+      final BmDiscoverServicesResult response = await futureResponse
           .fbmEnsureAdapterIsOn("discoverServices")
           .fbmEnsureDeviceIsConnected(this, "discoverServices")
           .fbmTimeout(timeout, "discoverServices");
@@ -277,7 +280,6 @@ class BluetoothDevice {
       // return primary services
       result = response.services.map((p) => BluetoothService.fromProto(p)).where((p) => p.isPrimary).toList();
 
-      result = result;
     } finally {
       mtx.give();
     }
@@ -286,7 +288,7 @@ class BluetoothDevice {
     // we always listen to the Services Changed characteristic if it exists.
     if (subscribeToServicesChanged) {
       if (!kIsWeb && !Platform.isIOS && !Platform.isMacOS) {
-        BluetoothCharacteristic? c = _servicesChangedCharacteristic;
+        final BluetoothCharacteristic? c = _servicesChangedCharacteristic;
         if (c != null && (c.properties.notify || c.properties.indicate) && c.isNotifying == false) {
           await c.setNotifyValue(true);
         }
@@ -301,8 +303,8 @@ class BluetoothDevice {
     if (FlutterBlueMax._connectionStates[remoteId] == null) {
       return null;
     }
-    int? code = FlutterBlueMax._connectionStates[remoteId]!.disconnectReasonCode;
-    String? description = FlutterBlueMax._connectionStates[remoteId]!.disconnectReasonString;
+    final int? code = FlutterBlueMax._connectionStates[remoteId]!.disconnectReasonCode;
+    final String? description = FlutterBlueMax._connectionStates[remoteId]!.disconnectReasonString;
     return DisconnectReason(_nativeError, code, description);
   }
 
@@ -331,7 +333,7 @@ class BluetoothDevice {
   ///   - whenever the mtu changes
   Stream<int> get mtu {
     // get initial value from our cache
-    int initialValue = FlutterBlueMax._mtuValues[remoteId]?.mtu ?? 23;
+    final int initialValue = FlutterBlueMax._mtuValues[remoteId]?.mtu ?? 23;
     return FlutterBlueMaxPlatform.instance.onMtuChanged
         .where((p) => p.remoteId == remoteId)
         .map((p) => p.mtu)
@@ -356,23 +358,23 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     int rssi = 0;
 
     try {
-      var responseStream = FlutterBlueMaxPlatform.instance.onReadRssi.where((p) => (p.remoteId == remoteId));
+      final responseStream = FlutterBlueMaxPlatform.instance.onReadRssi.where((p) => p.remoteId == remoteId);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmReadRssiResult> futureResponse = responseStream.first;
+      final Future<BmReadRssiResult> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.readRssi(BmReadRssiRequest(remoteId: remoteId)));
 
       // wait for response
-      BmReadRssiResult response = await futureResponse
+      final BmReadRssiResult response = await futureResponse
           .fbmEnsureAdapterIsOn("readRssi")
           .fbmEnsureDeviceIsConnected(this, "readRssi")
           .fbmTimeout(timeout, "readRssi");
@@ -405,7 +407,7 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     // predelay
@@ -432,16 +434,16 @@ class BluetoothDevice {
     var mtu = 0;
 
     try {
-      var request = BmMtuChangeRequest(
+      final request = BmMtuChangeRequest(
         remoteId: remoteId,
         mtu: desiredMtu,
       );
 
-      var responseStream =
+      final responseStream =
           FlutterBlueMaxPlatform.instance.onMtuChanged.where((p) => p.remoteId == remoteId).map((p) => p.mtu);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<int> futureResponse = responseStream.first;
+      final Future<int> futureResponse = responseStream.first;
 
       // invoke
       await FlutterBlueMax._invokeMethod(() => FlutterBlueMaxPlatform.instance.requestMtu(request));
@@ -472,7 +474,7 @@ class BluetoothDevice {
           FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
-    var request = BmConnectionPriorityRequest(
+    final request = BmConnectionPriorityRequest(
       remoteId: remoteId,
       connectionPriority: _bmFromConnectionPriority(connectionPriorityRequest),
     );
@@ -503,7 +505,7 @@ class BluetoothDevice {
           ErrorPlatform.fbm, "setPreferredPhy", FbmErrorCode.deviceIsDisconnected.index, "device is not connected");
     }
 
-    var request = BmPreferredPhy(
+    final request = BmPreferredPhy(
       remoteId: remoteId,
       txPhy: txPhy,
       rxPhy: rxPhy,
@@ -529,24 +531,24 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
-      var responseStream = FlutterBlueMaxPlatform.instance.onBondStateChanged
+      final responseStream = FlutterBlueMaxPlatform.instance.onBondStateChanged
           .where((p) => p.remoteId == remoteId)
           .where((p) => p.bondState != BmBondStateEnum.bonding);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmBondStateResponse> futureResponse = responseStream.first;
+      final Future<BmBondStateResponse> futureResponse = responseStream.first;
 
       // invoke
-      bool changed = await FlutterBlueMax._invokeMethod(
+      final bool changed = await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.createBond(BmCreateBondRequest(remoteId: remoteId, pin: pin)));
 
       // only wait for 'bonded' if we weren't already bonded
       if (changed) {
-        BmBondStateResponse bs = await futureResponse
+        final BmBondStateResponse bs = await futureResponse
             .fbmEnsureAdapterIsOn("createBond")
             .fbmEnsureDeviceIsConnected(this, "createBond")
             .fbmTimeout(timeout, "createBond");
@@ -570,24 +572,24 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
-      var responseStream = FlutterBlueMaxPlatform.instance.onBondStateChanged
+      final responseStream = FlutterBlueMaxPlatform.instance.onBondStateChanged
           .where((p) => p.remoteId == remoteId)
           .where((p) => p.bondState != BmBondStateEnum.bonding);
 
       // Start listening now, before invokeMethod, to ensure we don't miss the response
-      Future<BmBondStateResponse> futureResponse = responseStream.first;
+      final Future<BmBondStateResponse> futureResponse = responseStream.first;
 
       // invoke
-      bool changed = await FlutterBlueMax._invokeMethod(
+      final bool changed = await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.removeBond(BmRemoveBondRequest(remoteId: remoteId)));
 
       // only wait for 'unbonded' state if we weren't already unbonded
       if (changed) {
-        BmBondStateResponse bs = await futureResponse.fbmTimeout(timeout, "removeBond");
+        final BmBondStateResponse bs = await futureResponse.fbmTimeout(timeout, "removeBond");
 
         // success?
         if (bs.bondState != BmBondStateEnum.none) {
@@ -628,7 +630,7 @@ class BluetoothDevice {
 
     // get current state if needed
     if (FlutterBlueMax._bondStates[remoteId] == null) {
-      var val = await FlutterBlueMax._invokeMethod(
+      final val = await FlutterBlueMax._invokeMethod(
           () => FlutterBlueMaxPlatform.instance.getBondState(BmBondStateRequest(remoteId: remoteId)));
       // update _bondStates if it is still null after the await
       if (FlutterBlueMax._bondStates[remoteId] == null) {
@@ -644,7 +646,7 @@ class BluetoothDevice {
 
   /// Get the previous bondState of the device (Android Only)
   BluetoothBondState? get prevBondState {
-    var b = FlutterBlueMax._bondStates[remoteId]?.prevState;
+    final b = FlutterBlueMax._bondStates[remoteId]?.prevState;
     return b != null ? _bmToBondState(b) : null;
   }
 
@@ -652,7 +654,7 @@ class BluetoothDevice {
   BluetoothCharacteristic? get _servicesChangedCharacteristic {
     final Guid gattUuid = Guid("1801");
     final Guid servicesChangedUuid = Guid("2A05");
-    BluetoothService? gatt = servicesList._firstWhereOrNull((svc) => svc.uuid == gattUuid);
+    final BluetoothService? gatt = servicesList._firstWhereOrNull((svc) => svc.uuid == gattUuid);
     return gatt?.characteristics._firstWhereOrNull((chr) => chr.uuid == servicesChangedUuid);
   }
 
@@ -664,10 +666,10 @@ class BluetoothDevice {
   Future<void> _ensureAndroidDisconnectionDelay(int androidDelay) async {
     if (!kIsWeb && Platform.isAndroid) {
       if (FlutterBlueMax._connectTimestamp.containsKey(remoteId)) {
-        Duration minGap = Duration(milliseconds: androidDelay);
-        Duration elapsed = DateTime.now().difference(FlutterBlueMax._connectTimestamp[remoteId]!);
+        final Duration minGap = Duration(milliseconds: androidDelay);
+        final Duration elapsed = DateTime.now().difference(FlutterBlueMax._connectTimestamp[remoteId]!);
         if (elapsed.compareTo(minGap) < 0) {
-          Duration timeLeft = minGap - elapsed;
+          final Duration timeLeft = minGap - elapsed;
           FlutterBlueMaxPlatform.log("[FBM] disconnect: enforcing ${minGap.inMilliseconds}ms disconnect gap, delaying "
               "${timeLeft.inMilliseconds}ms");
           await Future<void>.delayed(timeLeft);
@@ -751,7 +753,7 @@ class BluetoothDevice {
     }
 
     // Only allow a single ble operation to be underway at a time
-    _Mutex mtx = _MutexFactory.getMutexForKey("global");
+    final _Mutex mtx = _MutexFactory.getMutexForKey("global");
     await mtx.take();
 
     try {
@@ -802,7 +804,4 @@ class BluetoothDevice {
   Stream<List<BluetoothService>> get services async* {
     yield [];
   }
-
-  @Deprecated('Use fromId instead')
-  BluetoothDevice.fromProto(BmBluetoothDevice p) : remoteId = p.remoteId;
 }

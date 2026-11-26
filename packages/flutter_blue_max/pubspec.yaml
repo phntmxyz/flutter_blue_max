@@ -10,10 +10,10 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  flutter_blue_max_platform_interface: 6.0.0
   flutter_blue_max_android: 6.0.0
   flutter_blue_max_darwin: 6.0.0
   flutter_blue_max_linux: 6.0.0
+  flutter_blue_max_platform_interface: 6.0.0
   flutter_blue_max_web: 6.0.0
 
 dev_dependencies:

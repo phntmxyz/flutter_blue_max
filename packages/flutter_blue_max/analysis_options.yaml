@@ -16,6 +16,7 @@ formatter:
 analyzer:
   exclude:
     - build/**
+    - example/**
 
 linter:
   rules:
