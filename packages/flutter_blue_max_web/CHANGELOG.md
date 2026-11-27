@@ -1,3 +1,6 @@
+## 6.1.0
+* Document the public API.
+
 ## 6.0.0
 * First public release as `flutter_blue_max_web` (fork of `flutter_blue_plus_web`). Version numbers below 6.0.0 refer to the original FlutterBluePlus history and are not published under this name. No functional changes; L2CAP is not supported on Web.
 

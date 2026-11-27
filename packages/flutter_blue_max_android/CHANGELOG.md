@@ -1,5 +1,10 @@
-## Unreleased
+## 6.1.0
 * Require Android Gradle Plugin 7.0 or newer for the `namespace` and `lint` build DSL.
+* Isolate the old native BLE session across hot restart.
+* Deliver GATT events that precede a disconnect.
+* Make the bonding wait non-blocking. Calls during bonding no longer end in an ANR.
+* Keep closed L2CAP channels from opening sockets, keep sockets from outliving a restart and isolate accepted socket failures from the listener.
+* Document the public API.
 
 ## 6.0.0
 * First public release as `flutter_blue_max_android` (fork of `flutter_blue_plus_android`). Version numbers below 6.0.0 refer to the original FlutterBluePlus history and are not published under this name.

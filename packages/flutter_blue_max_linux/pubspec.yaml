@@ -1,6 +1,6 @@
 name: flutter_blue_max_linux
 description: Linux implementation of the flutter_blue_max plugin.
-version: 6.0.0
+version: 6.1.0
 homepage: https://github.com/phntmxyz/flutter_blue_max
 
 environment:
@@ -11,7 +11,7 @@ dependencies:
   bluez: '>=0.7.8 <0.10.0'
   flutter:
     sdk: flutter
-  flutter_blue_max_platform_interface: 6.0.0
+  flutter_blue_max_platform_interface: 6.1.0
   rxdart: '>=0.27.0 <0.29.0'
 
 dev_dependencies:
