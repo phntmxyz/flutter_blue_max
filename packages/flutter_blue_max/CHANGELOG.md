@@ -1,3 +1,16 @@
+## 2.1.0
+* **[Feature]** Add `PLATFORM_SUPPORT.md`, which lists every feature per platform as supported, limited, impossible or not implemented.
+* **[Deprecated]** `FbpErrorCode`, `FbpError`, `ErrorPlatform.fbp` and the `fbp*` future extensions. Use `FbmErrorCode`, `FbmError`, `ErrorPlatform.fbm` and the `fbm*` extensions. The old names stay as deprecated aliases.
+* **[Fix]** `turnOn` on iOS and macOS throws `UnsupportedError` instead of ending in a `StateError` or reporting `androidOnly`.
+* **[Fix]** A characteristic read that the peer answers with an ATT error ends in that error on iOS and macOS instead of a timeout.
+* **[Fix]** `Phy.leCoded.mask` returns the Coded PHY bit. Combining it with another mask dropped the Coded PHY before.
+* **[Fix]** The descriptor written event carries the written value on iOS and macOS.
+* **[Fix]** `lastValue` was always empty on Android because the cache used different keys for storing and reading.
+* **[Fix]** `connect(autoConnect: true)` with the adapter off still throws `adapterIsOff` and connects once Bluetooth is back on.
+* **[Fix]** Cancelling a pending connect on iOS and macOS completes both futures.
+* **[Fix]** Hot restart no longer mixes the old native BLE session with the new one.
+* Document how to test with the library in `MOCKING.md` and move the L2CAP documentation into the README.
+
 ## 2.0.0
 
 First public release of `flutter_blue_max`, the [FlutterBluePlus](https://github.com/chipweinberger/flutter_blue_plus) fork maintained by [PHNTM](https://github.com/phntmxyz). Version numbers below 2.0.0 refer to the original FlutterBluePlus history and are not published under this name.
